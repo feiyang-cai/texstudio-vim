@@ -15,7 +15,22 @@ class LatexEditorViewTest: public QObject{
 		void insertHardLineBreaks_data();
 		void insertHardLineBreaks();
 		void inMathEnvironment_data();
-		void inMathEnvironment();
+        void inMathEnvironment();
+        void vimEditingModeSwitches();
+        void vimCursorStyles();
+        void vimInsertEscape();
+        void vimVisualLineStaysOnCurrentLine();
+        void vimVisualBlockCtrlV();
+        void vimVisualBlockDeleteAffectsAllRows();
+        void vimVisualBlockInsertAtStart();
+        void vimCloseElementEscapesInsertMode();
+        void vimCloseElementIsConsumedInNormalMode();
+        void vimPromptEnterDoesNotInsertNewline();
+        void vimPromptHistory();
+        void vimMarks();
+        void vimNormalModeConsumesUnhandledPrintableKeys();
+        void vimExSubstituteCommands();
+        void vimExCommands();
 };
 
 #endif

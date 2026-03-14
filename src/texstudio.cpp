@@ -2081,6 +2081,31 @@ void Texstudio::configureNewEditorView(LatexEditorView *edit)
     connect(edit, SIGNAL(openInternalDocViewer(QString,QString)), this, SLOT(openInternalDocViewer(QString,QString)));
     connect(edit, SIGNAL(showExtendedSearch()), this, SLOT(showExtendedSearch()));
     connect(edit, SIGNAL(execMacro(Macro,MacroExecContext)), this, SLOT(execMacro(Macro,MacroExecContext)));
+    connect(edit, &LatexEditorView::vimCommandRequested, this, [this, edit](const QString &command) {
+        if (!editors->containsEditor(edit))
+            return;
+
+        if (currentEditorView() != edit)
+            editors->setCurrentEditor(edit);
+
+        if (command == QLatin1String("w")) {
+            fileSave(false, edit->editor);
+            return;
+        }
+
+        if (command == QLatin1String("q")) {
+            fileClose();
+            return;
+        }
+
+        if (command == QLatin1String("wq") || command == QLatin1String("x")) {
+            fileSave(false, edit->editor);
+            if (edit->editor->fileName().isEmpty() || !edit->editor->document()->isClean())
+                return;
+            if (editors->containsEditor(edit))
+                fileClose();
+        }
+    });
 
     connect(edit->editor, SIGNAL(fileReloaded()), this, SLOT(fileReloaded()));
     connect(edit->editor, SIGNAL(fileInConflictShowDiff()), this, SLOT(fileInConflictShowDiff()));
@@ -3050,6 +3075,7 @@ void Texstudio::fileSaveAs(const QString &fileName, const bool saveSilently)
 		// save file
 		removeDiffMarkers();// clean document from diff markers first
 		currentEditor()->save(fn);
+        currentEditor()->document()->markViewDirty();//force repaint of line markers after Save As, too
 		currentEditorView()->document->setEditorView(currentEditorView()); //update file name
 		MarkCurrentFileAsRecent();
 

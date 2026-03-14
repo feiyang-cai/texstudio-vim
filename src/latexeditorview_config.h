@@ -10,6 +10,11 @@ class QString;
 class LatexEditorViewConfig
 {
 public:
+    enum EditingMode {
+        StandardEditing = 0,
+        VimEditing = 1
+    };
+
 	bool parenmatch, parenComplete;
 	bool autoindent, weakindent;
 	bool replaceIndentTabs;
@@ -36,6 +41,7 @@ public:
 	static QList<int> possibleEditOperations();
 	bool allowDragAndDrop;
 	bool mouseWheelZoom, smoothScrolling, verticalOverScroll;
+    int editingMode;
 
     bool hackAutoChoose, hackDisableFixedPitch, hackDisableWidthCache, hackDisableLineCache, hackDisableAccentWorkaround;
 	int hackRenderingMode; //0: normal, 1: qt (missing), 2: single letter

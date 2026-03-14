@@ -34,7 +34,9 @@ class QStatusPanel;
 class LatexCompleter;
 class SpellerUtility;
 class SpellerManager;
-class DefaultInputBinding;
+class LatexDefaultInputBinding;
+class VimInputBinding;
+class VimPromptPanel;
 class LatexEditorViewConfig;
 class Macro;
 class MacroExecContext;
@@ -184,16 +186,20 @@ public:
 
 private:
 	QAction *lineNumberPanelAction, *lineMarkPanelAction, *lineFoldPanelAction, *lineChangePanelAction,
-	        *statusPanelAction, *searchReplacePanelAction, *gotoLinePanelAction;
+	        *statusPanelAction, *searchReplacePanelAction, *gotoLinePanelAction, *vimPromptPanelAction;
 	QLineMarkPanel *lineMarkPanel;
 	QLineNumberPanel *lineNumberPanel;
 	QSearchReplacePanel *searchReplacePanel;
 	QGotoLinePanel *gotoLinePanel;
 	QStatusPanel *statusPanel;
+    VimPromptPanel *vimPromptPanel;
 
 	QPoint m_point;
 
     QDocumentCursor wordSelection;
+    static QList<QAction *> s_baseActions;
+    static int s_contextMenuRow;
+    static int s_contextMenuCol;
 
 	static int environmentFormat, referencePresentFormat, referenceMissingFormat, referenceMultipleFormat, citationMissingFormat, citationPresentFormat, structureFormat, todoFormat,
 	       packagePresentFormat, packageMissingFormat, packageUndefinedFormat,
@@ -207,7 +213,9 @@ private:
 
     std::set<QString> *latexPackageList;
 
-	friend class DefaultInputBinding;
+	friend class LatexDefaultInputBinding;
+    friend class VimInputBinding;
+    friend class VimPromptPanel;
 	friend class SyntaxCheckTest;
 
 	SpellerManager *spellerManager;
@@ -216,6 +224,8 @@ private:
 	static LatexCompleter *completer;
 	QList<CursorPosition> changePositions; //line, index
 	int curChangePos;
+    LatexDefaultInputBinding *defaultInputBinding;
+    VimInputBinding *vimInputBinding;
 
 	LatexEditorViewConfig *config;
 
@@ -285,6 +295,11 @@ public slots:
 	void mouseHovered(QPoint pos);
 	bool closeElement();
 	void insertHardLineBreaks(int newLength, bool smartScopeSelection, bool joinLines);
+    bool executeVimExCommand(const QString &command);
+    void executeVimSearch(const QString &text, bool backward);
+    QString lastVimSearchText() const;
+    void recordVimSearchState(const QString &text, bool backward);
+    void clearVimSearchHighlight();
 public:
 	enum LineSorting {SortAscending = 0, SortDescending, SortNone, SortRandomShuffle};
 
@@ -313,6 +328,8 @@ private:
 	bool moveToCommandStart (QDocumentCursor &cursor, QString commandPrefix);
 	bool showMathEnvPreview(QDocumentCursor cursor, QString command, QString environment, QPoint pos);
     QString findEnclosedMathText(QDocumentCursor cursor, QString command);
+    void rebindInputMode();
+    void setVimPromptVisible(bool visible);
 
 public slots:
 	void temporaryHighlight(QDocumentCursor cur);
@@ -363,6 +380,7 @@ signals:
 	void openInternalDocViewer(QString package, QString command = "");
 
 	void showExtendedSearch();
+    void vimCommandRequested(const QString &command);
 
 private slots:
 	void lineMarkContextMenuRequested(int lineNumber, QPoint globalPos);

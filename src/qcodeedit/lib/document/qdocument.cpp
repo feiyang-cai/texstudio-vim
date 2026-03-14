@@ -980,6 +980,7 @@ void QDocument::print(QPrinter *pr)
 	cxt.palette = QApplication::palette();
 	cxt.fillCursorRect = false;
 	cxt.blinkingCursor = false;
+    cxt.cursorStyle = QDocument::AutoCursorStyle;
 
 	for ( int i = firstPage; i <= lastPage; ++i )
 	{
@@ -7081,46 +7082,59 @@ void QDocumentPrivate::drawCursors(QPainter *p, const QDocument::PaintContext &c
 		repForeground = cxt.palette.text().color(); // Fallback
 	p->setPen(repForeground);
 
+    auto cursorWidth = [this](const QDocumentCursor &cur) {
+        QPointF pt = cur.documentPosition();
+        QDocumentCursor curHelper(cur, false);
+        curHelper.movePosition(1);
+        QPointF pt2 = curHelper.documentPosition();
+        qreal width = 0;
+        if (pt.y() == pt2.y())
+            width = pt2.x() - pt.x();
+        if (width == 0)
+            width = textWidth(0, " ");
+        return width;
+    };
+
 	foreach(QDocumentCursor cur, QList<QDocumentCursorHandle*>() << cxt.cursors << cxt.extra) {
 		if (!cur.line().isHidden()) {
 			if (cxt.blinkingCursor) {
-				if (m_overwrite && !cur.hasSelection()) {
-					// block cursor for overwrite
-					p->setPen(Qt::NoPen);
-					QColor col = repForeground;
-					col.setAlpha(160);
-					QBrush brush(col);
-					p->setBrush(brush);
-                    QPointF pt = cur.documentPosition();
-					QDocumentCursor curHelper(cur, false);
-					curHelper.movePosition(1);
-                    QPointF pt2 = curHelper.documentPosition();
-                    qreal width = 0;
-                    if (pt.y() == pt2.y()) {
-						width = pt2.x() - pt.x();
-					}
-					if (width == 0) {
-						width = textWidth(0, " ");
-					}
-                    p->drawRect(QRectF(pt.x(), pt.y(), width, QDocumentPrivate::m_lineSpacing));
-				}else{
-					// regular line cursor
+                QDocument::CursorRenderingStyle style = cxt.cursorStyle;
+                if (style == QDocument::AutoCursorStyle)
+                    style = m_overwrite ? QDocument::BlockCursorStyle : QDocument::LineCursorStyle;
+                if (cur.hasSelection() && style == QDocument::BlockCursorStyle)
+                    style = QDocument::LineCursorStyle;
+
+                QColor cursorColor = cur.handle()->hasFlag(QDocumentCursorHandle::ExternalCursor) ? Qt::blue : repForeground;
+                switch (style) {
+                case QDocument::BlockCursorStyle: {
+                    p->setPen(Qt::NoPen);
+                    QColor col = cursorColor;
+                    col.setAlpha(160);
+                    p->setBrush(QBrush(col));
+                    const QPointF pt = cur.documentPosition();
+                    p->drawRect(QRectF(pt.x(), pt.y(), cursorWidth(cur), QDocumentPrivate::m_lineSpacing));
+                    break;
+                }
+                case QDocument::UnderlineCursorStyle: {
+                    QPointF pt = cur.documentPosition() + QPointF(0, QDocumentPrivate::m_lineSpacing - 2.);
+                    QPen pen(cursorColor);
+                    pen.setWidthF(m_drawCursorBold ? 2. : 1.);
+                    p->setPen(pen);
+                    p->drawLine(pt, pt + QPointF(cursorWidth(cur), 0));
+                    break;
+                }
+                case QDocument::LineCursorStyle:
+                default: {
                     QPointF pt = cur.documentPosition()+QPointF(0,2.);
                     QPointF curHt(0, QDocumentPrivate::m_lineSpacing-4.);
-                    QPen pen(p->pen());
-                    if (m_drawCursorBold) {
-                       pen.setWidthF(2.);
-                    }
-                    if(cur.handle()->hasFlag(QDocumentCursorHandle::ExternalCursor)){
-                        pen.setColor(Qt::blue);
-                    }
+                    QPen pen(cursorColor);
+                    if (m_drawCursorBold)
+                        pen.setWidthF(2.);
                     p->setPen(pen);
                     p->drawLine(pt, pt + curHt);
-                    /*if (m_drawCursorBold) {
-						pt.setX(pt.x() + 1);
-						p->drawLine(pt, pt + curHt);
-                    }*/
-				}
+                    break;
+                }
+                }
 			}
 		}
 	}

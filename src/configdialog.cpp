@@ -450,6 +450,8 @@ ConfigDialog::ConfigDialog(QWidget *parent): QDialog(parent,Qt::Dialog|Qt::Windo
 	//pageEditor
 	populateComboBoxFont(false);
 	connect(ui.checkBoxShowOnlyMonospacedFonts, SIGNAL(toggled(bool)), this, SLOT(populateComboBoxFont(bool)));
+    ui.comboBoxEditorMode->addItem(tr("Standard"));
+    ui.comboBoxEditorMode->addItem(tr("Vim (experimental)"));
 
 	QComboBox * encodingBoxes[3] = {ui.comboBoxEncoding, ui.comboBoxBibFileEncoding, ui.comboBoxLogFileEncoding};
 	ui.comboBoxLogFileEncoding->addItem("Document"); //not translated so the config is language independent

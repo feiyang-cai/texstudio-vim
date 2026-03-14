@@ -519,6 +519,7 @@ ConfigManager::ConfigManager(QObject *parent): QObject (parent),
 
 	//editor
 	registerOption("Editor/WordWrapMode", &editorConfig->wordwrap, 1, &pseudoDialog->comboBoxLineWrap);
+    registerOption("Editor/EditingMode", &editorConfig->editingMode, static_cast<int>(LatexEditorViewConfig::StandardEditing), &pseudoDialog->comboBoxEditorMode);
 	registerOption("Editor/WrapLineWidth", &editorConfig->lineWidth, 80, &pseudoDialog->spinBoxWrapLineWidth);
 	registerOption("Editor/Parentheses Matching", &editorConfig->parenmatch, true); //TODO: checkbox?
 	registerOption("Editor/Parentheses Completion", &editorConfig->parenComplete, true, &pseudoDialog->checkBoxAutoCompleteParens);

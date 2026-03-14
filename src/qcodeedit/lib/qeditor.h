@@ -264,6 +264,11 @@ class QCE_EXPORT QEditor : public QAbstractScrollArea
 		Q_INVOKABLE QDocumentCursor cursorMirror(int i) const;
 		
 		Q_INVOKABLE QList<QDocumentCursor> cursors() const;
+        QDocument::CursorRenderingStyle cursorStyle() const;
+        void setCursorStyle(QDocument::CursorRenderingStyle style);
+        QString inputModeLabel() const;
+        void setInputModeLabel(const QString &label);
+        Q_PROPERTY(QString inputModeLabel READ inputModeLabel WRITE setInputModeLabel NOTIFY inputModeChanged DESIGNABLE false STORED false)
 
 		QLanguageDefinition* languageDefinition() const;
 		QCodeCompletionEngine* completionEngine() const;
@@ -543,7 +548,8 @@ public slots:
 		void emitWordDoubleClicked();
 		
 		void visibleLinesChanged();
-		
+        void inputModeChanged(const QString &label);
+
 		void slowOperationStarted();
 		void slowOperationEnded();
 	public slots:
@@ -720,6 +726,8 @@ public slots:
 		QBasicTimer m_blink, m_click, m_drag, m_autoScroll;
 
 		bool mDisplayModifyTime;
+        QDocument::CursorRenderingStyle m_cursorStyle;
+        QString m_inputModeLabel;
 		bool mIgnoreExternalChanges;
 		bool mSilentReloadOnExternalChanges;
 		bool m_useQSaveFile;

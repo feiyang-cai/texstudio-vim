@@ -1743,6 +1743,16 @@ Then you can select a new shortcut by one of the following ways:
                   <item row="3" column="1" colspan="2">
                    <widget class="QComboBox" name="comboBoxEncoding"/>
                   </item>
+                  <item row="4" column="0">
+                   <widget class="QLabel" name="labelEditorMode">
+                    <property name="text">
+                     <string>Editing Mode:</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item row="4" column="1" colspan="2">
+                   <widget class="QComboBox" name="comboBoxEditorMode"/>
+                  </item>
                   <item row="5" column="1" colspan="2">
                    <widget class="QCheckBox" name="checkBoxAutoDetectEncodingFromLatex">
                     <property name="text">

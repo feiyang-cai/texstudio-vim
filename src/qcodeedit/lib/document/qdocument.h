@@ -125,6 +125,14 @@ class QCE_EXPORT QDocument : public QObject
 	Q_OBJECT
 
 	public:
+        enum CursorRenderingStyle
+        {
+            AutoCursorStyle,
+            LineCursorStyle,
+            BlockCursorStyle,
+            UnderlineCursorStyle
+        };
+
 		struct PaintContext
 		{
             qreal width;
@@ -134,6 +142,7 @@ class QCE_EXPORT QDocument : public QObject
 			QPalette palette;
 			bool blinkingCursor;
 			bool fillCursorRect;
+            CursorRenderingStyle cursorStyle;
 			QList<QDocumentCursorHandle*> extra;
 			QList<QDocumentCursorHandle*> cursors;
 			QList<QDocumentSelection> selections;

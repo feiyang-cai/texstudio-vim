@@ -80,6 +80,8 @@ void QStatusPanel::editorChange(QEditor *e)
 	{
 		disconnect(	editor(), SIGNAL( cursorPositionChanged() ),
 					this	, SLOT  ( update() ) );
+        disconnect( editor(), SIGNAL( inputModeChanged(QString) ),
+                    this    , SLOT  ( update() ) );
 		if(timer) {
 			disconnect(timer, SIGNAL(timeout()), this, SLOT(update()));
 			delete timer;
@@ -92,6 +94,8 @@ void QStatusPanel::editorChange(QEditor *e)
 	{
 		connect(e	, SIGNAL( cursorPositionChanged() ),
 				this, SLOT  ( update() ) );
+        connect(e  , SIGNAL( inputModeChanged(QString) ),
+                this, SLOT  ( update() ) );
 		if(e->displayModifyTime()){
 			timer = new QTimer(this);
 			connect(timer, SIGNAL(timeout()), this, SLOT(update()));
@@ -172,7 +176,8 @@ bool QStatusPanel::paint(QPainter *p, QEditor *e)
 	xpos += UtilsUi::getFmWidth(fm, timeDiff);
 	xpos += 20;
 
-	s = editor()->flag(QEditor::Overwrite) ? tr("OVERWRITE") : tr("INSERT");
+    const QString inputModeLabel = editor()->inputModeLabel();
+    s = inputModeLabel.isEmpty() ? (editor()->flag(QEditor::Overwrite) ? tr("OVERWRITE") : tr("INSERT")) : inputModeLabel;
 	p->drawText(xpos, ascent, s);
 	xpos += UtilsUi::getFmWidth(fm, s) + 10;
 

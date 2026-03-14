@@ -5,9 +5,11 @@
 #include "latexcompleter_config.h"
 #include "latexcompleter.h"
 #include "latexeditorview.h"
+#include "latexeditorview_config.h"
 #include "qdocumentcursor.h"
 #include "qdocument.h"
 #include "qeditor.h"
+#include "qeditorinputbindinginterface.h"
 #include "testutil.h"
 #include "latexdocument.h"
 
@@ -315,6 +317,74 @@ void LatexCompleterTest::simple(){
 
 	edView->editor->clearPlaceHolders();
 	edView->editor->clearCursorMirrors();
+}
+
+void LatexCompleterTest::vimInsertModeCommandCompletion()
+{
+    const int oldMode = edView->getConfig()->editingMode;
+    edView->getConfig()->editingMode = LatexEditorViewConfig::VimEditing;
+    edView->updateSettings();
+
+    edView->editor->setText("", false);
+    edView->editor->setCursorPosition(0, 0, false);
+    edView->editor->setFocus();
+    edView->editor->emitNeedUpdatedCompleter();
+
+    QTest::keyClick(edView->editor, Qt::Key_I);
+    QTest::keyClick(edView->editor, Qt::Key_Backslash);
+
+    QEQUAL(edView->editor->text(), QString("\\"));
+    QVERIFY(!edView->editor->inputBindings().isEmpty());
+    QEQUAL(edView->editor->inputBindings().first()->id(), QString("TXS::CompleterInputBinding"));
+
+    QTest::keyClick(edView->editor, Qt::Key_B);
+    QVERIFY(edView->getCompleter()->isVisible());
+    QTest::keyClick(edView->editor, Qt::Key_E);
+
+    QVERIFY(edView->getCompleter()->isVisible());
+    QEQUAL(edView->editor->text(), QString("\\be"));
+
+    edView->getCompleter()->close();
+    edView->getConfig()->editingMode = oldMode;
+    edView->updateSettings();
+}
+
+void LatexCompleterTest::vimInsertModeCommandCompletionViaInputMethod()
+{
+    const int oldMode = edView->getConfig()->editingMode;
+    edView->getConfig()->editingMode = LatexEditorViewConfig::VimEditing;
+    edView->updateSettings();
+
+    edView->editor->setText("", false);
+    edView->editor->setCursorPosition(0, 0, false);
+    edView->editor->setFocus();
+    edView->editor->emitNeedUpdatedCompleter();
+
+    QTest::keyClick(edView->editor, Qt::Key_I);
+
+    QInputMethodEvent triggerEvent;
+    triggerEvent.setCommitString("\\");
+    QCoreApplication::sendEvent(edView->editor, &triggerEvent);
+
+    QEQUAL(edView->editor->text(), QString("\\"));
+    QVERIFY(!edView->editor->inputBindings().isEmpty());
+    QEQUAL(edView->editor->inputBindings().first()->id(), QString("TXS::CompleterInputBinding"));
+
+    QInputMethodEvent bEvent;
+    bEvent.setCommitString("b");
+    QCoreApplication::sendEvent(edView->editor, &bEvent);
+    QVERIFY(edView->getCompleter()->isVisible());
+
+    QInputMethodEvent eEvent;
+    eEvent.setCommitString("e");
+    QCoreApplication::sendEvent(edView->editor, &eEvent);
+
+    QVERIFY(edView->getCompleter()->isVisible());
+    QEQUAL(edView->editor->text(), QString("\\be"));
+
+    edView->getCompleter()->close();
+    edView->getConfig()->editingMode = oldMode;
+    edView->updateSettings();
 }
 
 void LatexCompleterTest::keyval_data(){

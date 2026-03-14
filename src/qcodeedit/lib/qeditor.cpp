@@ -324,7 +324,7 @@ QEditor::QEditor(QWidget *p)
     m_doc(nullptr), m_definition(nullptr),
 	m_doubleClickSelectionType(QDocumentCursor::WordOrCommandUnderCursor), m_tripleClickSelectionType(QDocumentCursor::LineUnderCursor),
 	m_curPlaceHolder(-1), m_placeHolderSynchronizing(false), m_state(defaultFlags()),
-    mDisplayModifyTime(true), m_blockKey(false), m_disableAccentHack(false), m_LineWidth(0), m_wrapAfterNumChars(0), m_scrollAnimation(nullptr)
+    mDisplayModifyTime(true), m_cursorStyle(QDocument::AutoCursorStyle), m_inputModeLabel(), m_blockKey(false), m_disableAccentHack(false), m_LineWidth(0), m_wrapAfterNumChars(0), m_scrollAnimation(nullptr)
 {
 	m_editors << this;
 
@@ -344,7 +344,7 @@ QEditor::QEditor(bool actions, QWidget *p,QDocument *doc)
     m_doc(nullptr), m_definition(nullptr),
 	m_doubleClickSelectionType(QDocumentCursor::WordOrCommandUnderCursor), m_tripleClickSelectionType(QDocumentCursor::ParenthesesOuter),
 	m_curPlaceHolder(-1), m_placeHolderSynchronizing(false), m_state(defaultFlags()),
-    mDisplayModifyTime(true), m_blockKey(false), m_disableAccentHack(false), m_LineWidth(0), m_wrapAfterNumChars(0), m_scrollAnimation(nullptr)
+    mDisplayModifyTime(true), m_cursorStyle(QDocument::AutoCursorStyle), m_inputModeLabel(), m_blockKey(false), m_disableAccentHack(false), m_LineWidth(0), m_wrapAfterNumChars(0), m_scrollAnimation(nullptr)
 {
 	m_editors << this;
 
@@ -365,7 +365,7 @@ QEditor::QEditor(const QString& s, QWidget *p)
     pMenu(nullptr), m_lineEndingsMenu(nullptr), m_lineEndingsActions(nullptr),
     m_bindingsMenu(nullptr), aDefaultBinding(nullptr), m_bindingsActions(nullptr),
     m_doc(nullptr), m_definition(nullptr), m_curPlaceHolder(-1), m_placeHolderSynchronizing(false), m_state(defaultFlags()),
-        mDisplayModifyTime(true),m_blockKey(false),m_disableAccentHack(false),m_LineWidth(0),m_scrollAnimation(nullptr)
+        mDisplayModifyTime(true), m_cursorStyle(QDocument::AutoCursorStyle), m_inputModeLabel(), m_blockKey(false), m_disableAccentHack(false), m_LineWidth(0), m_wrapAfterNumChars(0), m_scrollAnimation(nullptr)
 {
 	m_editors << this;
 
@@ -387,7 +387,7 @@ QEditor::QEditor(const QString& s, bool actions, QWidget *p)
     pMenu(nullptr), m_lineEndingsMenu(nullptr), m_lineEndingsActions(nullptr),
     m_bindingsMenu(nullptr), aDefaultBinding(nullptr), m_bindingsActions(nullptr),
     m_doc(nullptr), m_definition(nullptr), m_curPlaceHolder(-1), m_placeHolderSynchronizing(false), m_state(defaultFlags()),
-    mDisplayModifyTime(true), m_useQSaveFile(true), m_blockKey(false), m_disableAccentHack(false), m_LineWidth(0), m_scrollAnimation(nullptr)
+    mDisplayModifyTime(true), m_cursorStyle(QDocument::AutoCursorStyle), m_inputModeLabel(), m_useQSaveFile(true), m_blockKey(false), m_disableAccentHack(false), m_LineWidth(0), m_wrapAfterNumChars(0), m_scrollAnimation(nullptr)
 {
 	m_editors << this;
 
@@ -2034,6 +2034,32 @@ QList<QDocumentCursor> QEditor::cursors() const{
 	return res;
 }
 
+QDocument::CursorRenderingStyle QEditor::cursorStyle() const
+{
+    return m_cursorStyle;
+}
+
+void QEditor::setCursorStyle(QDocument::CursorRenderingStyle style)
+{
+    if (m_cursorStyle == style)
+        return;
+    m_cursorStyle = style;
+    repaintCursor();
+}
+
+QString QEditor::inputModeLabel() const
+{
+    return m_inputModeLabel;
+}
+
+void QEditor::setInputModeLabel(const QString &label)
+{
+    if (m_inputModeLabel == label)
+        return;
+    m_inputModeLabel = label;
+    emit inputModeChanged(m_inputModeLabel);
+}
+
 /*!
 	\brief Clear all placeholders
 */
@@ -3173,6 +3199,7 @@ void QEditor::paintEvent(QPaintEvent */*e*/)
     }
 	ctx.fillCursorRect = true;
 	ctx.blinkingCursor = flag(CursorOn);
+    ctx.cursorStyle = m_cursorStyle;
 
 	if ( m_cursor.hasSelection() )
 	{

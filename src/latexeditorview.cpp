@@ -2356,17 +2356,25 @@ private:
     {
         const int firstLine = editor->cursor().lineNumber();
         const int lastLine = qMin(editor->document()->lineCount() - 1, firstLine + count - 1);
+        const bool deletingAtDocumentEnd = lastLine + 1 >= editor->document()->lineCount();
         g_vimRegister.type = VimRegisterType::LineWise;
         g_vimRegister.blocks.clear();
         g_vimRegister.text = lineRangeText(editor->document(), firstLine, lastLine, true);
+        int landingLine = firstLine;
         QDocumentCursor cursor(editor->document(), firstLine, 0, lastLine, editor->document()->line(lastLine).length());
-        if (lastLine + 1 < editor->document()->lineCount())
+        if (!enterInsert && deletingAtDocumentEnd && firstLine > 0) {
+            landingLine = firstLine - 1;
+            cursor.select(firstLine - 1, editor->document()->line(firstLine - 1).length(), lastLine, editor->document()->line(lastLine).length());
+        } else if (lastLine + 1 < editor->document()->lineCount()) {
             cursor.select(firstLine, 0, lastLine + 1, 0);
+        }
         cursor.removeSelectedText();
-        editor->setCursor(cursor);
         if (enterInsert) {
+            editor->setCursor(cursor);
             startInsertSession(QStringLiteral("i"), editor);
         } else {
+            editor->setCursor(QDocumentCursor(editor->document(), qMin(landingLine, qMax(0, editor->document()->lineCount() - 1)), 0));
+            moveToLineStartText(editor);
             setMode(VimMode::Normal, editor);
             normalizeNormalCursor(editor);
         }
@@ -2511,15 +2519,26 @@ private:
         if (m_mode == VimMode::VisualLine) {
             const int firstLine = editor->cursor().startLineNumber();
             const int lastLine = editor->cursor().endLineNumber();
+            const bool deletingAtDocumentEnd = lastLine + 1 >= editor->document()->lineCount();
             g_vimRegister.type = VimRegisterType::LineWise;
             g_vimRegister.blocks.clear();
             g_vimRegister.text = lineRangeText(editor->document(), firstLine, lastLine, true);
 
+            int landingLine = firstLine;
             QDocumentCursor cursor(editor->document(), firstLine, 0, lastLine, editor->document()->line(lastLine).length());
-            if (lastLine + 1 < editor->document()->lineCount())
+            if (!enterInsert && deletingAtDocumentEnd && firstLine > 0) {
+                landingLine = firstLine - 1;
+                cursor.select(firstLine - 1, editor->document()->line(firstLine - 1).length(), lastLine, editor->document()->line(lastLine).length());
+            } else if (lastLine + 1 < editor->document()->lineCount()) {
                 cursor.select(firstLine, 0, lastLine + 1, 0);
+            }
             cursor.removeSelectedText();
-            editor->setCursor(cursor);
+            if (enterInsert) {
+                editor->setCursor(cursor);
+            } else {
+                editor->setCursor(QDocumentCursor(editor->document(), qMin(landingLine, qMax(0, editor->document()->lineCount() - 1)), 0));
+                moveToLineStartText(editor);
+            }
         } else {
             QDocumentCursor cursor = editor->cursor();
             setRegisterFromSelection(cursor, VimRegisterType::CharacterWise);
@@ -2543,20 +2562,24 @@ private:
     {
         QDocumentCursor cursor = editor->cursor();
         if (g_vimRegister.type == VimRegisterType::LineWise) {
+            const int lineCountBefore = editor->document()->lineCount();
             int targetLine = cursor.lineNumber() + (after ? 1 : 0);
             targetLine = qMax(0, targetLine);
             QDocumentCursor target(editor->document(), qMin(targetLine, qMax(0, editor->document()->lineCount() - 1)), 0);
+            int insertedStartLine = qMin(targetLine, qMax(0, lineCountBefore - 1));
             if (targetLine >= editor->document()->lineCount()) {
                 target.movePosition(1, QDocumentCursor::EndOfLine);
                 QString text = g_vimRegister.text;
                 const bool documentIsEmpty = editor->document()->lineCount() == 1 && editor->document()->line(0).length() == 0;
+                insertedStartLine = documentIsEmpty ? 0 : lineCountBefore;
                 if (!documentIsEmpty)
                     text.prepend(QLatin1Char('\n'));
                 editor->insertText(target, text);
             } else {
                 editor->insertText(target, g_vimRegister.text);
             }
-            editor->setCursor(target);
+            editor->setCursor(QDocumentCursor(editor->document(), insertedStartLine, 0));
+            moveToLineStartText(editor);
         } else if (g_vimRegister.type == VimRegisterType::BlockWise) {
             const int baseLine = cursor.lineNumber();
             const int column = cursor.columnNumber() + (after ? 1 : 0);

@@ -500,6 +500,50 @@ void LatexEditorViewTest::vimMarks()
     edView->updateSettings();
 }
 
+void LatexEditorViewTest::vimDeleteLastLineMovesToPreviousLine()
+{
+    const int oldMode = edView->getConfig()->editingMode;
+    edView->getConfig()->editingMode = LatexEditorViewConfig::VimEditing;
+    edView->updateSettings();
+
+    edView->editor->setText("one\n  two\nthree", false);
+    edView->editor->setCursorPosition(2, 0, false);
+    edView->editor->setFocus();
+
+    QTest::keyClick(edView->editor, Qt::Key_D);
+    QTest::keyClick(edView->editor, Qt::Key_D);
+
+    QEQUAL(edView->editor->document()->text(), QString("one\n  two"));
+    QEQUAL(edView->editor->cursor().lineNumber(), 1);
+    QEQUAL(edView->editor->cursor().columnNumber(), 2);
+    QEQUAL(edView->editor->inputModeLabel(), QString("NORMAL"));
+
+    edView->getConfig()->editingMode = oldMode;
+    edView->updateSettings();
+}
+
+void LatexEditorViewTest::vimLinewisePasteKeepsCursorOnInsertedText()
+{
+    const int oldMode = edView->getConfig()->editingMode;
+    edView->getConfig()->editingMode = LatexEditorViewConfig::VimEditing;
+    edView->updateSettings();
+
+    edView->editor->setText("    alpha\nbeta\ngamma", false);
+    edView->editor->setCursorPosition(0, 0, false);
+    edView->editor->setFocus();
+
+    QTest::keyClick(edView->editor, Qt::Key_Y, Qt::ShiftModifier);
+    QTest::keyClick(edView->editor, Qt::Key_P);
+
+    QEQUAL(edView->editor->document()->text(), QString("    alpha\n    alpha\nbeta\ngamma"));
+    QEQUAL(edView->editor->cursor().lineNumber(), 1);
+    QEQUAL(edView->editor->cursor().columnNumber(), 4);
+    QEQUAL(edView->editor->inputModeLabel(), QString("NORMAL"));
+
+    edView->getConfig()->editingMode = oldMode;
+    edView->updateSettings();
+}
+
 void LatexEditorViewTest::vimNormalModeConsumesUnhandledPrintableKeys()
 {
     const int oldMode = edView->getConfig()->editingMode;

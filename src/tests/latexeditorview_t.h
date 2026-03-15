@@ -28,6 +28,8 @@ class LatexEditorViewTest: public QObject{
         void vimPromptEnterDoesNotInsertNewline();
         void vimPromptHistory();
         void vimMarks();
+        void vimDeleteLastLineMovesToPreviousLine();
+        void vimLinewisePasteKeepsCursorOnInsertedText();
         void vimNormalModeConsumesUnhandledPrintableKeys();
         void vimExSubstituteCommands();
         void vimExCommands();

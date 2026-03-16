@@ -234,11 +234,12 @@ void LatexEditorViewTest::vimVisualBlockCtrlV()
 
 #ifdef Q_OS_MAC
     const Qt::KeyboardModifiers visualBlockModifier = Qt::MetaModifier;
-#else
-    const Qt::KeyboardModifiers visualBlockModifier = Qt::ControlModifier;
-#endif
     QKeyEvent visualBlockShortcut(QEvent::KeyPress, Qt::Key_V, visualBlockModifier);
     QCoreApplication::sendEvent(edView->editor, &visualBlockShortcut);
+#else
+    const Qt::KeyboardModifiers visualBlockModifier = Qt::ControlModifier;
+    QTest::keyClick(edView->editor, Qt::Key_V, visualBlockModifier);
+#endif
 
     QEQUAL(edView->editor->inputModeLabel(), QString("V-BLOCK"));
     QEQUAL(edView->editor->cursor().lineNumber(), 0);
@@ -273,11 +274,12 @@ void LatexEditorViewTest::vimVisualBlockDeleteAffectsAllRows()
 
 #ifdef Q_OS_MAC
     const Qt::KeyboardModifiers visualBlockModifier = Qt::MetaModifier;
-#else
-    const Qt::KeyboardModifiers visualBlockModifier = Qt::ControlModifier;
-#endif
     QKeyEvent visualBlockShortcut(QEvent::KeyPress, Qt::Key_V, visualBlockModifier);
     QCoreApplication::sendEvent(edView->editor, &visualBlockShortcut);
+#else
+    const Qt::KeyboardModifiers visualBlockModifier = Qt::ControlModifier;
+    QTest::keyClick(edView->editor, Qt::Key_V, visualBlockModifier);
+#endif
 
     QTest::keyClick(edView->editor, Qt::Key_J);
     QTest::keyClick(edView->editor, Qt::Key_D);
@@ -302,11 +304,12 @@ void LatexEditorViewTest::vimVisualBlockInsertAtStart()
 
 #ifdef Q_OS_MAC
     const Qt::KeyboardModifiers visualBlockModifier = Qt::MetaModifier;
-#else
-    const Qt::KeyboardModifiers visualBlockModifier = Qt::ControlModifier;
-#endif
     QKeyEvent visualBlockShortcut(QEvent::KeyPress, Qt::Key_V, visualBlockModifier);
     QCoreApplication::sendEvent(edView->editor, &visualBlockShortcut);
+#else
+    const Qt::KeyboardModifiers visualBlockModifier = Qt::ControlModifier;
+    QTest::keyClick(edView->editor, Qt::Key_V, visualBlockModifier);
+#endif
 
     QTest::keyClick(edView->editor, Qt::Key_J);
     QTest::keyClick(edView->editor, Qt::Key_I, Qt::ShiftModifier);

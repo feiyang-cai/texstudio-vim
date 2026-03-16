@@ -1181,6 +1181,14 @@ public:
         syncPromptState(editor);
         if (m_mode == VimMode::Insert || m_mode == VimMode::Replace)
             return handleInsertMode(event, editor);
+#ifndef Q_OS_MAC
+        if (event->matches(QKeySequence::Paste)
+                && (m_mode == VimMode::Normal || m_mode == VimMode::Visual
+                    || m_mode == VimMode::VisualLine || m_mode == VimMode::VisualBlock)) {
+            beginVisualBlock(editor);
+            return true;
+        }
+#endif
         if (event->matches(QKeySequence::Undo)) {
             editor->undo();
             return true;

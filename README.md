@@ -27,9 +27,7 @@ I did not manually design and review every code path to production standard. Use
 
 - Releases: [GitHub Releases](https://github.com/feiyang-cai/texstudio-vim/releases)
 - Current planned prerelease tag: `v4.9.3beta1-vim-preview1`
-- macOS and Linux builds are intended to be distributed from GitHub release artifacts for this fork
-
-The current macOS package is for Apple Silicon.
+- Release artifacts for supported platforms are intended to be distributed from GitHub releases for this fork, including macOS, Linux, and Windows.
 
 ## Feedback
 

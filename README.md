@@ -1,41 +1,48 @@
+# texstudio-vim
 
-[CI]: https://github.com/texstudio-org/texstudio/workflows/CI/badge.svg
-[Codacy Badge]: https://app.codacy.com/project/badge/Grade/892de515e8c54a7a99bd836743c4510c
-[Codacy TeXstudio]: https://app.codacy.com/gh/texstudio-org/texstudio/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade
+This is an experimental fork of [TeXstudio](https://github.com/texstudio-org/texstudio) with native Vim-style editing support.
 
-[Website]: https://www.texstudio.org
+This is not an official TeXstudio release, and it should be treated as unstable. Some Vim behavior is implemented, some is still incomplete, and there will be bugs.
 
-[Download]: https://www.texstudio.org/#download
-[Releases]: https://github.com/texstudio-org/texstudio/releases/
-[News]: https://www.texstudio.org/#news
-[Contribute]: https://github.com/texstudio-org/texstudio/wiki/Contribute
-[User Manual]: https://texstudio-org.github.io/getting_started.html
-[Dev Builds]: https://github.com/texstudio-org/texstudio/actions/workflows/cd.yml
+## Important warning
 
+This fork is largely AI-generated.
 
-# TeXstudio
-![CI] [![Codacy Badge]][Codacy TeXstudio]
+What I mainly did was:
 
-**TeXstudio** is a fully featured **LaTeX** editor.
+- prompt
+- guide direction
+- test behavior
 
-Our goal is to make ***writing LaTeX documents as easy and comfortable*** as possible.
+I did not manually design and review every code path to production standard. Use this carefully, especially for important work.
 
----
-#### 〔 [Download] / [Releases] / [Dev Builds] 〕〔 [News] 〕〔 [User Manual] 〕〔 [Contribute] 〕
----
+## Current status
 
+- Experimental Vim support is the main goal of this fork.
+- Supported Vim behavior is documented in [VIM_MODE.md](VIM_MODE.md).
+- This is not full Vim parity.
+- Expect edge-case bugs and regressions.
 
-### Features
-- Advanced **Syntax Highlighting**
-- Live **Reference Checking**
-- An integrated **PDF viewer**
-- Live **Inline Preview**
-- **Latex Commands completion and syntax checking**
-- Live **Grammar checking**
-- Local and global **structure view**
-- **Citations checking and completion**
-- **Spellchecking**
+## Downloads
 
-<br>
+- macOS build: [Box download](BOX_LINK_HERE)
+- Linux build: planned later
 
-#### Find out more at our [Website].
+The current macOS package is for Apple Silicon.
+
+## Feedback
+
+Feel free to test it and send feedback, especially if you find:
+
+- broken Vim motions or operators
+- insert-mode regressions
+- search and replace issues
+- visual mode or block mode bugs
+- crashes or data-loss risks
+
+## Upstream
+
+The base editor project is TeXstudio:
+
+- upstream repo: [texstudio-org/texstudio](https://github.com/texstudio-org/texstudio)
+- official website: [texstudio.org](https://www.texstudio.org)

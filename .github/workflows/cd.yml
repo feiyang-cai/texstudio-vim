@@ -370,7 +370,7 @@ jobs:
   build-linux-release:
     name: linux appimage
     if: github.event_name == 'push'
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
     - name: Checkout
       uses: actions/checkout@v6
@@ -384,7 +384,7 @@ jobs:
       run: sudo apt-get update
 
     - name: Dependencies
-      run: sudo apt-get install qtbase5-dev libqt5svg5-dev qtdeclarative5-dev qttools5-dev libqt5svg5-dev libpoppler-qt5-dev libpoppler-cpp-dev pkg-config zlib1g-dev libquazip5-dev 
+      run: sudo apt-get install qt6-base-dev qt6-base-dev-tools qt6-svg-dev qt6-declarative-dev qt6-tools-dev qt6-tools-dev-tools libpoppler-qt6-dev libpoppler-cpp-dev pkg-config zlib1g-dev libquazip1-qt6-dev libhunspell-dev
 
     - name: Configure
       run: |

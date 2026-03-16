@@ -9,7 +9,7 @@ permissions:
 jobs:
   build-linux:
     name: Linux-autoTests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
     - name: Checkout
       uses: actions/checkout@v6
@@ -18,7 +18,7 @@ jobs:
       run: sudo apt-get update
 
     - name: Dependencies
-      run: sudo apt-get install cmake qtbase5-dev qt5-qmake libqt5svg5-dev qtdeclarative5-dev qttools5-dev libqt5svg5-dev zlib1g-dev pkg-config libhunspell-dev libquazip5-dev
+      run: sudo apt-get install cmake qt6-base-dev qt6-base-dev-tools qt6-svg-dev qt6-declarative-dev qt6-tools-dev qt6-tools-dev-tools zlib1g-dev pkg-config libhunspell-dev libquazip1-qt6-dev
 
     - name: Configure
       run: cmake -DTEXSTUDIO_ENABLE_TESTS=ON -DTEXSTUDIO_BUILD_ADWAITA=OFF -DCMAKE_BUILD_TYPE=Debug .
@@ -28,5 +28,3 @@ jobs:
 
     - name: Test
       run: QT_QPA_PLATFORM=offscreen ./texstudio --auto-tests
-
-

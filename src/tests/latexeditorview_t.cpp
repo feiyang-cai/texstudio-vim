@@ -238,6 +238,9 @@ void LatexEditorViewTest::vimVisualBlockCtrlV()
     QCoreApplication::sendEvent(edView->editor, &visualBlockShortcut);
 #else
     const Qt::KeyboardModifiers visualBlockModifier = Qt::ControlModifier;
+    QKeyEvent visualBlockShortcutOverride(QEvent::ShortcutOverride, Qt::Key_V, visualBlockModifier);
+    QCoreApplication::sendEvent(edView->editor, &visualBlockShortcutOverride);
+    QVERIFY(visualBlockShortcutOverride.isAccepted());
     QTest::keyClick(edView->editor, Qt::Key_V, visualBlockModifier);
 #endif
 
@@ -278,6 +281,9 @@ void LatexEditorViewTest::vimVisualBlockDeleteAffectsAllRows()
     QCoreApplication::sendEvent(edView->editor, &visualBlockShortcut);
 #else
     const Qt::KeyboardModifiers visualBlockModifier = Qt::ControlModifier;
+    QKeyEvent visualBlockShortcutOverride(QEvent::ShortcutOverride, Qt::Key_V, visualBlockModifier);
+    QCoreApplication::sendEvent(edView->editor, &visualBlockShortcutOverride);
+    QVERIFY(visualBlockShortcutOverride.isAccepted());
     QTest::keyClick(edView->editor, Qt::Key_V, visualBlockModifier);
 #endif
 
@@ -308,6 +314,9 @@ void LatexEditorViewTest::vimVisualBlockInsertAtStart()
     QCoreApplication::sendEvent(edView->editor, &visualBlockShortcut);
 #else
     const Qt::KeyboardModifiers visualBlockModifier = Qt::ControlModifier;
+    QKeyEvent visualBlockShortcutOverride(QEvent::ShortcutOverride, Qt::Key_V, visualBlockModifier);
+    QCoreApplication::sendEvent(edView->editor, &visualBlockShortcutOverride);
+    QVERIFY(visualBlockShortcutOverride.isAccepted());
     QTest::keyClick(edView->editor, Qt::Key_V, visualBlockModifier);
 #endif
 

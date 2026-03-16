@@ -347,6 +347,9 @@ public:
 	bool isInMathHighlighting(const QDocumentCursor &cursor);
 	void checkRTLLTRLanguageSwitching();
 
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override;
+
 signals:
 	void lineHandleDeleted(QDocumentLineHandle *l);
 	void showMarkTooltipForLogMessage(QList<int> logMessages);

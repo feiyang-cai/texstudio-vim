@@ -1333,6 +1333,19 @@ public:
         return m_lastSearchText;
     }
 
+    bool shouldOverrideShortcut(const QKeyEvent *event) const
+    {
+#ifdef Q_OS_MAC
+        Q_UNUSED(event)
+        return false;
+#else
+        return event
+               && event->matches(QKeySequence::Paste)
+               && (m_mode == VimMode::Normal || m_mode == VimMode::Visual
+                   || m_mode == VimMode::VisualLine || m_mode == VimMode::VisualBlock);
+#endif
+    }
+
     bool handleEscapeShortcut(QEditor *editor)
     {
         if (!editor)
@@ -2979,6 +2992,7 @@ LatexEditorView::LatexEditorView(QWidget *parent, LatexEditorViewConfig *aconfig
     document = doc;
 
 	editor->setProperty("latexEditor", QVariant::fromValue<LatexEditorView *>(this));
+    editor->installEventFilter(this);
 
 	lineMarkPanel = new QLineMarkPanel;
     lineMarkPanel->setCursor(Qt::PointingHandCursor);
@@ -3098,6 +3112,21 @@ void LatexEditorView::updatePanels()
     for(QPanel *p:codeeditor->panels()){
         p->update();
     }
+}
+
+bool LatexEditorView::eventFilter(QObject *watched, QEvent *event)
+{
+    if (watched == editor && event && event->type() == QEvent::ShortcutOverride
+            && config->editingMode == LatexEditorViewConfig::VimEditing
+            && vimInputBinding) {
+        auto *keyEvent = static_cast<QKeyEvent *>(event);
+        if (vimInputBinding->shouldOverrideShortcut(keyEvent)) {
+            event->accept();
+            return true;
+        }
+    }
+
+    return QWidget::eventFilter(watched, event);
 }
 
 void LatexEditorView::paste()

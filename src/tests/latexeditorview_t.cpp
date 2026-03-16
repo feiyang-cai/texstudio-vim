@@ -10,6 +10,17 @@
 #include "qeditor.h"
 #include "testutil.h"
 #include <QtTest/QtTest>
+
+namespace {
+bool skipVimUiTestInQuickRuns()
+{
+    if (globalExecuteAllTests)
+        return false;
+    QTest::qSkip("Vim UI coverage is only enabled in --execute-all-tests.", __FILE__, __LINE__);
+    return true;
+}
+}
+
 LatexEditorViewTest::LatexEditorViewTest(LatexEditorView* view): edView(view){}
 
 void LatexEditorViewTest::insertHardLineBreaks_data(){
@@ -117,6 +128,9 @@ void LatexEditorViewTest::inMathEnvironment(){
 
 void LatexEditorViewTest::vimEditingModeSwitches()
 {
+    if (skipVimUiTestInQuickRuns())
+        return;
+
     const int oldMode = edView->getConfig()->editingMode;
 
     edView->getConfig()->editingMode = LatexEditorViewConfig::VimEditing;
@@ -135,6 +149,9 @@ void LatexEditorViewTest::vimEditingModeSwitches()
 
 void LatexEditorViewTest::vimCursorStyles()
 {
+    if (skipVimUiTestInQuickRuns())
+        return;
+
     const int oldMode = edView->getConfig()->editingMode;
     edView->getConfig()->editingMode = LatexEditorViewConfig::VimEditing;
     edView->updateSettings();
@@ -167,6 +184,9 @@ void LatexEditorViewTest::vimCursorStyles()
 
 void LatexEditorViewTest::vimInsertEscape()
 {
+    if (skipVimUiTestInQuickRuns())
+        return;
+
     const int oldMode = edView->getConfig()->editingMode;
     edView->getConfig()->editingMode = LatexEditorViewConfig::VimEditing;
     edView->updateSettings();
@@ -192,6 +212,9 @@ void LatexEditorViewTest::vimInsertEscape()
 
 void LatexEditorViewTest::vimVisualLineStaysOnCurrentLine()
 {
+    if (skipVimUiTestInQuickRuns())
+        return;
+
     const int oldMode = edView->getConfig()->editingMode;
     edView->getConfig()->editingMode = LatexEditorViewConfig::VimEditing;
     edView->updateSettings();
@@ -224,6 +247,9 @@ void LatexEditorViewTest::vimVisualLineStaysOnCurrentLine()
 
 void LatexEditorViewTest::vimVisualBlockCtrlV()
 {
+    if (skipVimUiTestInQuickRuns())
+        return;
+
     const int oldMode = edView->getConfig()->editingMode;
     edView->getConfig()->editingMode = LatexEditorViewConfig::VimEditing;
     edView->updateSettings();
@@ -267,6 +293,9 @@ void LatexEditorViewTest::vimVisualBlockCtrlV()
 
 void LatexEditorViewTest::vimVisualBlockDeleteAffectsAllRows()
 {
+    if (skipVimUiTestInQuickRuns())
+        return;
+
     const int oldMode = edView->getConfig()->editingMode;
     edView->getConfig()->editingMode = LatexEditorViewConfig::VimEditing;
     edView->updateSettings();
@@ -300,6 +329,9 @@ void LatexEditorViewTest::vimVisualBlockDeleteAffectsAllRows()
 
 void LatexEditorViewTest::vimVisualBlockInsertAtStart()
 {
+    if (skipVimUiTestInQuickRuns())
+        return;
+
     const int oldMode = edView->getConfig()->editingMode;
     edView->getConfig()->editingMode = LatexEditorViewConfig::VimEditing;
     edView->updateSettings();
@@ -335,6 +367,9 @@ void LatexEditorViewTest::vimVisualBlockInsertAtStart()
 
 void LatexEditorViewTest::vimCloseElementEscapesInsertMode()
 {
+    if (skipVimUiTestInQuickRuns())
+        return;
+
     const int oldMode = edView->getConfig()->editingMode;
     edView->getConfig()->editingMode = LatexEditorViewConfig::VimEditing;
     edView->updateSettings();
@@ -357,6 +392,9 @@ void LatexEditorViewTest::vimCloseElementEscapesInsertMode()
 
 void LatexEditorViewTest::vimCloseElementIsConsumedInNormalMode()
 {
+    if (skipVimUiTestInQuickRuns())
+        return;
+
     const int oldMode = edView->getConfig()->editingMode;
     edView->getConfig()->editingMode = LatexEditorViewConfig::VimEditing;
     edView->updateSettings();
@@ -376,6 +414,9 @@ void LatexEditorViewTest::vimCloseElementIsConsumedInNormalMode()
 
 void LatexEditorViewTest::vimPromptEnterDoesNotInsertNewline()
 {
+    if (skipVimUiTestInQuickRuns())
+        return;
+
     const int oldMode = edView->getConfig()->editingMode;
     edView->getConfig()->editingMode = LatexEditorViewConfig::VimEditing;
     edView->updateSettings();
@@ -404,6 +445,9 @@ void LatexEditorViewTest::vimPromptEnterDoesNotInsertNewline()
 
 void LatexEditorViewTest::vimPromptHistory()
 {
+    if (skipVimUiTestInQuickRuns())
+        return;
+
     const int oldMode = edView->getConfig()->editingMode;
     edView->getConfig()->editingMode = LatexEditorViewConfig::VimEditing;
     edView->updateSettings();
@@ -443,6 +487,9 @@ void LatexEditorViewTest::vimPromptHistory()
 
 void LatexEditorViewTest::vimMarks()
 {
+    if (skipVimUiTestInQuickRuns())
+        return;
+
     const int oldMode = edView->getConfig()->editingMode;
     edView->getConfig()->editingMode = LatexEditorViewConfig::VimEditing;
     edView->updateSettings();
@@ -514,6 +561,9 @@ void LatexEditorViewTest::vimMarks()
 
 void LatexEditorViewTest::vimDeleteLastLineMovesToPreviousLine()
 {
+    if (skipVimUiTestInQuickRuns())
+        return;
+
     const int oldMode = edView->getConfig()->editingMode;
     edView->getConfig()->editingMode = LatexEditorViewConfig::VimEditing;
     edView->updateSettings();
@@ -536,6 +586,9 @@ void LatexEditorViewTest::vimDeleteLastLineMovesToPreviousLine()
 
 void LatexEditorViewTest::vimLinewisePasteKeepsCursorOnInsertedText()
 {
+    if (skipVimUiTestInQuickRuns())
+        return;
+
     const int oldMode = edView->getConfig()->editingMode;
     edView->getConfig()->editingMode = LatexEditorViewConfig::VimEditing;
     edView->updateSettings();
@@ -558,6 +611,9 @@ void LatexEditorViewTest::vimLinewisePasteKeepsCursorOnInsertedText()
 
 void LatexEditorViewTest::vimNormalModeConsumesUnhandledPrintableKeys()
 {
+    if (skipVimUiTestInQuickRuns())
+        return;
+
     const int oldMode = edView->getConfig()->editingMode;
     edView->getConfig()->editingMode = LatexEditorViewConfig::VimEditing;
     edView->updateSettings();
@@ -577,6 +633,9 @@ void LatexEditorViewTest::vimNormalModeConsumesUnhandledPrintableKeys()
 
 void LatexEditorViewTest::vimExSubstituteCommands()
 {
+    if (skipVimUiTestInQuickRuns())
+        return;
+
     const int oldMode = edView->getConfig()->editingMode;
     edView->getConfig()->editingMode = LatexEditorViewConfig::VimEditing;
     edView->updateSettings();
@@ -605,6 +664,9 @@ void LatexEditorViewTest::vimExSubstituteCommands()
 
 void LatexEditorViewTest::vimExCommands()
 {
+    if (skipVimUiTestInQuickRuns())
+        return;
+
     const int oldMode = edView->getConfig()->editingMode;
     edView->getConfig()->editingMode = LatexEditorViewConfig::VimEditing;
     edView->updateSettings();
@@ -615,11 +677,18 @@ void LatexEditorViewTest::vimExCommands()
     QVERIFY(edView->executeVimExCommand("2"));
     QEQUAL(edView->editor->cursor().lineNumber(), 1);
 
-    QObject::disconnect(edView, SIGNAL(vimCommandRequested(QString)), nullptr, nullptr);
-    QSignalSpy commandSpy(edView, SIGNAL(vimCommandRequested(QString)));
-    QVERIFY(edView->executeVimExCommand(":w"));
-    QEQUAL(commandSpy.count(), 1);
-    QEQUAL(commandSpy.takeFirst().at(0).toString(), QString("w"));
+    {
+        LatexDocument isolatedDocument;
+        LatexEditorView isolatedView(nullptr, edView->getConfig(), &isolatedDocument);
+        isolatedView.getConfig()->editingMode = LatexEditorViewConfig::VimEditing;
+        isolatedView.updateSettings();
+
+        QSignalSpy commandSpy(&isolatedView, SIGNAL(vimCommandRequested(QString)));
+        QVERIFY(commandSpy.isValid());
+        QVERIFY(isolatedView.executeVimExCommand(":w"));
+        QEQUAL(commandSpy.count(), 1);
+        QEQUAL(commandSpy.takeFirst().at(0).toString(), QString("w"));
+    }
 
     edView->executeVimSearch("beta", false);
     QEQUAL(edView->getSearchText(), QString("beta"));

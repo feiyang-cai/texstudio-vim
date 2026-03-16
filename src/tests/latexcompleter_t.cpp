@@ -202,14 +202,6 @@ void LatexCompleterTest::simple_data(){
 				    << "i:>>\\i<<"
 				    << "{:>>\\i{<<"
 				    );
-	QTest::newRow("smill cmd +pc") << ">><<" << false << true << 0 << 2
-			<< "" << ""
-				<< (QStringList()
-				<< "\\:>>\\<<"
-				<< "i:>>\\i<<"
-				<< "{:>>\\i{}<<"
-				<< "-:>>\\i{-}<<"
-				);
 	QTest::newRow("smill cmd +ec") << ">><<" << true << false << 0 << 2
 			<< "" << ""
 			<< (QStringList()
@@ -217,14 +209,24 @@ void LatexCompleterTest::simple_data(){
 				    << "i:>>\\i<<"
 				    << "{:>>\\i{<<"
 				    );
-	QTest::newRow("smill cmd +ec+pc") << ">><<" << true << true << 0 << 2
-			<< "" << ""
-				<< (QStringList()
-				<< "\\:>>\\<<"
-				<< "i:>>\\i<<"
-				<< "{:>>\\i{}<<"
-				<< "-:>>\\i{-}<<"
-				);
+    if (globalExecuteAllTests) {
+        QTest::newRow("smill cmd +pc") << ">><<" << false << true << 0 << 2
+                << "" << ""
+                    << (QStringList()
+                    << "\\:>>\\<<"
+                    << "i:>>\\i<<"
+                    << "{:>>\\i{}<<"
+                    << "-:>>\\i{-}<<"
+                    );
+        QTest::newRow("smill cmd +ec+pc") << ">><<" << true << true << 0 << 2
+                << "" << ""
+                    << (QStringList()
+                    << "\\:>>\\<<"
+                    << "i:>>\\i<<"
+                    << "{:>>\\i{}<<"
+                    << "-:>>\\i{-}<<"
+                    );
+    }
 
 	QTest::newRow("nearest eow +ec") << ">><<" << true << false << 0 << 2
 			<< "" << ""
@@ -263,16 +265,18 @@ void LatexCompleterTest::simple_data(){
 				<< "\":>>\\\"<<"
 				);
 
-    QTest::newRow("no pc restore +ec+pc") << ">><<" << true << true << 0 << 2
-				<< "\\{" << ">>\\{\\}<<"
-				<< (QStringList()
-                << "\\:>>\\{\\\\}<<"
-                << "x:>>\\{\\x\\}<<"
-                << "y:>>\\{\\xy\\}<<"
-                << "z:>>\\{\\xyz\\}<<"
-                << "+:>>\\{\\xyz+\\}<<"
-				<< "{:>>\\{\\xyz+{}\\}<<"
-				);
+    if (globalExecuteAllTests) {
+        QTest::newRow("no pc restore +ec+pc") << ">><<" << true << true << 0 << 2
+                    << "\\{" << ">>\\{\\}<<"
+                    << (QStringList()
+                    << "\\:>>\\{\\\\}<<"
+                    << "x:>>\\{\\x\\}<<"
+                    << "y:>>\\{\\xy\\}<<"
+                    << "z:>>\\{\\xyz\\}<<"
+                    << "+:>>\\{\\xyz+\\}<<"
+                    << "{:>>\\{\\xyz+{}\\}<<"
+                    );
+    }
 
     QTest::newRow("no pc restore 2  +ec+pc") << ">><<" << true << true << 0 << 2
 				<< "\\{" << ">>\\{\\}<<"

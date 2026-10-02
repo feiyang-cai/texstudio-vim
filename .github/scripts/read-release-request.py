@@ -50,7 +50,33 @@ except HTTPError as error:
 else:
     if not release['draft']:
         raise SystemExit('This tag is already published; published assets will not be replaced')
+gui_required = True
+verified_run_id = request.get('verified_gui_run_id')
+if verified_run_id is not None:
+    if not isinstance(verified_run_id, int):
+        raise SystemExit('Invalid prior GUI verification run ID')
+    verified = get('/actions/runs/' + str(verified_run_id))
+    if verified['head_repository']['full_name'] != repository:
+        raise SystemExit('GUI verification must belong to this repository')
+    verified_request = json.loads(subprocess.check_output(
+        ['git', 'show', verified['head_sha'] + ':.github/release-request.json'], text=True))
+    if any(verified_request[key] != request[key] for key in ('tag', 'sha', 'build_run_id')):
+        raise SystemExit('Prior GUI checks used a different release build')
+    publisher_only = {'.github/scripts/publish-verified-release.py', '.github/scripts/read-release-request.py',
+                      '.github/workflows/publish-verified-tag.yml', '.github/release-request.json'}
+    subsequent = subprocess.check_output(['git', 'diff', '--name-only', verified['head_sha'], 'HEAD'], text=True).splitlines()
+    if any(name not in publisher_only and not name.endswith('.md') for name in subsequent):
+        raise SystemExit('GUI checker changes require rerunning all GUI environments')
+    verified_jobs = get(f'/actions/runs/{verified_run_id}/jobs?per_page=100')['jobs']
+    required_gui = {'gui / Packaged retest (' + runner + ')' for runner in
+                    ('windows-latest', 'windows-11-arm', 'macos-14', 'macos-15-intel')}
+    required_gui |= {'gui / AppImage retest (' + distro + ')' for distro in
+                     ('ubuntu-22.04', 'ubuntu-24.04', 'debian-12', 'debian-13', 'fedora-43')}
+    if not required_gui <= {job['name'] for job in verified_jobs if job['conclusion'] == 'success'}:
+        raise SystemExit('All nine prior GUI checks must have passed')
+    gui_required = False
+    print(f'Reusing successful GUI verification {verified_run_id}; only publication code changed')
 prerelease = bool(re.search(r'(alpha|beta|rc)[0-9]+-r', tag))
 with Path(os.environ['GITHUB_OUTPUT']).open('a') as output:
-    output.write(f'tag={tag}\nsha={sha}\nrun_id={run_id}\nprerelease={str(prerelease).lower()}\n')
+    output.write(f'tag={tag}\nsha={sha}\nrun_id={run_id}\nprerelease={str(prerelease).lower()}\ngui_required={str(gui_required).lower()}\n')
 print(f'Verified existing tag {tag}, commit {sha}, build {run_id}; application sources unchanged')

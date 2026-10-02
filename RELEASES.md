@@ -36,6 +36,24 @@ modes, editing, visual blocks, marks, substitution, Ex commands, insert-mode
 completion, and fork version parsing. Check both logs as well as exit status. Review the merged diff against the upstream tag so it contains
 only intentional fork differences.
 
+## Daily upstream synchronization
+
+The `Upstream release sync` workflow checks stable and prerelease releases daily
+and can be run manually from the default branch. Configure
+`COPILOT_SYNC_TOKEN` as a user-to-server token that can create issues and assign
+Copilot; it is exposed only to the trusted detector step. Each issue pins the
+upstream release tag and resolved commit SHA. The trusted controller reuses
+pending issues/PRs and requires the `CD` and `Vim desktop tests` workflows to
+pass on the exact sync head before merging. It then dispatches both workflows
+on the merge commit, creates an immutable fork tag only after those checks pass,
+and dispatches `CD` on that tag. Publication waits for all platform builds and
+all nine packaged GUI checks. Stable and prerelease progress is recorded
+separately only after the matching fork release is published.
+
+GitHub-required approval of Copilot workflow runs is not bypassed. Syncs preserve
+the approved Vim baseline and `VIM_REVISION`; changing either requires an
+owner-approved change.
+
 ## Release naming and publishing
 
 Create each fork tag on its own tested merge commit, never on the unmodified
@@ -43,9 +61,12 @@ upstream commit. Use `texstudio-vim-<upstream-version>-r<fork-revision>` for tag
 files. The numeric version inside the application follows upstream; the Git
 revision shown in About and `--version` includes the full fork release name.
 
-`r0` is the current Vim baseline. Increment the number in `VIM_REVISION` for
-released fork changes on the same upstream base (including Vim and packaging
-fixes). Reset it to `0` when adopting a new upstream version. Keep the upstream
+`r1` is the approved Vim baseline, recorded with its commit and branch in
+`.github/approved-vim-baseline.json`. Preserve `VIM_REVISION` when adopting a
+new upstream version; an upstream update alone does not authorize a revision
+change. Automatic sync releases use the approved Vim baseline and must not
+include unapproved Vim development from `master`. Advance the approved baseline
+only through owner-approved changes. Keep the upstream
 beta/alpha/rc designation, for example `texstudio-vim-4.9.9beta2-r1`. The fork
 revision is separate from upstream's beta number and Git commits since the tag.
 

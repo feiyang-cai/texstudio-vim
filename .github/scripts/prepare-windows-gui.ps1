@@ -27,4 +27,10 @@ public static class DesktopForeground {
 if ($foregroundProcessId) {
     $foregroundProcess = Get-Process -Id $foregroundProcessId -ErrorAction SilentlyContinue
     Write-Host "Desktop foreground process: $($foregroundProcess.ProcessName); window: $($foregroundProcess.MainWindowTitle)"
+    if ($foregroundProcess.ProcessName -eq 'WWAHost') {
+        # The ARM image's privacy wizard is HTML hosted in WWAHost. Closing its
+        # broker leaves this window alive even after the OOBE policy is set.
+        Write-Host 'Closing the leftover first-login privacy web host on the CI desktop'
+        Stop-Process -Id $foregroundProcessId -Force
+    }
 }

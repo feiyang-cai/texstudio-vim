@@ -58,12 +58,24 @@ with (output / 'desktop.log').open('w') as log:
             time.sleep(.25)
         actual = fixture.read_text()
         (output / 'saved-text.log').write_text(actual)
-        subprocess.run(['scrot', str(output / 'desktop.png')], check=True)
         if actual.splitlines() != ['one', 'one', 'three']:
             raise RuntimeError('Packaged Vim editing/save result is incorrect; see saved-text.log')
+        (output / 'named-register-text.log').write_text(actual)
+        # Uppercase input generates real Shift events; dot must replay that insertion.
+        subprocess.run(['xdotool', 'type', '--clearmodifiers', '--delay', '80', 'gg0iX'], check=True)
+        subprocess.run(['xdotool', 'key', '--clearmodifiers', 'Escape'], check=True)
+        subprocess.run(['xdotool', 'type', '--clearmodifiers', '--delay', '80', 'l.:w'], check=True)
+        subprocess.run(['xdotool', 'key', 'Return'], check=True)
+        deadline = time.monotonic() + 15
+        while time.monotonic() < deadline and fixture.read_text().splitlines() != ['XXone', 'one', 'three']:
+            time.sleep(.25)
+        actual = fixture.read_text()
+        (output / 'saved-text.log').write_text(actual)
+        if actual.splitlines() != ['XXone', 'one', 'three']:
+            raise RuntimeError('Packaged uppercase insertion/dot repeat is incorrect; see saved-text.log')
         if process.poll() is not None:
             raise RuntimeError('AppImage exited unexpectedly during editing')
-        print('AppImage version, desktop startup, named registers, editing and save passed')
+        print('AppImage version, desktop startup, named registers, uppercase insertion, dot repeat and save passed')
     finally:
         subprocess.run(['scrot', str(output / 'desktop.png')], check=False)
         if process.poll() is None:

@@ -802,6 +802,17 @@ void LatexEditorViewTest::vimPhysicalModifierEvents()
     QTest::keyRelease(view.editor, Qt::Key_Control);
     QTest::keyClicks(view.editor, "d");
     QCOMPARE(view.editor->document()->textLines().join("\n"), QString("one\nthree"));
+    // Typing uppercase text must also remain repeatable with dot.
+    view.editor->setText("abc", false);
+    view.editor->setCursorPosition(0, 0, false);
+    QTest::keyClicks(view.editor, "i");
+    QTest::keyPress(view.editor, Qt::Key_Shift);
+    QTest::keyClicks(view.editor, "X", Qt::ShiftModifier);
+    QTest::keyRelease(view.editor, Qt::Key_Shift);
+    QTest::keyClick(view.editor, Qt::Key_BracketLeft, Qt::ControlModifier);
+    QCOMPARE(view.editor->inputModeLabel(), QString("NORMAL"));
+    QTest::keyClicks(view.editor, "l.");
+    QCOMPARE(view.editor->document()->textLines().join("\n"), QString("XXabc"));
 }
 
 void LatexEditorViewTest::vimRegisterStore()

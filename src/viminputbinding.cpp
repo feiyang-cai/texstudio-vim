@@ -10,6 +10,13 @@
 #include <functional>
 
 namespace {
+bool isModifierKey(const QKeyEvent *event)
+{
+    return event->key() == Qt::Key_Shift || event->key() == Qt::Key_Control
+            || event->key() == Qt::Key_Alt || event->key() == Qt::Key_Meta
+            || event->key() == Qt::Key_AltGr;
+}
+
 enum class VimMode {
     Normal,
     Insert,
@@ -367,9 +374,7 @@ public:
             return handleInsertMode(event, editor);
         // Native keyboards send modifier presses separately from the character.
         // They must not cancel a register, count, operator or pending motion.
-        if (event->key() == Qt::Key_Shift || event->key() == Qt::Key_Control
-                || event->key() == Qt::Key_Alt || event->key() == Qt::Key_Meta
-                || event->key() == Qt::Key_AltGr)
+        if (isModifierKey(event))
             return true;
         if (handleRegisterPrefix(event, editor))
             return true;
@@ -854,6 +859,8 @@ private:
 
     void recordInsertStep(const QKeyEvent *event)
     {
+        if (isModifierKey(event))
+            return;
         if (!m_insertRepeatable)
             return;
 

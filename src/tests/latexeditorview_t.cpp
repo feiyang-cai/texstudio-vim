@@ -148,6 +148,53 @@ void LatexEditorViewTest::vimEditingModeSwitches()
     edView->updateSettings();
 }
 
+void LatexEditorViewTest::vimCtrlClickNavigation()
+{
+    if (skipVimUiTestInQuickRuns()) return;
+    const int oldMode = edView->getConfig()->editingMode;
+    edView->getConfig()->editingMode = LatexEditorViewConfig::VimEditing;
+    edView->updateSettings();
+    edView->editor->setText("\\label{target}\n\\ref{target}", false);
+    edView->document->startSyntaxChecker();
+    edView->document->synChecker.waitForQueueProcess();
+    edView->editor->setFocus();
+    edView->editor->setCursorPosition(1, 7, false);
+    QWidget *viewport = edView->editor->viewport();
+    const QPoint point(qRound(edView->editor->cursor().line().cursorToDocumentOffset(7).x()),
+                       qRound(edView->editor->lineRect(1).center().y()));
+    edView->checkForLinkOverlay(edView->editor->cursor());
+    QVERIFY(edView->hasLinkOverlay());
+    QTest::mouseMove(viewport, point);
+    QSignalSpy navigation(edView, SIGNAL(gotoDefinition(QDocumentCursor)));
+    QVERIFY(navigation.isValid());
+    const QString text = edView->editor->document()->text();
+    for (const QString &mode : {QString("NORMAL"), QString("INSERT"), QString("REPLACE")}) {
+        QTest::keyClick(edView->editor, Qt::Key_Escape);
+        if (mode == "INSERT") QTest::keyClick(edView->editor, Qt::Key_I);
+        if (mode == "REPLACE") QTest::keyClicks(edView->editor, "R");
+        QTest::mouseMove(viewport, point);
+        QTest::keyPress(edView->editor, Qt::Key_Control, Qt::ControlModifier);
+        QVERIFY(edView->editor->hasMouseTracking());
+        // A mouse move while Control is held must discover the actual ref token.
+        QMouseEvent hover(QEvent::MouseMove, QPointF(point), QPointF(viewport->mapToGlobal(point)),
+                          Qt::NoButton, Qt::NoButton, Qt::ControlModifier);
+        QApplication::sendEvent(viewport, &hover);
+        QVERIFY(edView->hasLinkOverlay());
+        QCOMPARE(edView->getLinkOverlay().type, LinkOverlay::RefOverlay);
+        const int previous = navigation.count();
+        QTest::mouseClick(viewport, Qt::LeftButton, Qt::ControlModifier, point);
+        QCOMPARE(navigation.count(), previous + 1);
+        QCOMPARE(edView->editor->inputModeLabel(), mode);
+        QCOMPARE(edView->editor->document()->text(), text);
+        QTest::keyRelease(edView->editor, Qt::Key_Control);
+        QVERIFY(!edView->editor->hasMouseTracking());
+        QVERIFY(!edView->hasLinkOverlay());
+    }
+    QTest::keyClick(edView->editor, Qt::Key_Escape);
+    edView->getConfig()->editingMode = oldMode;
+    edView->updateSettings();
+}
+
 void LatexEditorViewTest::vimCursorStyles()
 {
     if (skipVimUiTestInQuickRuns())

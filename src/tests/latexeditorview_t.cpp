@@ -1089,8 +1089,19 @@ void LatexEditorViewTest::vimSubstitutePrompt()
     QCOMPARE(view.editor->inputModeLabel(), QString("NORMAL"));
     QTest::keyClicks(view.editor, "u");
     QCOMPARE(document.textLines().join("\n"), QString("foo foo\nfoo"));
+    QKeyEvent redoOverride(QEvent::ShortcutOverride, Qt::Key_R, Qt::ControlModifier);
+    QCoreApplication::sendEvent(view.editor, &redoOverride);
+    QVERIFY(redoOverride.isAccepted());
     QTest::keyClick(view.editor, Qt::Key_R, Qt::ControlModifier);
     QCOMPARE(document.textLines().join("\n"), QString("X X\nX"));
+#ifdef Q_OS_MAC
+    QTest::keyClicks(view.editor, "u");
+    QKeyEvent physicalControlRedo(QEvent::ShortcutOverride, Qt::Key_R, Qt::MetaModifier);
+    QCoreApplication::sendEvent(view.editor, &physicalControlRedo);
+    QVERIFY(physicalControlRedo.isAccepted());
+    QTest::keyClick(view.editor, Qt::Key_R, Qt::MetaModifier);
+    QCOMPARE(document.textLines().join("\n"), QString("X X\nX"));
+#endif
     QTest::keyClicks(view.editor, ":");
     QTest::keyClicks(prompt, "s/X/Y/z");
     QTest::keyClick(prompt, Qt::Key_Return);

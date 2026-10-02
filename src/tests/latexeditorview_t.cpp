@@ -1117,6 +1117,8 @@ void LatexEditorViewTest::vimDocumentedMotions_data()
     QTest::newRow("down") << text << 0 << 3 << "j" << 1 << 3;
     QTest::newRow("up") << text << 1 << 3 << "k" << 0 << 3;
     QTest::newRow("down-clamps-column") << text << 0 << 8 << "2j" << 2 << 3;
+    QTest::newRow("vertical-restores-column") << QString("abcdef\nx\nabcdef") << 0 << 4 << "jj" << 2 << 4;
+    QTest::newRow("vertical-count-restores-column") << QString("abcdef\nx\nabcdef") << 0 << 4 << "2j" << 2 << 4;
     QTest::newRow("line-start") << text << 0 << 5 << "0" << 0 << 0;
     QTest::newRow("first-nonblank") << text << 0 << 0 << "^" << 0 << 2;
     QTest::newRow("line-end") << text << 0 << 0 << "$" << 0 << 8;

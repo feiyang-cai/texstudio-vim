@@ -1,0 +1,79 @@
+name: Packaged desktop retest
+on:
+  push:
+    paths:
+      - .github/scripts/smoke-native-package.py
+      - .github/scripts/prepare-windows-gui.ps1
+      - .github/scripts/select-gui-build.py
+      - .github/workflows/packaged-gui.yml
+  workflow_dispatch:
+    inputs:
+      build_run_id:
+        description: Existing CD run ID (empty selects latest compatible packages)
+        type: string
+        required: false
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: packaged-gui-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  select:
+    runs-on: ubuntu-24.04
+    outputs:
+      run_id: ${{ steps.build.outputs.run_id }}
+      sha: ${{ steps.build.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: build
+        name: Select compatible existing packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_BUILD_RUN_ID: ${{ inputs.build_run_id }}
+        run: python3 .github/scripts/select-gui-build.py
+  desktop:
+    name: Packaged retest (${{ matrix.runner }})
+    needs: select
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-latest
+            artifact: texstudio-vim-win-qt6-zip
+          - runner: windows-11-arm
+            artifact: texstudio-vim-win-arm-qt6-zip
+          - runner: macos-15-intel
+            artifact: texstudio-osx
+          - runner: macos-14
+            artifact: texstudio-vim-osx-m1
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v8
+        with:
+          name: ${{ matrix.artifact }}
+          path: native-package
+          run-id: ${{ needs.select.outputs.run_id }}
+          github-token: ${{ github.token }}
+      - name: Prepare disposable Windows desktop
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: .github/scripts/prepare-windows-gui.ps1
+      - name: Desktop input dependencies
+        run: python -m pip install pyautogui pillow
+      - name: Packaged OS keyboard and mouse tests
+        env:
+          BUILD_SHA: ${{ needs.select.outputs.sha }}
+        run: python .github/scripts/smoke-native-package.py
+      - name: Save GUI diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: packaged-retest-${{ matrix.runner }}
+          path: native-smoke-results/
+          if-no-files-found: warn

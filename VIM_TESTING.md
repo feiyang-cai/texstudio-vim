@@ -46,7 +46,13 @@ checks the commit in the executable version, and verifies saved text after named
 registers, Insert/dot, Replace, global substitution, and forward/backward searches.
 Screenshots, application logs and intermediate saved results are retained.
 
-The Windows/macOS packaged jobs are newly added and require a successful hosted
+`Packaged desktop retest` can reuse an existing CD build when application sources
+are unchanged, allowing CI-only desktop fixes to be checked without recompiling.
+It verifies that subsequent changes affect only CI/documentation and records the
+package commit. Windows runner setup disables the first-login privacy wizard on
+the disposable CI VM so it cannot steal keyboard focus.
+
+The Windows/macOS packaged jobs require a successful hosted
 run before their behavior can be called verified. Missing interactive desktop,
 Accessibility or screen-recording permission is reported as a failure/blocker,
 not a passing test. These virtual runner checks do not cover physical keyboards,

@@ -38,6 +38,7 @@ class LatexEditorViewTest: public QObject{
         void vimRegisterStore();
         void vimRegistersSharedAcrossViews();
         void vimClipboardRegisters();
+        void vimDesktopClipboard();
 };
 
 #endif

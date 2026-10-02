@@ -57,7 +57,11 @@ VimRegister VimRegisters::read(QChar name) const
         if (!mime)
             return {};
         VimRegister value;
+        // QDocument stores LF internally. External clipboard producers, notably
+        // Windows applications, may provide CRLF or legacy CR line endings.
         value.text = mime->text();
+        value.text.replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
+        value.text.replace(QLatin1Char('\r'), QLatin1Char('\n'));
         value.type = value.text.endsWith(QLatin1Char('\n')) ? VimRegisterType::LineWise : VimRegisterType::CharacterWise;
         if (mime->hasFormat(registerMimeType)) {
             const QJsonObject object = QJsonDocument::fromJson(mime->data(registerMimeType)).object();

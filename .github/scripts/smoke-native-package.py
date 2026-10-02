@@ -21,7 +21,7 @@ output.mkdir(parents=True, exist_ok=True)
 archives = list(Path(args.packages).rglob('*.zip'))
 if len(archives) != 1:
     raise SystemExit(f'Expected one portable package, got {len(archives)}')
-installation = output / 'installation'
+installation = Path(args.packages).resolve() / 'installation'
 installation.mkdir(exist_ok=True)
 if sys.platform == 'darwin':
     subprocess.run(['ditto', '-x', '-k', str(archives[0]), str(installation)], check=True)
@@ -118,9 +118,24 @@ with (output / 'application.log').open('w') as log:
             time.sleep(.5)
         if not geometry:
             raise RuntimeError('No accessible fixture window; check desktop session and macOS screen-recording permission')
+        # The title appears before startup finishes arranging the editor/docks.
+        # Re-read geometry after startup so the click uses the final editor area.
+        time.sleep(3)
+        geometry = activate(process.pid)
+        if not geometry:
+            raise RuntimeError('Fixture window disappeared during startup')
         (output / 'window.json').write_text(json.dumps(geometry))
         x, y, width, height = geometry
         gui.click(x + width * 2 // 3, y + height // 4)
+        time.sleep(.5)
+        gui.screenshot().save(output / 'before-input.png')
+        if sys.platform != 'darwin':
+            owner = ctypes.c_ulong()
+            foreground = user32.GetForegroundWindow()
+            user32.GetWindowThreadProcessId(ctypes.c_void_p(foreground), ctypes.byref(owner))
+            (output / 'focus.json').write_text(json.dumps({'expected_pid': process.pid, 'foreground_pid': owner.value}))
+            if owner.value != process.pid:
+                raise RuntimeError('Desktop focus did not reach the packaged application')
         gui.press('esc')
         type_keys('gg0"ayyjdd"aP')
         save_and_check('default-vim-registers', ['one', 'one', 'three'])

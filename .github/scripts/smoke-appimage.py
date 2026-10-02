@@ -34,13 +34,21 @@ with (output / 'desktop.log').open('w') as log:
         if window.returncode or not window.stdout.strip():
             raise RuntimeError('No visible TeXstudio window')
         window_id = window.stdout.splitlines()[0]
-        subprocess.run(['xdotool', 'windowfocus', '--sync', window_id], check=True, timeout=10)
+        subprocess.run(['xdotool', 'windowactivate', '--sync', window_id], check=True, timeout=10)
         time.sleep(2)
         if process.poll() is not None:
             raise RuntimeError('AppImage exited during startup')
+        geometry = subprocess.run(['xdotool', 'getwindowgeometry', '--shell', window_id],
+                                  capture_output=True, text=True, check=True)
+        (output / 'window-geometry.log').write_text(geometry.stdout)
+        dimensions = dict(line.split('=', 1) for line in geometry.stdout.splitlines() if '=' in line)
+        # Activate the editor widget itself; top-level focus alone can leave a dock focused.
+        subprocess.run(['xdotool', 'mousemove', '--window', window_id,
+                        str(int(dimensions['WIDTH']) * 2 // 3),
+                        str(int(dimensions['HEIGHT']) // 4), 'click', '1'], check=True)
         # Named yank, delete, and paste through the packaged application's keyboard path.
         subprocess.run(['xdotool', 'key', '--clearmodifiers', 'Escape'], check=True)
-        subprocess.run(['xdotool', 'type', '--clearmodifiers', '--delay', '80', '"ayyjdd"aP'], check=True)
+        subprocess.run(['xdotool', 'type', '--clearmodifiers', '--delay', '80', 'gg0"ayyjdd"aP'], check=True)
         subprocess.run(['xdotool', 'type', '--clearmodifiers', '--delay', '80', ':w'], check=True)
         subprocess.run(['xdotool', 'key', 'Return'], check=True)
         deadline = time.monotonic() + 15

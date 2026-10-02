@@ -134,3 +134,19 @@ Not implemented in this branch:
 - full Vim regex and ex command parity
 
 This mode is intended as an opt-in experimental editor mode and does not change default TeXstudio behavior.
+
+## Development testing
+
+`Vim desktop tests` builds a Debug editor and runs the focused Vim, completion,
+and version suites on native Windows x86_64/ARM64 and macOS Intel/Apple Silicon
+runners. Linux CI runs the suite both offscreen and in an X11 desktop. Reports
+and a Unicode clipboard screenshot are saved as workflow artifacts.
+
+CD additionally exercises the packaged Linux x86_64 AppImage in Ubuntu 22.04/24.04,
+Debian 12/13, and Fedora 43 containers on hosted Linux runners. Each check verifies
+the commit identity, desktop startup, named-register editing, and saving through
+keyboard input. These distribution checks use containers, not separate virtual
+machines, and do not cover hardware acceleration or a full installed TeX system.
+
+Branch builds are test artifacts. Publishing a release requires explicit approval
+and a version tag; passing these checks alone does not publish or bump a version.

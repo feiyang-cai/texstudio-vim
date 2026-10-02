@@ -200,12 +200,12 @@ void LatexEditorViewTest::vimInsertEscape()
     QTest::keyClicks(edView->editor, "X");
     QTest::keyClick(edView->editor, Qt::Key_Escape);
 
-    QEQUAL(edView->editor->document()->text(), QString("Xabc"));
+    QEQUAL(edView->editor->document()->textLines().join("\n"), QString("Xabc"));
     QEQUAL(edView->editor->inputModeLabel(), QString("NORMAL"));
     QEQUAL(edView->editor->cursor().columnNumber(), 0);
 
     QTest::keyClick(edView->editor, Qt::Key_X);
-    QEQUAL(edView->editor->document()->text(), QString("abc"));
+    QEQUAL(edView->editor->document()->textLines().join("\n"), QString("abc"));
 
     edView->getConfig()->editingMode = oldMode;
     edView->updateSettings();
@@ -240,7 +240,7 @@ void LatexEditorViewTest::vimVisualLineStaysOnCurrentLine()
 
     QTest::keyClick(edView->editor, Qt::Key_D);
     // The source had no trailing newline; deleting its tail keeps that property.
-    QEQUAL(edView->editor->document()->text(), QString("alpha"));
+    QEQUAL(edView->editor->document()->textLines().join("\n"), QString("alpha"));
     QEQUAL(edView->editor->inputModeLabel(), QString("NORMAL"));
 
     edView->getConfig()->editingMode = oldMode;
@@ -323,7 +323,7 @@ void LatexEditorViewTest::vimVisualBlockDeleteAffectsAllRows()
     QTest::keyClick(edView->editor, Qt::Key_J);
     QTest::keyClick(edView->editor, Qt::Key_D);
 
-    QEQUAL(edView->editor->document()->text(), QString("lpha\neta\ngamma"));
+    QEQUAL(edView->editor->document()->textLines().join("\n"), QString("lpha\neta\ngamma"));
     QEQUAL(edView->editor->inputModeLabel(), QString("NORMAL"));
     QEQUAL(edView->editor->cursorMirrorCount(), 0);
 
@@ -361,7 +361,7 @@ void LatexEditorViewTest::vimVisualBlockInsertAtStart()
     QTest::keyClicks(edView->editor, "X");
     QTest::keyClick(edView->editor, Qt::Key_Escape);
 
-    QEQUAL(edView->editor->document()->text(), QString("Xalpha\nXbeta\ngamma"));
+    QEQUAL(edView->editor->document()->textLines().join("\n"), QString("Xalpha\nXbeta\ngamma"));
     QEQUAL(edView->editor->inputModeLabel(), QString("NORMAL"));
     QEQUAL(edView->editor->cursorMirrorCount(), 0);
 
@@ -391,7 +391,7 @@ void LatexEditorViewTest::vimCloseElementEscapesInsertMode()
     QTest::keyClicks(edView->editor, "X");
 
     QVERIFY(edView->closeElement());
-    QEQUAL(edView->editor->document()->text(), QString("Xabc"));
+    QEQUAL(edView->editor->document()->textLines().join("\n"), QString("Xabc"));
     QEQUAL(edView->editor->inputModeLabel(), QString("NORMAL"));
     QEQUAL(edView->editor->cursor().columnNumber(), 0);
 
@@ -418,7 +418,7 @@ void LatexEditorViewTest::vimCloseElementIsConsumedInNormalMode()
     QVERIFY(edView->editor->hasFocus());
 
     QVERIFY(edView->closeElement());
-    QEQUAL(edView->editor->document()->text(), QString("abc"));
+    QEQUAL(edView->editor->document()->textLines().join("\n"), QString("abc"));
     QEQUAL(edView->editor->inputModeLabel(), QString("NORMAL"));
     QEQUAL(edView->editor->cursor().columnNumber(), 1);
 
@@ -449,7 +449,7 @@ void LatexEditorViewTest::vimPromptEnterDoesNotInsertNewline()
     QTest::keyClicks(promptEdit, "2");
     QTest::keyClick(promptEdit, Qt::Key_Return);
 
-    QEQUAL(edView->editor->document()->text(), QString("alpha\nbeta\ngamma"));
+    QEQUAL(edView->editor->document()->textLines().join("\n"), QString("alpha\nbeta\ngamma"));
     QEQUAL(edView->editor->cursor().lineNumber(), 1);
     QEQUAL(edView->editor->inputModeLabel(), QString("NORMAL"));
 
@@ -551,7 +551,7 @@ void LatexEditorViewTest::vimMarks()
     QCoreApplication::sendEvent(edView->editor, &linewiseDeleteToMark);
     QTest::keyClick(edView->editor, Qt::Key_A);
 
-    QEQUAL(edView->editor->document()->text(), QString(""));
+    QEQUAL(edView->editor->document()->textLines().join("\n"), QString(""));
     QEQUAL(edView->editor->inputModeLabel(), QString("NORMAL"));
 
     edView->editor->setText("one\ntwo\nthree", false);
@@ -566,7 +566,7 @@ void LatexEditorViewTest::vimMarks()
     QTest::keyClick(edView->editor, Qt::Key_A);
     QTest::keyClick(edView->editor, Qt::Key_P);
 
-    QEQUAL(edView->editor->document()->text(), QString("one\ntwo\nthree\none\ntwo\nthree"));
+    QEQUAL(edView->editor->document()->textLines().join("\n"), QString("one\ntwo\nthree\none\ntwo\nthree"));
     QEQUAL(edView->editor->inputModeLabel(), QString("NORMAL"));
 
     edView->getConfig()->editingMode = oldMode;
@@ -589,7 +589,7 @@ void LatexEditorViewTest::vimDeleteLastLineMovesToPreviousLine()
     QTest::keyClick(edView->editor, Qt::Key_D);
     QTest::keyClick(edView->editor, Qt::Key_D);
 
-    QEQUAL(edView->editor->document()->text(), QString("one\n  two"));
+    QEQUAL(edView->editor->document()->textLines().join("\n"), QString("one\n  two"));
     QEQUAL(edView->editor->cursor().lineNumber(), 1);
     QEQUAL(edView->editor->cursor().columnNumber(), 2);
     QEQUAL(edView->editor->inputModeLabel(), QString("NORMAL"));
@@ -614,7 +614,7 @@ void LatexEditorViewTest::vimLinewisePasteKeepsCursorOnInsertedText()
     QTest::keyClicks(edView->editor, "Y");
     QTest::keyClick(edView->editor, Qt::Key_P);
 
-    QEQUAL(edView->editor->document()->text(), QString("    alpha\n    alpha\nbeta\ngamma"));
+    QEQUAL(edView->editor->document()->textLines().join("\n"), QString("    alpha\n    alpha\nbeta\ngamma"));
     QEQUAL(edView->editor->cursor().lineNumber(), 1);
     QEQUAL(edView->editor->cursor().columnNumber(), 4);
     QEQUAL(edView->editor->inputModeLabel(), QString("NORMAL"));
@@ -638,7 +638,7 @@ void LatexEditorViewTest::vimNormalModeConsumesUnhandledPrintableKeys()
 
     QTest::keyClicks(edView->editor, "H");
 
-    QEQUAL(edView->editor->document()->text(), QString("abc"));
+    QEQUAL(edView->editor->document()->textLines().join("\n"), QString("abc"));
     QEQUAL(edView->editor->inputModeLabel(), QString("NORMAL"));
 
     edView->getConfig()->editingMode = oldMode;
@@ -658,19 +658,19 @@ void LatexEditorViewTest::vimExSubstituteCommands()
     edView->editor->setCursorPosition(0, 0, false);
 
     QVERIFY(edView->executeVimExCommand("s/foo/X/"));
-    QEQUAL(edView->editor->document()->text(), QString("X foo\nfoo foo\nbar"));
+    QEQUAL(edView->editor->document()->textLines().join("\n"), QString("X foo\nfoo foo\nbar"));
 
     QVERIFY(edView->executeVimExCommand("%s/foo/Y/g"));
-    QEQUAL(edView->editor->document()->text(), QString("X Y\nY Y\nbar"));
+    QEQUAL(edView->editor->document()->textLines().join("\n"), QString("X Y\nY Y\nbar"));
 
     edView->editor->setText("foo foo\nfoo foo\nfoo foo", false);
     QVERIFY(edView->executeVimExCommand("1,2s/foo/Z/"));
-    QEQUAL(edView->editor->document()->text(), QString("Z foo\nZ foo\nfoo foo"));
+    QEQUAL(edView->editor->document()->textLines().join("\n"), QString("Z foo\nZ foo\nfoo foo"));
 
     edView->executeVimSearch("foo", false);
     edView->editor->setCursorPosition(2, 0, false);
     QVERIFY(edView->executeVimExCommand("s//Q/g"));
-    QEQUAL(edView->editor->document()->text(), QString("Z foo\nZ foo\nQ Q"));
+    QEQUAL(edView->editor->document()->textLines().join("\n"), QString("Z foo\nZ foo\nQ Q"));
 
     edView->getConfig()->editingMode = oldMode;
     edView->updateSettings();
@@ -762,7 +762,7 @@ void LatexEditorViewTest::vimRegisterCommands()
     edView->editor->setCursorPosition(0, 0, false);
     edView->editor->setFocus();
     QTest::keyClicks(edView->editor, keys);
-    const QString actual = edView->editor->document()->text();
+    const QString actual = edView->editor->document()->textLines().join("\n");
     const QString mode = edView->editor->inputModeLabel();
     edView->getConfig()->editingMode = oldMode;
     edView->updateSettings();
@@ -816,7 +816,7 @@ void LatexEditorViewTest::vimRegistersSharedAcrossViews()
     second.editor->setText("target", false);
     second.editor->setCursorPosition(0, 0, false);
     QTest::keyClicks(second.editor, "\"zP");
-    QCOMPARE(second.editor->document()->text(), QString("sourcetarget"));
+    QCOMPARE(second.editor->document()->textLines().join("\n"), QString("sourcetarget"));
     QTest::keyClicks(second.editor, "\"");
     QTest::keyClick(second.editor, Qt::Key_Escape);
     QTest::keyClicks(second.editor, "x");
@@ -838,12 +838,12 @@ void LatexEditorViewTest::vimClipboardRegisters()
     QTest::keyClicks(edView->editor, "\"+yy");
     const QString yanked = clipboard->text();
     QTest::keyClicks(edView->editor, "j\"+P");
-    const QString pasted = edView->editor->document()->text();
+    const QString pasted = edView->editor->document()->textLines().join("\n");
     clipboard->setText("external");
     edView->editor->setText("target", false);
     edView->editor->setCursorPosition(0, 0, false);
     QTest::keyClicks(edView->editor, "\"+P");
-    const QString externalPaste = edView->editor->document()->text();
+    const QString externalPaste = edView->editor->document()->textLines().join("\n");
     const VimRegister block{VimRegisterType::BlockWise, "a\nb", {"a", "b"}};
     vimRegisters().write('+', block, true);
     const VimRegister restored = vimRegisters().read('+');
@@ -871,15 +871,21 @@ void LatexEditorViewTest::vimDesktopClipboard()
     view.show();
     QVERIFY(QTest::qWaitForWindowExposed(&view));
     view.editor->setText("original", false);
+    // Register payloads use LF, while saving must retain the document format.
+    view.editor->document()->setLineEndingDirect(QDocument::Windows, true);
     view.editor->setCursorPosition(0, 0, false);
     view.editor->setFocus();
     QClipboard *clipboard = QApplication::clipboard();
     const QString previous = clipboard->text();
     clipboard->setText(QString::fromUtf8("αβ\r\n第二行\r\n"));
+    const VimRegister external = vimRegisters().read('+');
     QTest::keyClicks(view.editor, "\"+P");
-    const QString actual = view.editor->document()->text();
+    const QString actual = view.editor->document()->textLines().join("\n");
     clipboard->setText(previous);
+    QCOMPARE(external.text, QString::fromUtf8("αβ\n第二行\n"));
+    QCOMPARE(external.type, VimRegisterType::LineWise);
     QCOMPARE(actual, QString::fromUtf8("αβ\n第二行\noriginal"));
+    QCOMPARE(view.editor->document()->text(), QString::fromUtf8("αβ\r\n第二行\r\noriginal"));
 
     const VimRegister payload{VimRegisterType::LineWise, "primary\n", {}};
     vimRegisters().write('*', payload, true);

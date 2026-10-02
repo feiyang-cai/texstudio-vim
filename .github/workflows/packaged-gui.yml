@@ -37,6 +37,7 @@ jobs:
   desktop:
     name: Packaged retest (${{ matrix.runner }})
     needs: select
+    if: needs.select.outputs.run_id != ''
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 15
     strategy:
@@ -83,6 +84,7 @@ jobs:
   linux:
     name: AppImage retest (${{ matrix.name }})
     needs: select
+    if: needs.select.outputs.run_id != ''
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     strategy:

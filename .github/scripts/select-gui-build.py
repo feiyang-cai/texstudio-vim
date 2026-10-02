@@ -46,4 +46,8 @@ for run in candidates:
     print(f"Retesting package build {run['id']} at {sha}; application sources are unchanged")
     break
 else:
-    raise SystemExit('No complete package build with unchanged application sources; wait for CD and rerun')
+    if requested:
+        raise SystemExit('Requested build has no complete compatible package set')
+    print('No compatible completed packages yet; fresh CD builds will perform GUI checks.')
+    with Path(os.environ['GITHUB_OUTPUT']).open('a') as output:
+        output.write('run_id=\nsha=\n')

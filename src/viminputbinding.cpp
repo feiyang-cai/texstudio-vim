@@ -390,6 +390,10 @@ public:
             editor->undo();
             return true;
         }
+        if (m_mode == VimMode::Normal && isVimRedoShortcut(event)) {
+            editor->redo();
+            return true;
+        }
         if ((event->modifiers() & Qt::AltModifier) || ((event->modifiers() & Qt::MetaModifier) && !isVisualBlockShortcut(event))) {
             clearPending(editor);
             return false;
@@ -536,8 +540,11 @@ public:
 
     bool shouldOverrideShortcut(const QKeyEvent *event) const
     {
+        if (!event) return false;
+        if (isCtrlLeftBracket(event)) return true;
+        if (m_mode == VimMode::Normal && isVimRedoShortcut(event))
+            return true;
 #ifdef Q_OS_MAC
-        Q_UNUSED(event)
         return false;
 #else
         return event
@@ -702,9 +709,24 @@ private:
         return value;
     }
 
+    static bool hasVimControlModifier(const QKeyEvent *event)
+    {
+#ifdef Q_OS_MAC
+        // Qt maps physical Control to Meta and physical Command to Control.
+        return (event->modifiers() & (Qt::ControlModifier | Qt::MetaModifier)) != 0;
+#else
+        return (event->modifiers() & Qt::ControlModifier) != 0;
+#endif
+    }
+
+    static bool isVimRedoShortcut(const QKeyEvent *event)
+    {
+        return event && event->key() == Qt::Key_R && hasVimControlModifier(event);
+    }
+
     static bool isCtrlLeftBracket(const QKeyEvent *event)
     {
-        return event->key() == Qt::Key_BracketLeft && (event->modifiers() & Qt::ControlModifier);
+        return event->key() == Qt::Key_BracketLeft && hasVimControlModifier(event);
     }
 
     static bool isVisualBlockShortcut(const QKeyEvent *event)
@@ -995,7 +1017,7 @@ private:
 
     bool handleNormalMode(QKeyEvent *event, QEditor *editor)
     {
-        if (event->matches(QKeySequence::Redo) || (event->key() == Qt::Key_R && (event->modifiers() & Qt::ControlModifier))) {
+        if (event->matches(QKeySequence::Redo) || isVimRedoShortcut(event)) {
             editor->redo();
             return true;
         }

@@ -1536,7 +1536,7 @@ void Texstudio::setupMenus()
     newManagedAction(menu, "checklt", tr("Check LanguageTool"), SLOT(checkLanguageTool()));
     newManagedAction(menu, "showsettings", tr("Show settings"), SLOT(showSettings()));
 	newManagedAction(menu, "bugreport", tr("Bugs Report/Feature Request"), SLOT(openBugsAndFeatures()));
-	newManagedAction(menu, "appinfo", tr("About TeXstudio..."), SLOT(helpAbout()), 0, APPICON)->setMenuRole(QAction::AboutRole);
+	newManagedAction(menu, "appinfo", tr("About texstudio-vim..."), SLOT(helpAbout()), 0, APPICON)->setMenuRole(QAction::AboutRole);
 
 	//additional elements for development
 
@@ -12747,7 +12747,7 @@ void Texstudio::colorSchemeChanged(Qt::ColorScheme colorScheme)
  * \brief open webpage with txs issue submit
  */
 void Texstudio::openBugsAndFeatures() {
-	QDesktopServices::openUrl(QUrl("https://github.com/texstudio-org/texstudio/issues/"));
+	QDesktopServices::openUrl(QUrl("https://github.com/feiyang-cai/texstudio-vim/issues"));
 }
 /*!
  * \brief manipulate QMainWindowTabBar which contains the tabbed QDockWidget to only show icons

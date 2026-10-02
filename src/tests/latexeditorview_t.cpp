@@ -727,6 +727,7 @@ void LatexEditorViewTest::vimRegisterCommands_data()
     QTest::newRow("repeat named deletion") << "abcd" << "\"ax.\"aP" << "bcd";
     QTest::newRow("repeat named paste") << "abc" << "\"ayl\"ap." << "aaabc";
     QTest::newRow("visual paste preserves named source") << "abc" << "\"ayl vl\"ap\"aP" << "aac";
+    QTest::newRow("visual paste last character") << "abc" << "yl$vp" << "aba";
     QTest::newRow("visual paste undo") << "abc" << "ylvlpu" << "abc";
     QTest::newRow("empty visual paste is harmless") << "abc" << "vl\"zp" << "abc";
     QTest::newRow("repeat named line delete") << "one\ntwo\nthree" << "\"add.\"aP" << "two\nthree";

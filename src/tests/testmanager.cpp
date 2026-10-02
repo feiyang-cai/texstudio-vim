@@ -15,6 +15,8 @@
 #include "qeditor_t.h"
 #include "latexcompleter_t.h"
 #include "latexeditorview_t.h"
+#include "latexeditorview.h"
+#include "latexeditorview_config.h"
 #include "latexeditorview_bm.h"
 #include "latexstyleparser_t.h"
 #include "scriptengine_t.h"
@@ -127,13 +129,20 @@ QString TestManager::execute(TestLevel level, LatexEditorView* edView, QCodeEdit
     QCoreApplication *app = QCoreApplication::instance();
     TestmanagerEventFilter eventFilter;
     app->installNativeEventFilter(&eventFilter);*/
+    const int savedEditingMode = edView->getConfig()->editingMode;
 	for (int i=0; i <tests.size();i++){
+        // General editor suites exercise TeXstudio's standard input binding.
+        // Vim-specific tests select their mode explicitly; restore user state below.
+        edView->getConfig()->editingMode = LatexEditorViewConfig::StandardEditing;
+        edView->updateSettings();
 		emit newMessage(tests[i]->metaObject()->className());
 		qDebug()<<tests[i]->metaObject()->className();
 		QString res=performTest(tests[i]);
 		tr+=res;
 		if (!res.contains(", 0 failed, 0 skipped")) allPassed=false;
 	}
+    edView->getConfig()->editingMode = savedEditingMode;
+    edView->updateSettings();
     if (vimTests) {
         // Do not leave an edited test document that blocks automatic shutdown.
         editor->setText(QString(), false);

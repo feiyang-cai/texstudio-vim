@@ -3390,6 +3390,7 @@ static bool executeVimSubstituteCommand(LatexEditorView *view, const VimSubstitu
     QDocumentCursor lastReplacement;
     int replacedCount = 0;
 
+    view->document->beginMacro();
     for (int line = firstLine; line <= lastLine; ++line) {
         const int lineLength = view->document->line(line).length();
         if (lineLength == 0)
@@ -3403,6 +3404,7 @@ static bool executeVimSubstituteCommand(LatexEditorView *view, const VimSubstitu
         if (lineReplacements > 0 && search.lastReplacedPosition().isValid())
             lastReplacement = search.lastReplacedPosition().selectionStart();
     }
+    view->document->endMacro();
 
     if (replacedCount <= 0) {
         error = QCoreApplication::translate("LatexEditorView", "Pattern not found: %1").arg(command.pattern);

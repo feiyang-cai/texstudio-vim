@@ -23,7 +23,7 @@ config = output / 'config'
 config.mkdir(exist_ok=True)
 # These containers test editing and packaging, and intentionally omit TeX engines.
 (config / 'texstudio.ini').write_text(
-    '[texmaker]\nEditor\\EditingMode=1\nStartup\\CheckLatexConfiguration=false\n')
+    '[texmaker]\nStartup\\CheckLatexConfiguration=false\n')
 fixture = output / 'vim-smoke.tex'
 fixture.write_text('one\ntwo\nthree\n')
 with (output / 'desktop.log').open('w') as log:
@@ -75,6 +75,35 @@ with (output / 'desktop.log').open('w') as log:
         (output / 'saved-text.log').write_text(actual)
         if actual.splitlines() != ['XXone', 'one', 'three']:
             raise RuntimeError('Packaged uppercase insertion/dot repeat is incorrect; see saved-text.log')
+        def type_keys(text):
+            subprocess.run(['xdotool', 'type', '--clearmodifiers', '--delay', '80', text], check=True)
+
+        def save_and_check(label, expected):
+            type_keys(':w')
+            subprocess.run(['xdotool', 'key', 'Return'], check=True)
+            deadline = time.monotonic() + 15
+            while time.monotonic() < deadline:
+                actual = fixture.read_text().splitlines()
+                if actual == expected:
+                    (output / (label + '.txt')).write_text('\n'.join(actual))
+                    return
+                time.sleep(.2)
+            raise RuntimeError(f'{label}: expected {expected!r}, got {actual!r}')
+
+        type_keys('gg0RAB')
+        subprocess.run(['xdotool', 'key', 'Escape'], check=True)
+        save_and_check('replace-mode', ['ABone', 'one', 'three'])
+        type_keys(':%s/one/ONE/g')
+        subprocess.run(['xdotool', 'key', 'Return'], check=True)
+        save_and_check('global-substitution', ['ABONE', 'ONE', 'three'])
+        type_keys('/three')
+        subprocess.run(['xdotool', 'key', 'Return'], check=True)
+        type_keys('0rT')
+        save_and_check('forward-search', ['ABONE', 'ONE', 'Three'])
+        type_keys('?ABONE')
+        subprocess.run(['xdotool', 'key', 'Return'], check=True)
+        type_keys('0rZ')
+        save_and_check('backward-search', ['ZBONE', 'ONE', 'Three'])
         if process.poll() is not None:
             raise RuntimeError('AppImage exited unexpectedly during editing')
         print('AppImage version, desktop startup, named registers, uppercase insertion, dot repeat and save passed')

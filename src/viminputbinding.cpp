@@ -1272,6 +1272,50 @@ private:
         return false;
     }
 
+    static int vimWordClass(const QDocumentCursor &cursor)
+    {
+        if (cursor.atLineEnd()) return 0;
+        const QChar ch = cursor.nextChar();
+        if (ch.isSpace()) return 0;
+        return ch.isLetterOrNumber() || ch == QLatin1Char('_') ? 1 : 2;
+    }
+
+    static void moveVimWord(QDocumentCursor &cursor, VimMotion::Kind kind)
+    {
+        if (kind == VimMotion::WordBackward) {
+            if (cursor.atStart()) return;
+            cursor.movePosition(1, QDocumentCursor::PreviousCharacter);
+            while (!cursor.atStart() && vimWordClass(cursor) == 0)
+                cursor.movePosition(1, QDocumentCursor::PreviousCharacter);
+            const int category = vimWordClass(cursor);
+            while (!cursor.atStart()) {
+                QDocumentCursor previous(cursor);
+                previous.movePosition(1, QDocumentCursor::PreviousCharacter);
+                if (vimWordClass(previous) != category) break;
+                cursor = previous;
+            }
+            return;
+        }
+        if (kind == VimMotion::WordForward) {
+            const int category = vimWordClass(cursor);
+            while (!cursor.atEnd() && vimWordClass(cursor) == category)
+                cursor.movePosition(1, QDocumentCursor::NextCharacter);
+        } else if (!cursor.atEnd()) {
+            cursor.movePosition(1, QDocumentCursor::NextCharacter);
+        }
+        while (!cursor.atEnd() && vimWordClass(cursor) == 0)
+            cursor.movePosition(1, QDocumentCursor::NextCharacter);
+        if (kind == VimMotion::WordEnd) {
+            const int category = vimWordClass(cursor);
+            while (!cursor.atEnd()) {
+                QDocumentCursor next(cursor);
+                next.movePosition(1, QDocumentCursor::NextCharacter);
+                if (next.atEnd() || vimWordClass(next) != category) break;
+                cursor = next;
+            }
+        }
+    }
+
     void moveByMotion(QEditor *editor, const VimMotion &motion)
     {
         QDocumentCursor cursor = editor->cursor();
@@ -1281,13 +1325,13 @@ private:
             cursor.movePosition(1, QDocumentCursor::PreviousCharacter);
         for (int i = 0; i < motion.count; ++i) {
             switch (motion.kind) {
-            case VimMotion::Left: cursor.movePosition(1, QDocumentCursor::PreviousCharacter); break;
-            case VimMotion::Right: cursor.movePosition(1, QDocumentCursor::NextCharacter); break;
+            case VimMotion::Left: if (!cursor.atLineStart()) cursor.movePosition(1, QDocumentCursor::PreviousCharacter); break;
+            case VimMotion::Right: if (!cursor.atLineEnd()) cursor.movePosition(1, QDocumentCursor::NextCharacter); break;
             case VimMotion::Up: cursor.movePosition(1, QDocumentCursor::Up); break;
             case VimMotion::Down: cursor.movePosition(1, QDocumentCursor::Down); break;
-            case VimMotion::WordForward: cursor.movePosition(1, QDocumentCursor::NextWord); break;
-            case VimMotion::WordBackward: cursor.movePosition(1, QDocumentCursor::PreviousWord); break;
-            case VimMotion::WordEnd: cursor.movePosition(1, QDocumentCursor::EndOfWord); break;
+            case VimMotion::WordForward: moveVimWord(cursor, motion.kind); break;
+            case VimMotion::WordBackward: moveVimWord(cursor, motion.kind); break;
+            case VimMotion::WordEnd: moveVimWord(cursor, motion.kind); break;
             case VimMotion::LineStart: cursor.movePosition(1, QDocumentCursor::StartOfLine); break;
             case VimMotion::LineStartText: cursor.movePosition(1, QDocumentCursor::StartOfLineText); break;
             case VimMotion::LineEnd: cursor.movePosition(1, QDocumentCursor::EndOfLine); break;
@@ -1416,13 +1460,13 @@ private:
     {
         for (int i = 0; i < motion.count; ++i) {
             switch (motion.kind) {
-            case VimMotion::Left: cursor.movePosition(1, QDocumentCursor::PreviousCharacter); break;
-            case VimMotion::Right: cursor.movePosition(1, QDocumentCursor::NextCharacter); break;
+            case VimMotion::Left: if (!cursor.atLineStart()) cursor.movePosition(1, QDocumentCursor::PreviousCharacter); break;
+            case VimMotion::Right: if (!cursor.atLineEnd()) cursor.movePosition(1, QDocumentCursor::NextCharacter); break;
             case VimMotion::Up: cursor.movePosition(1, QDocumentCursor::Up); break;
             case VimMotion::Down: cursor.movePosition(1, QDocumentCursor::Down); break;
-            case VimMotion::WordForward: cursor.movePosition(1, QDocumentCursor::NextWord); break;
-            case VimMotion::WordBackward: cursor.movePosition(1, QDocumentCursor::PreviousWord); break;
-            case VimMotion::WordEnd: cursor.movePosition(1, QDocumentCursor::EndOfWord); break;
+            case VimMotion::WordForward: moveVimWord(cursor, motion.kind); break;
+            case VimMotion::WordBackward: moveVimWord(cursor, motion.kind); break;
+            case VimMotion::WordEnd: moveVimWord(cursor, motion.kind); break;
             case VimMotion::LineStart: cursor.movePosition(1, QDocumentCursor::StartOfLine); break;
             case VimMotion::LineStartText: cursor.movePosition(1, QDocumentCursor::StartOfLineText); break;
             case VimMotion::LineEnd: cursor.movePosition(1, QDocumentCursor::EndOfLine); break;
@@ -1703,7 +1747,12 @@ private:
 
     void changeToLineEnd(QEditor *editor)
     {
+        const int line = editor->cursor().lineNumber();
+        const int column = editor->cursor().columnNumber();
         deleteToLineEnd(editor);
+        // Insert at the deleted range's start, including the new end of line.
+        // Normal-mode clamping in deleteToLineEnd moves left at that boundary.
+        editor->setCursorPosition(line, column, false);
         startInsertSession(QStringLiteral("i"), editor);
     }
 

@@ -121,6 +121,10 @@ with (output / 'application.log').open('w') as log:
         # The title appears before startup finishes arranging the editor/docks.
         # Re-read geometry after startup so the click uses the final editor area.
         time.sleep(3)
+        if sys.platform != 'darwin':
+            # First-login setup can leave the Start menu over the app window.
+            gui.press('esc')
+            time.sleep(.2)
         geometry = activate(process.pid)
         if not geometry:
             raise RuntimeError('Fixture window disappeared during startup')

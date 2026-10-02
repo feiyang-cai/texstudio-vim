@@ -20,6 +20,7 @@ jobs:
       sha: ${{ steps.request.outputs.sha }}
       run_id: ${{ steps.request.outputs.run_id }}
       prerelease: ${{ steps.request.outputs.prerelease }}
+      gui_required: ${{ steps.request.outputs.gui_required }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -30,11 +31,13 @@ jobs:
         run: python3 .github/scripts/read-release-request.py
   gui:
     needs: prepare
+    if: needs.prepare.outputs.gui_required == 'true'
     uses: ./.github/workflows/packaged-gui.yml
     with:
       build_run_id: ${{ needs.prepare.outputs.run_id }}
   publish:
     needs: [prepare, gui]
+    if: always() && needs.prepare.result == 'success' && (needs.gui.result == 'success' || (needs.gui.result == 'skipped' && needs.prepare.outputs.gui_required == 'false'))
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -53,7 +56,8 @@ jobs:
         run: |
           test "$(find . -maxdepth 1 -type f | wc -l)" -eq 7
           sha256sum * > hashes.txt
-      - uses: softprops/action-gh-release@v3
+      - id: draft
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.prepare.outputs.tag }}
           name: ${{ needs.prepare.outputs.tag }}
@@ -71,4 +75,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+          RELEASE_ID: ${{ steps.draft.outputs.id }}
         run: python3 .github/scripts/publish-verified-release.py

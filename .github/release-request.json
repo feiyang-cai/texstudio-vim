@@ -1,5 +1,6 @@
 {
   "tag": "texstudio-vim-4.9.8-r1",
   "sha": "f585da64e6406d30d7a374f51f9d6df935bf62ef",
-  "build_run_id": 37057580110
+  "build_run_id": 37057580110,
+  "verified_gui_run_id": 37060409789
 }

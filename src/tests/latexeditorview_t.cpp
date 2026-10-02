@@ -847,5 +847,43 @@ void LatexEditorViewTest::vimClipboardRegisters()
     QCOMPARE(restored.blocks, block.blocks);
 }
 
+void LatexEditorViewTest::vimDesktopClipboard()
+{
+    if (skipVimUiTestInQuickRuns())
+        return;
+    qInfo() << "desktop platform:" << QGuiApplication::platformName()
+            << "primary selection:" << QApplication::clipboard()->supportsSelection();
+    LatexEditorViewConfig config = *edView->getConfig();
+    config.editingMode = LatexEditorViewConfig::VimEditing;
+    LatexDocument document;
+    LatexEditorView view(nullptr, &config, &document);
+    view.resize(900, 500);
+    view.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&view));
+    view.editor->setText("original", false);
+    view.editor->setCursorPosition(0, 0, false);
+    view.editor->setFocus();
+    QClipboard *clipboard = QApplication::clipboard();
+    const QString previous = clipboard->text();
+    clipboard->setText(QString::fromUtf8("αβ\r\n第二行\r\n"));
+    QTest::keyClicks(view.editor, "\"+P");
+    const QString actual = view.editor->document()->text();
+    clipboard->setText(previous);
+    QCOMPARE(actual, QString::fromUtf8("αβ\n第二行\noriginal"));
+
+    const VimRegister payload{VimRegisterType::LineWise, "primary\n", {}};
+    vimRegisters().write('*', payload, true);
+    const VimRegister restored = vimRegisters().read('*');
+    QCOMPARE(restored.text, payload.text);
+    QCOMPARE(restored.type, payload.type);
+    const QString screenshotDir = qEnvironmentVariable("TEXSTUDIO_TEST_SCREENSHOT_DIR");
+    if (!screenshotDir.isEmpty()) {
+        QVERIFY(QDir().mkpath(screenshotDir));
+        QTest::qWait(50);
+        QVERIFY(view.grab().save(screenshotDir + "/vim-desktop.png"));
+    }
+    view.hide();
+}
+
 #endif
 

@@ -4,6 +4,7 @@
 
 #include "mostQtHeaders.h"
 #include "utilsVersion.h"
+#include "updatechecker.h"
 #include "testutil.h"
 #include <QtTest/QtTest>
 
@@ -12,6 +13,47 @@ class VersionTest: public QObject{
 public:
 	VersionTest(bool executeAllTests) : allTests(executeAllTests) {}
 private slots:
+    void forkReleaseRevisionComparison() {
+        const auto r0 = Version::fromVimTag("texstudio-vim-4.9.9beta2-r0");
+        const auto r1 = Version::fromVimTag("texstudio-vim-4.9.9beta2-r1");
+        const auto r10 = Version::fromVimTag("texstudio-vim-4.9.9beta2-r10");
+        QVERIFY(r0.isValid());
+        QVERIFY(r1 > r0);
+        QVERIFY(r10 > r1);
+        QVERIFY(!(r0 > r1));
+        QCOMPARE(Version::versionToString(r1), QString("texstudio-vim-4.9.9beta2-r1"));
+        QVERIFY(Version::fromVimTag("texstudio-vim-4.9.9-r0") > r10);
+        QVERIFY(Version::fromVimTag("texstudio-vim-4.10.0beta1-r0") > r10);
+        QVERIFY(Version::fromVimTag("texstudio-vim-4.9.9beta3-r0") > r10);
+    }
+    void forkDevelopmentRevisionComparison() {
+        const auto development = Version::fromVimTag("texstudio-vim-4.9.9beta2-r0-22-g29d7acf46");
+        QVERIFY(development.isValid());
+        QVERIFY(development > Version::fromVimTag("texstudio-vim-4.9.9beta2-r0"));
+        QVERIFY(Version::fromVimTag("texstudio-vim-4.9.9beta2-r1") > development);
+    }
+    void forkReleaseTagRejection() {
+        for (const QString &tag : {"4.9.9", "upstream/4.9.9", "texstudio-vim-4.9.9-r-1", "texstudio-vim-4.9.9-r1-extra", "texstudio-vim-4.9.9-r999999999999999999"})
+            QVERIFY(!Version::fromVimTag(tag).isValid());
+    }
+    void forkPublishedReleaseFiltering() {
+        const auto versions = UpdateChecker::releaseVersions(R"([
+          {"tag_name":"texstudio-vim-4.9.9beta2-r1","published_at":"2026-10-02","prerelease":true},
+          {"tag_name":"texstudio-vim-4.9.8-r10","published_at":"2026-10-01"},
+          {"tag_name":"texstudio-vim-4.9.8-r2","published_at":"2026-10-02"},
+          {"tag_name":"texstudio-vim-9.0.0-r0","published_at":"2026-10-02","draft":true},
+          {"tag_name":"texstudio-vim-9.0.0-r1","published_at":null},
+          {"tag_name":"texstudio-vim-9.0.0-r2","published_at":"2026-10-02","prerelease":true},
+          {"tag_name":"9.0.0","published_at":"2026-10-02"},
+          {"tag_name":"texstudio-vim-4.9.9beta2-r1-2-gabcdef","published_at":"2026-10-02"}
+        ])");
+        QCOMPARE(versions.size(), 3);
+        QCOMPARE(versions[0].type, QString("beta"));
+        QVERIFY(versions[1] > versions[2]); // numeric revision, independent of publication order
+        QVERIFY(UpdateChecker::releaseVersions("invalid JSON").isEmpty());
+        QVERIFY(UpdateChecker::releaseVersions(R"({"message":"API error"})").isEmpty());
+    }
+
 	void parseGitData_data() {
 		QTest::addColumn<QString>("gitData");
 		QTest::addColumn<QStringList>("list");

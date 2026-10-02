@@ -115,8 +115,23 @@ Version::VersionCompareResult Version::compareIntVersion(const QList<int> &v1, c
  * If version is identical, take commitsafter/revision from git
  * \return
  */
+Version Version::fromVimTag(const QString &tag)
+{
+    static const QRegularExpression pattern(QStringLiteral("^texstudio-vim-([0-9]+\\.[0-9]+\\.[0-9]+)(?:(alpha|beta|rc)([0-9]+))?-r([0-9]+)(?:-([0-9]+)-g[0-9a-f]+)?$"));
+    const auto match = pattern.match(tag);
+    if (!match.hasMatch()) return Version();
+    bool revisionOk = false;
+    const int vimRevision = match.captured(4).toInt(&revisionOk);
+    if (!revisionOk) return Version();
+    Version v(match.captured(1), match.captured(2).isEmpty() ? "stable" : match.captured(2),
+              match.captured(3).toInt(), match.captured(5).toInt());
+    v.vimRevision = vimRevision;
+    return v;
+}
+
 Version Version::current()
 {
+    const Version fork = fromVimTag(QString::fromLatin1(TEXSTUDIO_GIT_REVISION));
     Version v;
     QStringList vp_base = stringVersion2Parts(TXSVERSION);
     if (!vp_base.isEmpty()) {
@@ -142,6 +157,11 @@ Version Version::current()
         }
 	}
 
+    if (fork.isValid()) {
+        const QString platform = v.platform;
+        v = fork;
+        v.platform = platform;
+    }
 	return v;
 }
 
@@ -155,6 +175,7 @@ QString Version::versionToString(const Version &v)
 		if (!(v.type.toLower() == "stable") || v.revision > 0) {
 			s += v.type + QString("%1").arg(v.revision);
 		}
+        if (v.vimRevision >= 0) s = "texstudio-vim-" + s + QString("-r%1").arg(v.vimRevision);
 		if (v.commitsAfter > 0)
 			s += QString("-%1").arg(v.commitsAfter);
 	}
@@ -167,8 +188,9 @@ bool Version::operator >(const Version &other) const
     if (res != Same)
         return (res == Higher);
     if (type.toLower() == other.type.toLower()){
-        bool revisionLarger = (revision > other.revision) || (revision == other.revision && commitsAfter > other.commitsAfter);
-        return revisionLarger;
+        if (revision != other.revision) return revision > other.revision;
+        if (vimRevision != other.vimRevision) return vimRevision > other.vimRevision;
+        return commitsAfter > other.commitsAfter;
     }
     int lvl = levelList.indexOf(type.toLower());
     int lvl_other = levelList.indexOf(other.type.toLower());

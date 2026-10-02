@@ -1814,10 +1814,18 @@ private:
             leaveVisualMode(editor, true);
             return;
         }
+        const bool characterSelection = m_mode == VimMode::Visual;
+        const int insertionLine = editor->cursor().startLineNumber();
+        const int insertionColumn = editor->cursor().startColumnNumber();
         // A visual put updates the unnamed delete register, not its named source.
         m_selectedRegister = QLatin1Char('"');
         editor->document()->beginMacro();
         deleteVisualSelection(editor, false);
+        if (characterSelection) {
+            const int line = qMin(insertionLine, editor->document()->lineCount() - 1);
+            editor->setCursor(QDocumentCursor(editor->document(), line,
+                    qMin(insertionColumn, editor->document()->line(line).length())));
+        }
         putRegisterValue(editor, false, source);
         editor->document()->endMacro();
     }

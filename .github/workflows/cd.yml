@@ -6,6 +6,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: cd-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
 env:
   OSX_QT_VERSION: 6.11.1
   OSX_POPPLER_VERSION: 26.08.0

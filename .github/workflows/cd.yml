@@ -463,6 +463,10 @@ jobs:
         with:
           name: ${{ matrix.artifact }}
           path: native-package
+      - name: Prepare disposable Windows desktop
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: .github/scripts/prepare-windows-gui.ps1
       - name: Desktop input dependencies
         run: python -m pip install pyautogui pillow
       - name: Packaged OS keyboard and mouse tests

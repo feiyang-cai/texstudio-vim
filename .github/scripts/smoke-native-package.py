@@ -12,6 +12,8 @@ import zipfile
 
 import pyautogui as gui
 
+input_driver = gui
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--packages', default='native-package')
 parser.add_argument('--output', default='native-smoke-results')
@@ -35,6 +37,8 @@ else:
     with zipfile.ZipFile(archives[0]) as archive:
         archive.extractall(installation)
     executable, = installation.rglob('texstudio.exe')
+    from windows_desktop_input import WindowsDesktopInput
+    input_driver = WindowsDesktopInput()
     user32 = ctypes.windll.user32
     # Windows desktop handles are pointer sized on both x64 and ARM64.
     user32.GetForegroundWindow.restype = ctypes.c_void_p
@@ -78,8 +82,7 @@ def activate(pid):
                 title = ctypes.create_unicode_buffer(user32.GetWindowTextLengthW(hwnd) + 1)
                 user32.GetWindowTextW(hwnd, title, len(title))
                 if 'vim-native-smoke.tex' in title.value:
-                    user32.ShowWindow(hwnd, 9)
-                    user32.SetForegroundWindow(hwnd)
+                    input_driver.activate(hwnd)
                     from ctypes.wintypes import RECT
                     bounds = RECT()
                     user32.GetWindowRect(ctypes.c_void_p(hwnd), ctypes.byref(bounds))
@@ -91,11 +94,11 @@ def activate(pid):
     return None
 
 def type_keys(text):
-    gui.write(text, interval=.09)
+    input_driver.write(text, interval=.09)
 
 def save_and_check(label, expected):
     type_keys(':w')
-    gui.press('enter')
+    input_driver.press('enter')
     deadline = time.monotonic() + 15
     while time.monotonic() < deadline:
         actual = fixture.read_text(encoding='utf-8').splitlines()
@@ -123,14 +126,14 @@ with (output / 'application.log').open('w') as log:
         time.sleep(3)
         if sys.platform != 'darwin':
             # First-login setup can leave the Start menu over the app window.
-            gui.press('esc')
+            input_driver.press('esc')
             time.sleep(.2)
         geometry = activate(process.pid)
         if not geometry:
             raise RuntimeError('Fixture window disappeared during startup')
         (output / 'window.json').write_text(json.dumps(geometry))
         x, y, width, height = geometry
-        gui.click(x + width * 2 // 3, y + height // 4)
+        input_driver.click(x + width * 2 // 3, y + height // 4)
         time.sleep(.5)
         gui.screenshot().save(output / 'before-input.png')
         if sys.platform != 'darwin':
@@ -140,29 +143,29 @@ with (output / 'application.log').open('w') as log:
             (output / 'focus.json').write_text(json.dumps({'expected_pid': process.pid, 'foreground_pid': owner.value}))
             if owner.value != process.pid:
                 raise RuntimeError('Desktop focus did not reach the packaged application')
-        gui.press('esc')
+        input_driver.press('esc')
         type_keys('gg0"ayyjdd"aP')
         save_and_check('default-vim-registers', ['one', 'one', 'three'])
         type_keys('gg0iX')
-        gui.press('esc')
+        input_driver.press('esc')
         type_keys('l.')
         save_and_check('insert-dot', ['XXone', 'one', 'three'])
         type_keys('gg0RAB')
-        gui.press('esc')
+        input_driver.press('esc')
         save_and_check('replace-mode', ['ABone', 'one', 'three'])
         type_keys(':%s/one/ONE/g')
-        gui.press('enter')
+        input_driver.press('enter')
         save_and_check('global-substitution', ['ABONE', 'ONE', 'three'])
         type_keys('u')
         save_and_check('substitution-undo', ['ABone', 'one', 'three'])
-        gui.hotkey('ctrl', 'r')
+        input_driver.hotkey('ctrl', 'r')
         save_and_check('substitution-redo', ['ABONE', 'ONE', 'three'])
         type_keys('/three')
-        gui.press('enter')
+        input_driver.press('enter')
         type_keys('0rT')
         save_and_check('forward-search', ['ABONE', 'ONE', 'Three'])
         type_keys('?ABONE')
-        gui.press('enter')
+        input_driver.press('enter')
         type_keys('0rZ')
         save_and_check('backward-search', ['ZBONE', 'ONE', 'Three'])
         (output / 'result.json').write_text(json.dumps({'status':'passed', 'input':'OS keyboard and mouse', 'default':'Vim'}))

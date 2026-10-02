@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - .github/scripts/smoke-native-package.py
+      - .github/scripts/windows_desktop_input.py
       - .github/scripts/prepare-windows-gui.ps1
       - .github/scripts/select-gui-build.py
       - .github/workflows/packaged-gui.yml

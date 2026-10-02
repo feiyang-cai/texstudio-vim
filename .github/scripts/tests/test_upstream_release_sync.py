@@ -83,6 +83,17 @@ class UpstreamReleaseSyncTests(unittest.TestCase):
         self.assertEqual(controller.changed_release_controls(files),
                          ['.github/workflows/upstream-release-sync.yml'])
 
+    def test_changed_or_closed_pull_request_head_is_rejected(self):
+        pr = {'head': {'sha': 'a' * 40}}
+        controller.check_pr_head_is_current(pr, {
+            'state': 'open', 'head': {'sha': 'a' * 40}, 'mergeable': True})
+        with self.assertRaises(RuntimeError):
+            controller.check_pr_head_is_current(pr, {
+                'state': 'open', 'head': {'sha': 'b' * 40}, 'mergeable': True})
+        with self.assertRaises(RuntimeError):
+            controller.check_pr_head_is_current(pr, {
+                'state': 'closed', 'head': {'sha': 'a' * 40}, 'mergeable': True})
+
     def test_fork_release_tag_parser_keeps_revision(self):
         self.assertEqual(
             controller.FORK_RELEASE_TAG.fullmatch(

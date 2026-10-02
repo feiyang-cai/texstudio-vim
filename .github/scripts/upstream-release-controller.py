@@ -147,6 +147,12 @@ def changed_release_controls(files):
             if file['filename'] in PROTECTED_PATHS]
 
 
+def check_pr_head_is_current(pr, fresh):
+    if (fresh['state'] != 'open' or fresh['head']['sha'] != pr['head']['sha']
+            or fresh['mergeable'] is not True):
+        raise RuntimeError('Sync PR is stale, changed, closed, or has unresolved conflicts')
+
+
 def validate_sync_metadata(pr, baseline):
     head_sha = pr['head']['sha']
     if pr['user']['login'] not in ('Copilot', 'copilot-swe-agent[bot]'):
@@ -192,8 +198,7 @@ def verify_sync_pr(pr, baseline):
         time.sleep(5)
     else:
         raise RuntimeError('GitHub could not determine whether the sync PR is conflict-free')
-    if fresh['state'] != 'open' or fresh['head']['sha'] != head_sha or fresh['mergeable'] is not True:
-        raise RuntimeError('Sync PR is stale, changed, closed, or has unresolved conflicts')
+    check_pr_head_is_current(pr, fresh)
     return fresh, kind, upstream_tag
 
 

@@ -93,7 +93,41 @@ def activate(pid):
             return result[0]
     return None
 
+def ensure_windows_input_focus():
+    if sys.platform == 'darwin':
+        return
+    api = ctypes.windll.user32
+    api.GetForegroundWindow.restype = ctypes.c_void_p
+    foreground = api.GetForegroundWindow()
+    owner = ctypes.c_ulong()
+    api.GetWindowThreadProcessId(foreground, ctypes.byref(owner))
+    if owner.value == process.pid:
+        return
+    api.GetWindowTextLengthW.argtypes = [ctypes.c_void_p]
+    api.GetWindowTextW.argtypes = [ctypes.c_void_p, ctypes.c_wchar_p, ctypes.c_int]
+    title = ctypes.create_unicode_buffer(api.GetWindowTextLengthW(foreground) + 1)
+    api.GetWindowTextW(foreground, title, len(title))
+    gui.screenshot().save(output / 'interrupted-desktop.png')
+    # A delayed first-login WSL installer can steal focus after startup passed.
+    # Close only its known setup window on this disposable hosted CI machine.
+    if 'wsl.exe' not in title.value.lower():
+        raise RuntimeError(f'Unexpected desktop focus loss: pid={owner.value}, title={title.value!r}')
+    print('Closing delayed hosted-runner WSL setup:', title.value, flush=True)
+    api.PostMessageW.argtypes = [ctypes.c_void_p, ctypes.c_uint, ctypes.c_size_t, ctypes.c_ssize_t]
+    api.PostMessageW(foreground, 0x0010, 0, 0) # WM_CLOSE
+    time.sleep(.5)
+    geometry = activate(process.pid)
+    if not geometry:
+        raise RuntimeError('Application window missing after closing runner setup')
+    x, y, width, height = geometry
+    input_driver.click(x + width * 2 // 3, y + height // 4)
+    time.sleep(.2)
+    api.GetWindowThreadProcessId(api.GetForegroundWindow(), ctypes.byref(owner))
+    if owner.value != process.pid:
+        raise RuntimeError('Application did not regain desktop focus')
+
 def type_keys(text):
+    ensure_windows_input_focus()
     input_driver.write(text, interval=.09)
 
 def save_and_check(label, expected):

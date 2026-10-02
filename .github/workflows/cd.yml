@@ -735,7 +735,7 @@ jobs:
       actions: write # for GeekyEggo/delete-artifact to delete artifacts
       contents: write # for softprops/action-gh-release to create GitHub release
     name: Release
-    needs: [verify, build-win10, build-win10-arm, build-linux-release, macosx, macosxM1] # build-linux-win,macosx-qt5 is disabled
+    needs: [verify, build-win10, build-win10-arm, build-linux-release, macosx, macosxM1, native-package-smoke, appimage-smoke]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/texstudio-vim-')
     steps:
@@ -760,7 +760,7 @@ jobs:
           body: |
             Native experimental Vim editing for TeXstudio. Release names identify the upstream base and the independent fork revision: `texstudio-vim-<upstream-version>-rN`.
 
-            `r0` is the current Vim baseline; subsequent fork updates on the same upstream base increment `rN`. Enable Vim in Options > Configure TeXstudio > Editor > Editing Mode. See [Vim support](https://github.com/feiyang-cai/texstudio-vim/blob/master/VIM_MODE.md) and [release versioning](https://github.com/feiyang-cai/texstudio-vim/blob/master/RELEASES.md).
+            `r0` is the original Vim baseline; `r1` expands typed/shared/clipboard registers, editing modes, motions, search and substitution, and fixes undo/redo and Ctrl-click navigation in Normal mode. Vim is the default for fresh configurations; saved editing-mode preferences are preserved. Update notifications use this fork's published releases and compare Vim revisions. Installation of updates remains manual. See [Vim support](https://github.com/feiyang-cai/texstudio-vim/blob/master/VIM_MODE.md) and [release versioning](https://github.com/feiyang-cai/texstudio-vim/blob/master/RELEASES.md).
           fail_on_unmatched_files: true
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
           files: ./*

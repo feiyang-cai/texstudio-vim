@@ -17,6 +17,7 @@ public:
 	static UpdateChecker *instance();
 
 	static QString lastCheckAsString();
+    static QList<Version> releaseVersions(const QByteArray &data);
 	QString latestVersion() { return latestStableVersion.versionNumber; }  // returns the version number retrieved in last check(), empty if no check has been performed so far
 	void autoCheck();
 	void check(bool m_silent = true, int currentComboBoxUpdateLevel = -1);

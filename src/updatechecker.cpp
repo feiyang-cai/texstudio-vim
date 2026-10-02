@@ -1,4 +1,7 @@
 #include "updatechecker.h"
+#include <QJsonDocument>
+#include <QJsonArray>
+#include <QJsonObject>
 #include "smallUsefulFunctions.h"
 #include "utilsVersion.h"
 #include "configmanager.h"
@@ -54,7 +57,7 @@ void UpdateChecker::check(bool silent, int currentComboBoxUpdateLevel)
 
 	this->silent = silent;
     networkManager = new QNetworkAccessManager();
-    QNetworkRequest request = QNetworkRequest(QUrl("https://api.github.com/repos/texstudio-org/texstudio/git/refs/tags"));
+    QNetworkRequest request = QNetworkRequest(QUrl("https://api.github.com/repos/feiyang-cai/texstudio-vim/releases?per_page=100"));
 	request.setRawHeader("User-Agent", "TeXstudio Update Checker");
 	QNetworkReply *reply = networkManager->get(request);
 	connect(reply, SIGNAL(finished()), this, SLOT(onRequestCompleted()));
@@ -103,53 +106,35 @@ void UpdateChecker::onRequestCompleted()
     networkManager=nullptr;
 }
 
+QList<Version> UpdateChecker::releaseVersions(const QByteArray &data)
+{
+    QList<Version> versions;
+    const auto document = QJsonDocument::fromJson(data);
+    if (!document.isArray()) return versions;
+    for (const auto &entry : document.array()) {
+        const auto release = entry.toObject();
+        if (release.value("draft").toBool() || release.value("published_at").toString().isEmpty()) continue;
+        const Version version = Version::fromVimTag(release.value("tag_name").toString());
+        if (!version.isValid() || version.commitsAfter != 0) continue;
+        if (release.value("prerelease").toBool() && version.type == "stable") continue;
+        versions << version;
+    }
+    return versions;
+}
+
 void UpdateChecker::parseData(const QByteArray &data)
 {
-    // parsing of github api result (tags)
-    QString result=QString(data);
-	QStringList items = Version::parseGitData(result);
-    QStringList tags;
-    foreach(const QString& item, items){
-		int pos = item.indexOf("\"ref\":\"refs/tags/");	// "\"ref\":\"refs/tags/" has length 17
-        if(pos>=0){
-            QString zw = item.mid(pos+17, item.indexOf("\"", pos+17) - (pos+17));
-//			qDebug() << zw;
-            tags<<zw;
-        }
+    latestStableVersion = Version();
+    latestReleaseCandidateVersion = Version();
+    latestDevVersion = Version();
+    for (const Version &version : releaseVersions(data)) {
+        Version *latest = version.type == "stable" ? &latestStableVersion
+                          : version.type == "rc" ? &latestReleaseCandidateVersion : &latestDevVersion;
+        if (!latest->isValid() || version > *latest) *latest = version;
     }
-    bool rcFound = false;
-    bool devFound = false;
-    for(int j=tags.length()-1;j>=0;j--){
-        QString tag=tags.value(j);
-        QStringList parts = Version::stringVersion2Parts(tag);
-//		qDebug() << parts[0] << parts[1] << parts[2] << parts[3];
-		if (!parts.isEmpty()) {
-            QString ver = parts[0];
-            QString type = parts[1];
-            int revision = parts[2].toInt();
-            if (!rcFound && type.toLower() == "rc"){
-                rcFound = true;
-                Version v( ver, type, revision);
-                latestReleaseCandidateVersion = v;
-            }
-            if (!devFound && ( type.toLower() == "beta" || type.toLower() == "alpha" )){
-                devFound = true;
-                Version v( ver, type, revision);
-                latestDevVersion = v;
-            }
-            if (type.isEmpty() || type.toLower() == "stable"){
-                Version v( ver, "stable", revision);
-                latestStableVersion = v;
-                if (latestStableVersion.isValid())
-                    emit dataParsed(latestStableVersion.versionNumber);
-                if (!latestDevVersion.isValid())
-                    latestDevVersion = v;
-                if (!latestReleaseCandidateVersion.isValid())
-                    latestReleaseCandidateVersion = v;
-                break; // all other versions are older, so abort after first release
-            }
-        }
-    }
+    if (latestStableVersion.isValid()) emit dataParsed(latestStableVersion.versionNumber);
+    if (!latestReleaseCandidateVersion.isValid()) latestReleaseCandidateVersion = latestStableVersion;
+    if (!latestDevVersion.isValid()) latestDevVersion = latestStableVersion;
 }
 
 void UpdateChecker::checkForNewVersion()
@@ -168,8 +153,8 @@ void UpdateChecker::checkForNewVersion()
 	bool checkReleaseCandidate = updateLevel >= 1;
 	bool checkDevVersions = updateLevel >= 2;
 	Version currentVersion = Version::current();
-	QString downloadAddress = "https://texstudio.org";
-	QString downloadAddressGit = "https://github.com/texstudio-org/texstudio/releases";
+	QString downloadAddress = "https://github.com/feiyang-cai/texstudio-vim/releases";
+	QString downloadAddressGit = "https://github.com/feiyang-cai/texstudio-vim/releases";
 
 	if (!currentVersion.isValid() && !latestReleaseCandidateVersion.isValid() && !latestDevVersion.isValid()) {
 		if (!silent) UtilsUi::txsWarning(tr("Update check failed (invalid update file format)."));

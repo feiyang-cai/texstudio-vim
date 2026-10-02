@@ -153,3 +153,18 @@ machines, and do not cover hardware acceleration or a full installed TeX system.
 
 Branch builds are test artifacts. Publishing a release requires explicit approval
 and a version tag; passing these checks alone does not publish or bump a version.
+
+## Update notifications
+
+The update checker reads published releases from `feiyang-cai/texstudio-vim`
+and links to this fork's release downloads. It ignores drafts, upstream-only tags,
+and development commit snapshots. It compares the upstream version and channel
+before the numeric Vim revision, so `texstudio-vim-4.9.9beta2-r1` updates r0 of the
+same beta. Stable, release-candidate and development preferences still apply.
+Checks use the most recent 100 releases returned by GitHub. A release must use
+our `texstudio-vim-<upstream-version>-r<revision>` tag format; beta/RC releases
+should be marked as prereleases.
+
+Automatic checking shows a notification and download link. It does not download
+or install the new application automatically. Existing installations receive
+this fork-specific checker only after installing a build containing this change.

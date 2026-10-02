@@ -3,11 +3,17 @@ on:
   push:
     paths:
       - .github/scripts/smoke-native-package.py
+      - .github/scripts/package_identity.py
       - .github/scripts/smoke-appimage.py
       - .github/scripts/windows_desktop_input.py
       - .github/scripts/prepare-windows-gui.ps1
       - .github/scripts/select-gui-build.py
       - .github/workflows/packaged-gui.yml
+  workflow_call:
+    inputs:
+      build_run_id:
+        type: string
+        required: true
   workflow_dispatch:
     inputs:
       build_run_id:
@@ -18,7 +24,7 @@ permissions:
   contents: read
   actions: read
 concurrency:
-  group: packaged-gui-${{ github.ref }}
+  group: packaged-gui-${{ github.ref }}-${{ github.workflow }}
   cancel-in-progress: true
 jobs:
   select:

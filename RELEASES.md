@@ -92,3 +92,19 @@ Publish `texstudio-vim-4.9.8-r1` first as the stable upstream-base release, then
 `texstudio-vim-4.9.9beta2-r1` as a prerelease. Both carry the same r1 Vim changes
 and require their own successful builds and packaged desktop checks. The beta
 release must not replace the stable release in GitHub's latest stable channel.
+
+## Recovering publication after a CI-only validation fix
+
+Published tags are never moved. If an existing tag has complete successful
+platform builds and regression checks but its publication was blocked by a
+CI-only checker issue, `.github/release-request.json` pins the tag, source SHA
+and original CD run. The verified-tag publication workflow rejects application
+changes, verifies the immutable tag and build provenance, reruns all nine GUI
+environments, and uploads the original build payload to a draft. It publishes
+only after every expected asset has finished uploading. Existing published
+release assets are not replaced.
+
+Exact-tag Windows builds display the canonical fork tag without a commit suffix.
+Their GUI checks require both the canonical version and the source commit in
+the archive filename from the pinned GitHub build. Branch builds and the other
+platforms retain the binary commit-suffix check.

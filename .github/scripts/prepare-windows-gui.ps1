@@ -34,3 +34,11 @@ if ($foregroundProcessId) {
         Stop-Process -Id $foregroundProcessId -Force
     }
 }
+# Closing the privacy web host can leave the first-login Start menu active.
+# Its protected input thread rejects ordinary foreground activation. Stop the
+# shell UI process on this disposable VM; Explorer restarts it when needed.
+Start-Sleep -Milliseconds 500
+Get-Process -Name StartMenuExperienceHost -ErrorAction SilentlyContinue | ForEach-Object {
+    Write-Host 'Closing the first-login Start menu on the CI desktop'
+    Stop-Process -Id $_.Id -Force
+}

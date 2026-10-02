@@ -49,7 +49,7 @@ QString TestManager::performTest(QObject* obj){
         const QMetaObject *meta = obj->metaObject();
         for (int i = 0; i < meta->methodCount(); ++i) {
             const QByteArray name = meta->method(i).name();
-            if (name.startsWith("vim"))
+            if (name.startsWith("vim") && !name.endsWith("_data"))
                 args << QString::fromLatin1(name);
         }
     }

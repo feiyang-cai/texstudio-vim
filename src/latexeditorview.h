@@ -214,8 +214,8 @@ private:
     std::set<QString> *latexPackageList;
 
 	friend class LatexDefaultInputBinding;
-    friend class VimInputBinding;
-    friend class VimPromptPanel;
+    friend class VimInputBindingImpl;
+    friend class VimPromptPanelImpl;
 	friend class SyntaxCheckTest;
 
 	SpellerManager *spellerManager;

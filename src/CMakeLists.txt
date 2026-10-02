@@ -51,6 +51,8 @@ set(HEADER_FILES ${HEADER_FILES}
     ${CMAKE_CURRENT_SOURCE_DIR}/latexcompleter_p.h
     ${CMAKE_CURRENT_SOURCE_DIR}/latexdocument.h
     ${CMAKE_CURRENT_SOURCE_DIR}/latexeditorview.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/viminputbinding.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/vimregisters.h
     ${CMAKE_CURRENT_SOURCE_DIR}/latexeditorview_config.h
     ${CMAKE_CURRENT_SOURCE_DIR}/latexlog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/latexlogwidget.h
@@ -161,6 +163,8 @@ set(SOURCE_FILES ${SOURCE_FILES}
     ${CMAKE_CURRENT_SOURCE_DIR}/latexcompleter.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/latexdocument.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/latexeditorview.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/viminputbinding.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/vimregisters.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/latexlog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/latexlogwidget.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/latexoutputfilter.cpp

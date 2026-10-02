@@ -9,6 +9,7 @@
 #include "qdocument.h"
 #include "qeditor.h"
 #include "testutil.h"
+#include "vimregisters.h"
 #include <QtTest/QtTest>
 
 namespace {
@@ -555,7 +556,7 @@ void LatexEditorViewTest::vimMarks()
     QTest::keyClick(edView->editor, Qt::Key_A);
     QTest::keyClick(edView->editor, Qt::Key_P);
 
-    QEQUAL(edView->editor->document()->text(), QString("one\ntwo\nthree\none\ntwo\nthree\n"));
+    QEQUAL(edView->editor->document()->text(), QString("one\ntwo\nthree\none\ntwo\nthree"));
     QEQUAL(edView->editor->inputModeLabel(), QString("NORMAL"));
 
     edView->getConfig()->editingMode = oldMode;
@@ -700,6 +701,149 @@ void LatexEditorViewTest::vimExCommands()
 
     edView->getConfig()->editingMode = oldMode;
     edView->updateSettings();
+}
+
+
+void LatexEditorViewTest::vimRegisterCommands_data()
+{
+    QTest::addColumn<QString>("initial");
+    QTest::addColumn<QString>("keys");
+    QTest::addColumn<QString>("expected");
+    QTest::newRow("named character yank") << "abc" << "\"ayl\"ap" << "aabc";
+    QTest::newRow("named line yank survives delete") << "one\ntwo\nthree" << "\"ayyjdd\"aP" << "one\none\nthree";
+    QTest::newRow("uppercase append character") << "abc" << "\"ayl\"Ayl\"ap" << "aaabc";
+    QTest::newRow("uppercase append lines") << "one\ntwo\nthree" << "\"ayyj\"Ayy\"aP" << "one\none\ntwo\ntwo\nthree";
+    QTest::newRow("black hole preserves unnamed") << "abc" << "yl\"_xp" << "bac";
+    QTest::newRow("yank history survives delete") << "one\ntwo\nthree" << "yyjdd\"0P" << "one\none\nthree";
+    QTest::newRow("small delete register") << "abc" << "xyl\"-p" << "bac";
+    QTest::newRow("numbered delete rotation") << "one\ntwo\nthree" << "dddd\"2P" << "one\nthree";
+    QTest::newRow("named paste count") << "abc" << "\"ayl\"a3p" << "aaaabc";
+    QTest::newRow("count before register") << "one\ntwo\nthree" << "2\"ayyG\"aP" << "one\ntwo\none\ntwo\nthree";
+    QTest::newRow("visual named yank") << "abc" << "vl\"ay\"aP" << "ababc";
+    QTest::newRow("visual paste uses original source") << "abc" << "ylvlp" << "ac";
+    QTest::newRow("explicit visual paste") << "abc" << "\"ayl vl\"ap" << "ac";
+    QTest::newRow("replace does not overwrite yank") << "abc" << "ylrzp" << "zabc";
+    QTest::newRow("register selection ends after command") << "abc" << "\"aylx\"ap" << "bac";
+    QTest::newRow("repeat named deletion") << "abcd" << "\"ax.\"aP" << "bcd";
+    QTest::newRow("repeat named paste") << "abc" << "\"ayl\"ap." << "aaabc";
+    QTest::newRow("visual paste preserves named source") << "abc" << "\"ayl vl\"ap\"aP" << "aac";
+    QTest::newRow("visual paste undo") << "abc" << "ylvlpu" << "abc";
+    QTest::newRow("empty visual paste is harmless") << "abc" << "vl\"zp" << "abc";
+    QTest::newRow("repeat named line delete") << "one\ntwo\nthree" << "\"add.\"aP" << "two\nthree";
+    QTest::newRow("line paste at EOF") << "one\ntwo" << "yyGp" << "one\ntwo\none";
+    QTest::newRow("counted paste undo") << "abc" << "\"ayl\"a3pu" << "abc";
+    QTest::newRow("named delete text object") << "word next" << "\"adiw" << " next";
+    QTest::newRow("text object named yank") << "word next" << "\"ayiw\"aP" << "wordword next";
+}
+
+void LatexEditorViewTest::vimRegisterCommands()
+{
+    if (skipVimUiTestInQuickRuns())
+        return;
+    QFETCH(QString, initial);
+    QFETCH(QString, keys);
+    QFETCH(QString, expected);
+    const int oldMode = edView->getConfig()->editingMode;
+    edView->getConfig()->editingMode = LatexEditorViewConfig::VimEditing;
+    edView->updateSettings();
+    vimRegisters() = VimRegisters();
+    edView->editor->setText(initial, false);
+    edView->editor->setCursorPosition(0, 0, false);
+    edView->editor->setFocus();
+    QTest::keyClicks(edView->editor, keys);
+    const QString actual = edView->editor->document()->text();
+    const QString mode = edView->editor->inputModeLabel();
+    edView->getConfig()->editingMode = oldMode;
+    edView->updateSettings();
+    QCOMPARE(actual, expected);
+    QCOMPARE(mode, QString("NORMAL"));
+}
+
+void LatexEditorViewTest::vimRegisterStore()
+{
+    VimRegisters registers;
+    const VimRegister first{VimRegisterType::LineWise, "first\n", {}};
+    const VimRegister second{VimRegisterType::LineWise, "second\n", {}};
+    registers.write('"', first, true);
+    registers.write('"', second, false);
+    QCOMPARE(registers.read('0').text, first.text);
+    QCOMPARE(registers.read('1').text, second.text);
+    registers.write('_', first, false);
+    QCOMPARE(registers.read('"').text, second.text);
+    QCOMPARE(registers.read('1').text, second.text);
+    registers.write('a', first, true);
+    registers.write('A', second, true);
+    QCOMPARE(registers.read('a').text, QString("first\nsecond\n"));
+    QCOMPARE(registers.read('A').text, registers.read('a').text);
+    QCOMPARE(registers.read('0').text, first.text);
+    const VimRegister block{VimRegisterType::BlockWise, "a\nb", {"a", "b"}};
+    registers.write('b', block, true);
+    registers.write('B', block, true);
+    QCOMPARE(registers.read('b').blocks, QStringList({"aa", "bb"}));
+    QCOMPARE(registers.read('b').type, VimRegisterType::BlockWise);
+    for (int i = 1; i <= 10; ++i)
+        registers.write('"', {VimRegisterType::LineWise, QString::number(i) + "\n", {}}, false);
+    QCOMPARE(registers.read('1').text, QString("10\n"));
+    QCOMPARE(registers.read('9').text, QString("2\n"));
+    registers.write('"', {VimRegisterType::CharacterWise, "x", {}}, false);
+    QCOMPARE(registers.read('-').text, QString("x"));
+    QCOMPARE(registers.read('1').text, QString("10\n"));
+}
+
+void LatexEditorViewTest::vimRegistersSharedAcrossViews()
+{
+    if (skipVimUiTestInQuickRuns())
+        return;
+    LatexEditorViewConfig config = *edView->getConfig();
+    config.editingMode = LatexEditorViewConfig::VimEditing;
+    LatexDocument firstDocument, secondDocument;
+    LatexEditorView first(nullptr, &config, &firstDocument);
+    LatexEditorView second(nullptr, &config, &secondDocument);
+    first.editor->setText("source", false);
+    first.editor->setCursorPosition(0, 0, false);
+    QTest::keyClicks(first.editor, "\"zyiw");
+    second.editor->setText("target", false);
+    second.editor->setCursorPosition(0, 0, false);
+    QTest::keyClicks(second.editor, "\"zP");
+    QCOMPARE(second.editor->document()->text(), QString("sourcetarget"));
+    QTest::keyClicks(second.editor, "\"");
+    QTest::keyClick(second.editor, Qt::Key_Escape);
+    QTest::keyClicks(second.editor, "x");
+    QCOMPARE(second.editor->inputModeLabel(), QString("NORMAL"));
+    QCOMPARE(vimRegisters().read('z').text, QString("source"));
+}
+
+void LatexEditorViewTest::vimClipboardRegisters()
+{
+    if (skipVimUiTestInQuickRuns())
+        return;
+    QClipboard *clipboard = QApplication::clipboard();
+    const QString previous = clipboard->text();
+    const int oldMode = edView->getConfig()->editingMode;
+    edView->getConfig()->editingMode = LatexEditorViewConfig::VimEditing;
+    edView->updateSettings();
+    edView->editor->setText("one\ntwo", false);
+    edView->editor->setCursorPosition(0, 0, false);
+    QTest::keyClicks(edView->editor, "\"+yy");
+    const QString yanked = clipboard->text();
+    QTest::keyClicks(edView->editor, "j\"+P");
+    const QString pasted = edView->editor->document()->text();
+    clipboard->setText("external");
+    edView->editor->setText("target", false);
+    edView->editor->setCursorPosition(0, 0, false);
+    QTest::keyClicks(edView->editor, "\"+P");
+    const QString externalPaste = edView->editor->document()->text();
+    const VimRegister block{VimRegisterType::BlockWise, "a\nb", {"a", "b"}};
+    vimRegisters().write('+', block, true);
+    const VimRegister restored = vimRegisters().read('+');
+    clipboard->setText(previous);
+    edView->getConfig()->editingMode = oldMode;
+    edView->updateSettings();
+    QCOMPARE(yanked, QString("one\n"));
+    QCOMPARE(pasted, QString("one\none\ntwo"));
+    QCOMPARE(externalPaste, QString("externaltarget"));
+    QCOMPARE(restored.type, VimRegisterType::BlockWise);
+    QCOMPARE(restored.blocks, block.blocks);
 }
 
 #endif

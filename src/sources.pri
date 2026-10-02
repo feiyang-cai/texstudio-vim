@@ -46,6 +46,8 @@ HEADERS += \
     $$PWD/latexcompleter_p.h \
     $$PWD/latexdocument.h \
     $$PWD/latexeditorview.h \
+    $$PWD/viminputbinding.h \
+    $$PWD/vimregisters.h \
     $$PWD/latexeditorview_config.h \
     $$PWD/latexlog.h \
     $$PWD/latexlogwidget.h \
@@ -153,6 +155,8 @@ SOURCES += \
     $$PWD/latexcompleter.cpp \
     $$PWD/latexdocument.cpp \
     $$PWD/latexeditorview.cpp \
+    $$PWD/viminputbinding.cpp \
+    $$PWD/vimregisters.cpp \
     $$PWD/latexlog.cpp \
     $$PWD/latexlogwidget.cpp \
     $$PWD/latexoutputfilter.cpp \

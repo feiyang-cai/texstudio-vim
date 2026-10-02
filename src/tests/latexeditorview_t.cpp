@@ -727,6 +727,10 @@ void LatexEditorViewTest::vimRegisterCommands_data()
     QTest::newRow("yank history survives delete") << "one\ntwo\nthree" << "yyjdd\"0P" << "one\none\nthree";
     QTest::newRow("small delete register") << "abc" << "xyl\"-p" << "bac";
     QTest::newRow("numbered delete rotation") << "one\ntwo\nthree" << "dddd\"2P" << "one\nthree";
+    QTest::newRow("gg from last line") << "one\ntwo\nthree" << "Gggdd" << "two\nthree";
+    QTest::newRow("replace with command character") << "abc" << "rx" << "xbc";
+    QTest::newRow("replace with digit") << "abc" << "r1" << "1bc";
+    QTest::newRow("find command character") << "abcabc" << "fax" << "abcbc";
     QTest::newRow("named paste count") << "abc" << "\"ayl\"a3p" << "aaaabc";
     QTest::newRow("count before register") << "one\ntwo\nthree" << "2\"ayyG\"aP" << "one\ntwo\none\ntwo\nthree";
     QTest::newRow("visual named yank") << "abc" << "vl\"ay\"aP" << "ababc";
@@ -768,6 +772,36 @@ void LatexEditorViewTest::vimRegisterCommands()
     edView->updateSettings();
     QCOMPARE(actual, expected);
     QCOMPARE(mode, QString("NORMAL"));
+}
+
+void LatexEditorViewTest::vimPhysicalModifierEvents()
+{
+    if (skipVimUiTestInQuickRuns())
+        return;
+    LatexEditorViewConfig config = *edView->getConfig();
+    config.editingMode = LatexEditorViewConfig::VimEditing;
+    LatexDocument document;
+    LatexEditorView view(nullptr, &config, &document);
+    view.editor->setText("one\ntwo\nthree", false);
+    view.editor->setCursorPosition(0, 0, false);
+    vimRegisters() = VimRegisters();
+    QTest::keyClicks(view.editor, "\"ayyjdd\"a");
+    QTest::keyPress(view.editor, Qt::Key_Shift);
+    QTest::keyClicks(view.editor, "P", Qt::ShiftModifier);
+    QTest::keyRelease(view.editor, Qt::Key_Shift);
+    QCOMPARE(view.editor->document()->textLines().join("\n"), QString("one\none\nthree"));
+    // Shift is also separate when selecting an uppercase append destination.
+    QTest::keyClick(view.editor, Qt::Key_QuoteDbl, Qt::ShiftModifier);
+    QTest::keyPress(view.editor, Qt::Key_Shift);
+    QTest::keyClicks(view.editor, "A", Qt::ShiftModifier);
+    QTest::keyRelease(view.editor, Qt::Key_Shift);
+    QTest::keyClicks(view.editor, "yy");
+    QCOMPARE(vimRegisters().read('a').text, QString("one\none\n"));
+    QTest::keyClicks(view.editor, "d");
+    QTest::keyPress(view.editor, Qt::Key_Control);
+    QTest::keyRelease(view.editor, Qt::Key_Control);
+    QTest::keyClicks(view.editor, "d");
+    QCOMPARE(view.editor->document()->textLines().join("\n"), QString("one\nthree"));
 }
 
 void LatexEditorViewTest::vimRegisterStore()

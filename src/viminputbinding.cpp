@@ -365,6 +365,12 @@ public:
         syncPromptState(editor);
         if (m_mode == VimMode::Insert || m_mode == VimMode::Replace)
             return handleInsertMode(event, editor);
+        // Native keyboards send modifier presses separately from the character.
+        // They must not cancel a register, count, operator or pending motion.
+        if (event->key() == Qt::Key_Shift || event->key() == Qt::Key_Control
+                || event->key() == Qt::Key_Alt || event->key() == Qt::Key_Meta
+                || event->key() == Qt::Key_AltGr)
+            return true;
         if (handleRegisterPrefix(event, editor))
             return true;
 #ifndef Q_OS_MAC
@@ -988,19 +994,39 @@ private:
         }
         if (m_pendingMarkAction != VimPendingMarkAction::None)
             return handlePendingMark(event, editor);
+        if (event->key() == Qt::Key_Escape || isCtrlLeftBracket(event)) {
+            clearPending(editor);
+            leaveVisualMode(editor, true);
+            setMode(VimMode::Normal, editor);
+            return true;
+        }
+
+        if (m_pendingReplace && !event->text().isEmpty() && event->text().size() == 1) {
+            replaceCharacters(editor, consumeCountOrOne(), event->text().at(0));
+            m_pendingReplace = false;
+            return true;
+        }
+
+        if (m_pendingFind != VimFindKind::None && !event->text().isEmpty() && event->text().size() == 1) {
+            executeFind(editor, m_pendingFind, event->text().at(0), consumeCountOrOne());
+            return true;
+        }
+
+        if (m_lastG) {
+            m_lastG = false;
+            if (!(event->modifiers() & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier)) && !event->text().isEmpty() && event->text().at(0) == QLatin1Char('g')) {
+                gotoLine(editor, m_count > 0 ? m_count : 1);
+                m_count = 0;
+                return true;
+            }
+        }
+
         if (!(event->modifiers() & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier)) && event->text().size() == 1 && event->text().at(0).isDigit()) {
             if (event->text() == QLatin1String("0") && m_count == 0) {
                 moveToLineStart(editor);
                 return true;
             }
             m_count = m_count * 10 + event->text().toInt();
-            return true;
-        }
-
-        if (event->key() == Qt::Key_Escape || isCtrlLeftBracket(event)) {
-            clearPending(editor);
-            leaveVisualMode(editor, true);
-            setMode(VimMode::Normal, editor);
             return true;
         }
 
@@ -1065,26 +1091,6 @@ private:
             case '`': m_pendingMarkAction = VimPendingMarkAction::JumpExact; return true;
             default:
                 break;
-            }
-        }
-
-        if (m_pendingReplace && !event->text().isEmpty() && event->text().size() == 1) {
-            replaceCharacters(editor, consumeCountOrOne(), event->text().at(0));
-            m_pendingReplace = false;
-            return true;
-        }
-
-        if (m_pendingFind != VimFindKind::None && !event->text().isEmpty() && event->text().size() == 1) {
-            executeFind(editor, m_pendingFind, event->text().at(0), consumeCountOrOne());
-            return true;
-        }
-
-        if (m_lastG) {
-            m_lastG = false;
-            if (!(event->modifiers() & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier)) && !event->text().isEmpty() && event->text().at(0) == QLatin1Char('g')) {
-                gotoLine(editor, m_count > 0 ? m_count : 1);
-                m_count = 0;
-                return true;
             }
         }
 

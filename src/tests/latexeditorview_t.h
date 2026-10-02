@@ -35,6 +35,7 @@ class LatexEditorViewTest: public QObject{
         void vimExCommands();
         void vimRegisterCommands_data();
         void vimRegisterCommands();
+        void vimPhysicalModifierEvents();
         void vimRegisterStore();
         void vimRegistersSharedAcrossViews();
         void vimClipboardRegisters();

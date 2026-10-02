@@ -8015,6 +8015,7 @@ void Texstudio::executeCommandLine(const QStringList &args, bool realCmdLine)
  * --execute-tests  : tests are run even if they were executed already in a previous run
  * --execute-all-tests  : run tests, including some more time consuming ones
  * --auto-tests  : run a subset of tests which work on travis-ci
+ * --vim-tests   : with --auto-tests, run Vim/editor completion/version tests in isolation
  * \return false if some tests failed
  */
 bool Texstudio::executeTests(const QStringList &args)

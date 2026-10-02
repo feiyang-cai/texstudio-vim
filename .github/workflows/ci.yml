@@ -29,3 +29,6 @@ jobs:
 
     - name: Test
       run: QT_QPA_PLATFORM=offscreen ./texstudio --auto-tests
+
+    - name: Vim regression tests
+      run: timeout -k 5s 120s env QT_QPA_PLATFORM=offscreen ./texstudio --start-always --auto-tests --vim-tests

@@ -44,13 +44,18 @@ bool globalExecuteAllTests;
 
 
 QString TestManager::performTest(QObject* obj){
-	char* argv[3];
-	argv[0]=(char*)"texstudio";
-	argv[1]=(char*)"-o";
-	argv[2]=tempResult;
-	QElapsedTimer timing;
-	timing.start();
-	QTest::qExec(obj,3,argv);
+    QStringList args = {"texstudio", "-o", QFile::decodeName(tempResult)};
+    if (QCoreApplication::arguments().contains("--vim-tests")) {
+        const QMetaObject *meta = obj->metaObject();
+        for (int i = 0; i < meta->methodCount(); ++i) {
+            const QByteArray name = meta->method(i).name();
+            if (name.startsWith("vim"))
+                args << QString::fromLatin1(name);
+        }
+    }
+    QElapsedTimer timing;
+    timing.start();
+    QTest::qExec(obj, args);
 	delete obj;
 	long long time = timing.elapsed();
 	totalTestTime += time;
@@ -69,13 +74,21 @@ QString TestManager::execute(TestLevel level, LatexEditorView* edView, QCodeEdit
 	tf.close();
 	tempResult = tfn.data();
 
-	globalExecuteAllTests = level == TL_ALL;
+    const bool vimTests = QCoreApplication::arguments().contains("--vim-tests");
+	globalExecuteAllTests = level == TL_ALL || vimTests;
 
 	//codeedit, editor are passed as extra parameters and not extracted from edView, so we don't have
 	//to include latexeditorview.h here
 	totalTestTime = 0;
 	QString tr;
-	QList<QObject*> tests=QList<QObject*>()
+    QList<QObject*> tests;
+    if (vimTests) {
+        // Isolate Vim UI checks from suites that alter shared editor state.
+        tests << new LatexEditorViewTest(edView)
+              << new LatexCompleterTest(edView)
+              << new VersionTest(true);
+    } else {
+        tests = QList<QObject*>()
             << new SmallUsefulFunctionsTest()
             << new LatexParserTest()
             << new LatexParsingTest()
@@ -105,6 +118,7 @@ QString TestManager::execute(TestLevel level, LatexEditorView* edView, QCodeEdit
             << new UserMacroTest()
             << new TexStudioTest(level==TL_ALL)
             << new GitTest(buildManager,level!=TL_AUTO);
+    }
 	bool allPassed=true;
 	if (level!=TL_ALL)
 		tr="There are skipped tests. Please rerun with --execute-all-tests\n\n";
@@ -120,6 +134,11 @@ QString TestManager::execute(TestLevel level, LatexEditorView* edView, QCodeEdit
 		tr+=res;
 		if (!res.contains(", 0 failed, 0 skipped")) allPassed=false;
 	}
+    if (vimTests) {
+        // Do not leave an edited test document that blocks automatic shutdown.
+        editor->setText(QString(), false);
+        editor->document()->setClean();
+    }
     //app->removeNativeEventFilter(&eventFilter);
 
 	tr+=QString("\nTotal testing time: %1 ms\n").arg(totalTestTime);

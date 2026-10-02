@@ -168,7 +168,7 @@ void LatexEditorViewTest::vimCursorStyles()
     QTest::keyClick(edView->editor, Qt::Key_Escape);
     QEQUAL(edView->editor->cursorStyle(), QDocument::BlockCursorStyle);
 
-    QTest::keyClick(edView->editor, Qt::Key_R, Qt::ShiftModifier);
+    QTest::keyClicks(edView->editor, "R");
     QEQUAL(edView->editor->cursorStyle(), QDocument::UnderlineCursorStyle);
 
     QTest::keyClick(edView->editor, Qt::Key_Escape);
@@ -223,7 +223,7 @@ void LatexEditorViewTest::vimVisualLineStaysOnCurrentLine()
     edView->editor->setCursorPosition(1, 2, false);
     edView->editor->setFocus();
 
-    QTest::keyClick(edView->editor, Qt::Key_V, Qt::ShiftModifier);
+    QTest::keyClicks(edView->editor, "V");
 
     QEQUAL(edView->editor->inputModeLabel(), QString("V-LINE"));
     QEQUAL(edView->editor->cursor().lineNumber(), 1);
@@ -238,7 +238,8 @@ void LatexEditorViewTest::vimVisualLineStaysOnCurrentLine()
     QEQUAL(edView->editor->cursor().endLineNumber(), 2);
 
     QTest::keyClick(edView->editor, Qt::Key_D);
-    QEQUAL(edView->editor->document()->text(), QString("alpha\n"));
+    // The source had no trailing newline; deleting its tail keeps that property.
+    QEQUAL(edView->editor->document()->text(), QString("alpha"));
     QEQUAL(edView->editor->inputModeLabel(), QString("NORMAL"));
 
     edView->getConfig()->editingMode = oldMode;
@@ -272,7 +273,9 @@ void LatexEditorViewTest::vimVisualBlockCtrlV()
 
     QEQUAL(edView->editor->inputModeLabel(), QString("V-BLOCK"));
     QEQUAL(edView->editor->cursor().lineNumber(), 0);
-    QEQUAL(edView->editor->cursor().columnNumber(), 0);
+    // The document cursor spans the inclusive visual block cell.
+    QEQUAL(edView->editor->cursor().selectionStart().columnNumber(), 0);
+    QEQUAL(edView->editor->cursor().selectedText(), QString("a"));
 
     QTest::keyClick(edView->editor, Qt::Key_J);
 
@@ -353,7 +356,7 @@ void LatexEditorViewTest::vimVisualBlockInsertAtStart()
 #endif
 
     QTest::keyClick(edView->editor, Qt::Key_J);
-    QTest::keyClick(edView->editor, Qt::Key_I, Qt::ShiftModifier);
+    QTest::keyClicks(edView->editor, "I");
     QTest::keyClicks(edView->editor, "X");
     QTest::keyClick(edView->editor, Qt::Key_Escape);
 
@@ -597,7 +600,7 @@ void LatexEditorViewTest::vimLinewisePasteKeepsCursorOnInsertedText()
     edView->editor->setCursorPosition(0, 0, false);
     edView->editor->setFocus();
 
-    QTest::keyClick(edView->editor, Qt::Key_Y, Qt::ShiftModifier);
+    QTest::keyClicks(edView->editor, "Y");
     QTest::keyClick(edView->editor, Qt::Key_P);
 
     QEQUAL(edView->editor->document()->text(), QString("    alpha\n    alpha\nbeta\ngamma"));
@@ -622,7 +625,7 @@ void LatexEditorViewTest::vimNormalModeConsumesUnhandledPrintableKeys()
     edView->editor->setCursorPosition(0, 0, false);
     edView->editor->setFocus();
 
-    QTest::keyClick(edView->editor, Qt::Key_H, Qt::ShiftModifier);
+    QTest::keyClicks(edView->editor, "H");
 
     QEQUAL(edView->editor->document()->text(), QString("abc"));
     QEQUAL(edView->editor->inputModeLabel(), QString("NORMAL"));
@@ -687,7 +690,8 @@ void LatexEditorViewTest::vimExCommands()
         QVERIFY(commandSpy.isValid());
         QVERIFY(isolatedView.executeVimExCommand(":w"));
         QEQUAL(commandSpy.count(), 1);
-        QEQUAL(commandSpy.takeFirst().at(0).toString(), QString("w"));
+        const QList<QVariant> commandArguments = commandSpy.takeFirst();
+        QEQUAL(commandArguments.at(0).toString(), QString("w"));
     }
 
     edView->executeVimSearch("beta", false);

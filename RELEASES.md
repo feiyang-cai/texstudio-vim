@@ -29,9 +29,11 @@ git merge --no-ff upstream/4.9.8
 
 Use the same procedure for the next release. Build with debug tests enabled and
 run `QT_QPA_PLATFORM=offscreen ./build/texstudio --auto-tests` before tagging.
-The quick tests include Vim modes, motions, editing, visual blocks, marks,
-substitution, Ex commands, and insert-mode completion. Check the test log as well
-as the exit status. Review the merged diff against the upstream tag so it contains
+Also run `QT_QPA_PLATFORM=offscreen ./build/texstudio --auto-tests --vim-tests`.
+This dedicated run enables the Vim UI tests skipped by the quick suite and
+isolates them from other tests that alter shared editor state. It checks Vim
+modes, editing, visual blocks, marks, substitution, Ex commands, insert-mode
+completion, and fork version parsing. Check both logs as well as exit status. Review the merged diff against the upstream tag so it contains
 only intentional fork differences.
 
 ## Release naming and publishing

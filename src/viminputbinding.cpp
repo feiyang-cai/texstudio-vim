@@ -1323,33 +1323,20 @@ private:
             cursor = QDocumentCursor(editor->document(), cursor.lineNumber(), m_visualBlockPreferredColumn);
         if (m_mode == VimMode::Visual && cursor.hasSelection() && cursor.columnNumber() > 0)
             cursor.movePosition(1, QDocumentCursor::PreviousCharacter);
-        for (int i = 0; i < motion.count; ++i) {
-            switch (motion.kind) {
-            case VimMotion::Left: if (!cursor.atLineStart()) cursor.movePosition(1, QDocumentCursor::PreviousCharacter); break;
-            case VimMotion::Right: if (!cursor.atLineEnd()) cursor.movePosition(1, QDocumentCursor::NextCharacter); break;
-            case VimMotion::Up: cursor.movePosition(1, QDocumentCursor::Up); break;
-            case VimMotion::Down: cursor.movePosition(1, QDocumentCursor::Down); break;
-            case VimMotion::WordForward: moveVimWord(cursor, motion.kind); break;
-            case VimMotion::WordBackward: moveVimWord(cursor, motion.kind); break;
-            case VimMotion::WordEnd: moveVimWord(cursor, motion.kind); break;
-            case VimMotion::LineStart: cursor.movePosition(1, QDocumentCursor::StartOfLine); break;
-            case VimMotion::LineStartText: cursor.movePosition(1, QDocumentCursor::StartOfLineText); break;
-            case VimMotion::LineEnd: cursor.movePosition(1, QDocumentCursor::EndOfLine); break;
-            case VimMotion::FileStart: cursor.movePosition(1, QDocumentCursor::Start); break;
-            case VimMotion::FileEnd: cursor.movePosition(1, QDocumentCursor::End); break;
-            case VimMotion::PrevBlock: cursor.movePosition(1, QDocumentCursor::PreviousBlock); break;
-            case VimMotion::NextBlock: cursor.movePosition(1, QDocumentCursor::NextBlock); break;
-            case VimMotion::MatchingPair:
-            case VimMotion::FindCharacter:
-            case VimMotion::None:
-                break;
-            }
-        }
+        const bool vertical = motion.kind == VimMotion::Up || motion.kind == VimMotion::Down;
+        int preferredColumn = cursor.columnNumber();
+        if (vertical && m_verticalPreferredColumn >= 0
+                && cursor.lineNumber() == m_lastVerticalLine && cursor.columnNumber() == m_lastVerticalColumn)
+            preferredColumn = m_verticalPreferredColumn;
+        moveCursorByMotion(cursor, motion, preferredColumn);
         if (m_mode == VimMode::VisualBlock)
-            m_visualBlockPreferredColumn = cursor.columnNumber();
+            m_visualBlockPreferredColumn = vertical ? preferredColumn : cursor.columnNumber();
         editor->setCursor(cursor);
         if (m_mode != VimMode::VisualBlock)
             normalizeNormalCursor(editor);
+        m_verticalPreferredColumn = vertical ? preferredColumn : -1;
+        m_lastVerticalLine = editor->cursor().lineNumber();
+        m_lastVerticalColumn = editor->cursor().columnNumber();
     }
 
     void beginOperator(VimOperator op, QEditor *editor)
@@ -1456,14 +1443,23 @@ private:
         clearPending(editor);
     }
 
-    void moveCursorByMotion(QDocumentCursor &cursor, const VimMotion &motion)
+    void moveCursorByMotion(QDocumentCursor &cursor, const VimMotion &motion, int preferredColumn = -1)
     {
+        if (preferredColumn < 0) preferredColumn = cursor.columnNumber();
         for (int i = 0; i < motion.count; ++i) {
             switch (motion.kind) {
             case VimMotion::Left: if (!cursor.atLineStart()) cursor.movePosition(1, QDocumentCursor::PreviousCharacter); break;
             case VimMotion::Right: if (!cursor.atLineEnd()) cursor.movePosition(1, QDocumentCursor::NextCharacter); break;
-            case VimMotion::Up: cursor.movePosition(1, QDocumentCursor::Up); break;
-            case VimMotion::Down: cursor.movePosition(1, QDocumentCursor::Down); break;
+            case VimMotion::Up: {
+                const int line = qMax(0, cursor.lineNumber() - 1);
+                cursor.moveTo(line, qMin(preferredColumn, cursor.document()->line(line).length()));
+                break;
+            }
+            case VimMotion::Down: {
+                const int line = qMin(cursor.document()->lineCount() - 1, cursor.lineNumber() + 1);
+                cursor.moveTo(line, qMin(preferredColumn, cursor.document()->line(line).length()));
+                break;
+            }
             case VimMotion::WordForward: moveVimWord(cursor, motion.kind); break;
             case VimMotion::WordBackward: moveVimWord(cursor, motion.kind); break;
             case VimMotion::WordEnd: moveVimWord(cursor, motion.kind); break;
@@ -2253,6 +2249,9 @@ private:
     int m_visualAnchorLine;
     int m_visualAnchorColumn;
     int m_visualBlockPreferredColumn;
+    int m_verticalPreferredColumn = -1;
+    int m_lastVerticalLine = -1;
+    int m_lastVerticalColumn = -1;
     QString m_insertEntryAction;
     QVector<VimInsertStep> m_insertSteps;
     std::function<void()> m_repeatAction;

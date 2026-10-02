@@ -84,8 +84,8 @@ and a screenshot of the Unicode clipboard test as a `vim-tests-*` artifact.
 The **CD** workflow runs the exact packaged AppImage in Ubuntu 22.04/24.04, Debian
 12/13 and Fedora 43 containers on hosted Linux VMs. Each container has an X11
 session. Its smoke test checks the package's commit hash, opens a fixture, sends
-named-register yank/delete/paste commands through the window, saves the result,
-and uploads logs plus a desktop screenshot as an `appimage-smoke-*` artifact.
+named-register yank/delete/paste commands and uppercase insertion/dot repetition
+through the window, saves the result, and uploads logs plus a desktop screenshot as an `appimage-smoke-*` artifact.
 These are distribution compatibility checks, not separate desktop VMs per distro.
 
 The test launcher rejects failed, skipped or missing suites and enforces a timeout.

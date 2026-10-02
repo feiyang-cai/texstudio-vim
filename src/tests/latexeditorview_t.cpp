@@ -326,6 +326,10 @@ void LatexEditorViewTest::vimVisualBlockDeleteAffectsAllRows()
     QEQUAL(edView->editor->document()->textLines().join("\n"), QString("lpha\neta\ngamma"));
     QEQUAL(edView->editor->inputModeLabel(), QString("NORMAL"));
     QEQUAL(edView->editor->cursorMirrorCount(), 0);
+    QTest::keyClicks(edView->editor, "u");
+    QEQUAL(edView->editor->document()->textLines().join("\n"), QString("alpha\nbeta\ngamma"));
+    QTest::keyClick(edView->editor, Qt::Key_R, Qt::ControlModifier);
+    QEQUAL(edView->editor->document()->textLines().join("\n"), QString("lpha\neta\ngamma"));
 
     edView->getConfig()->editingMode = oldMode;
     edView->updateSettings();

@@ -1843,8 +1843,10 @@ private:
             value.text = value.blocks.join(QLatin1Char('\n'));
             storeRegister(value, false);
             QList<QDocumentCursor> cursors = editor->cursors();
+            editor->document()->beginMacro();
             for (QDocumentCursor &cursor : cursors)
                 cursor.removeSelectedText();
+            editor->document()->endMacro();
             editor->setCursor(cursors.value(0));
             editor->clearCursorMirrors();
             if (enterInsert)

@@ -21,7 +21,9 @@ if version.returncode or os.environ['BUILD_SHA'][:7] not in version.stdout:
     raise SystemExit('Packaged binary has an unexpected version; see version.log')
 config = output / 'config'
 config.mkdir(exist_ok=True)
-(config / 'texstudio.ini').write_text('[texmaker]\nEditor\\EditingMode=1\n')
+# These containers test editing and packaging, and intentionally omit TeX engines.
+(config / 'texstudio.ini').write_text(
+    '[texmaker]\nEditor\\EditingMode=1\nStartup\\CheckLatexConfiguration=false\n')
 fixture = output / 'vim-smoke.tex'
 fixture.write_text('one\ntwo\nthree\n')
 with (output / 'desktop.log').open('w') as log:

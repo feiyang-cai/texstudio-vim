@@ -2,16 +2,23 @@ name: Vim desktop tests
 on:
   push:
   workflow_dispatch:
+    inputs:
+      platform:
+        description: Desktop platforms to test
+        type: choice
+        default: all
+        options: [all, macos, windows]
 
 permissions:
   contents: read
 
 concurrency:
-  group: vim-desktop-${{ github.ref }}
+  group: vim-desktop-${{ github.ref }}-${{ github.event_name }}-${{ inputs.platform || 'all' }}
   cancel-in-progress: true
 
 jobs:
   macos:
+    if: github.event_name != 'workflow_dispatch' || inputs.platform == 'all' || inputs.platform == 'macos'
     name: Vim desktop (${{ matrix.runner }})
     strategy:
       fail-fast: false
@@ -22,11 +29,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Dependencies
-        run: brew install cmake ninja qt quazip hunspell poppler pkg-config
+        run: brew install cmake ninja qt hunspell poppler pkg-config
       - name: Configure
         run: >-
           cmake -S . -B build-vim -G Ninja
-          -DCMAKE_PREFIX_PATH="$(brew --prefix qt);$(brew --prefix quazip);$(brew --prefix hunspell)"
+          -DCMAKE_PREFIX_PATH="$(brew --prefix qt);$(brew --prefix hunspell)"
+          -DCMAKE_DISABLE_FIND_PACKAGE_QuaZip-Qt6=ON -DCMAKE_DISABLE_FIND_PACKAGE_QuaZip=ON
           -DCMAKE_BUILD_TYPE=Debug -DTEXSTUDIO_ENABLE_TESTS=ON
           -DTEXSTUDIO_BUILD_ADWAITA=OFF -DTEXSTUDIO_ENABLE_CRASH_HANDLER=OFF
       - name: Build
@@ -42,6 +50,7 @@ jobs:
           if-no-files-found: warn
 
   windows:
+    if: github.event_name != 'workflow_dispatch' || inputs.platform == 'all' || inputs.platform == 'windows'
     name: Vim desktop (${{ matrix.runner }})
     strategy:
       fail-fast: false

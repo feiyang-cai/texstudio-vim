@@ -71,3 +71,28 @@ QT_QPA_PLATFORM=offscreen ./texstudio --start-always --auto-tests --vim-tests
 
 This milestone does not add recorded Vim macros, mappings, Vimscript or complete
 Vim compatibility. Those remain later development work.
+
+## Cross-platform desktop checks
+
+The **Vim desktop tests** workflow builds Debug test binaries and runs the Vim,
+completion and version suites on Windows x64, Windows ARM64, macOS Intel and macOS
+Apple Silicon hosted VMs. It uses the native Qt desktop platform (Windows or Cocoa).
+The existing Linux **CI** workflow also runs the suite under Xvfb with the X11
+platform, in addition to its offscreen checks. Each desktop run uploads its log
+and a screenshot of the Unicode clipboard test as a `vim-tests-*` artifact.
+
+The **CD** workflow runs the exact packaged AppImage in Ubuntu 22.04/24.04, Debian
+12/13 and Fedora 43 containers on hosted Linux VMs. Each container has an X11
+session. Its smoke test checks the package's commit hash, opens a fixture, sends
+named-register yank/delete/paste commands through the window, saves the result,
+and uploads logs plus a desktop screenshot as an `appimage-smoke-*` artifact.
+These are distribution compatibility checks, not separate desktop VMs per distro.
+
+The test launcher rejects failed, skipped or missing suites and enforces a timeout.
+A successful build alone is not counted as a successful desktop test. The new
+clipboard coverage includes Unicode, external CRLF text and the primary-selection
+register (or its clipboard fallback on platforms without primary selection).
+
+These checks exercise the test fixtures and packaged editing path; they do not
+establish compatibility with every window manager, display server or keyboard
+layout. Native Wayland and physical-machine testing remain separate follow-ups.

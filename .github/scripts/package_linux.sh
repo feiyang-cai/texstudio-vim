@@ -19,6 +19,21 @@ sed -i -e'/export PYTH/d' appdir/AppRun # workaroun python issue #4061
 # ./appimagetool-*.AppImage -s deploy appdir/usr/share/applications/*.desktop # Bundle EVERYTHING
 # ./linuxdeployqt-continuous-x86_64.AppImage appdir/usr/share/applications/*.desktop -bundle-non-qt-libs -extra-plugins=iconengines/libqsvgicon.so -appimage
 # ./linuxdeployqt-continuous-x86_64.AppImage appdir/usr/share/applications/*.desktop -appimage
+# Standalone deployment can copy the ELF interpreter without its executable bit.
+# AppRun executes it directly, so preserve execution permission in the image.
+python3 - <<'PYLOADER'
+from pathlib import Path
+root = Path("appdir").resolve()
+loaders = list(root.rglob("ld-linux*.so*"))
+if not loaders:
+    raise SystemExit("Standalone AppDir has no ELF interpreter")
+for loader in loaders:
+    target = loader.resolve(strict=True)
+    if root not in target.parents:
+        raise SystemExit(f"ELF interpreter resolves outside AppDir: {loader}")
+    target.chmod(target.stat().st_mode | 0o111)
+    print(f"Executable ELF interpreter: {target.relative_to(root)}")
+PYLOADER
 ./appimagetool-*.AppImage ./appdir # create actual appimage
 cp TeXstudio-${VERSION}-x86_64.AppImage ../texstudio-vim-${VERSION}-x86_64.AppImage
 cp TeXstudio-${VERSION}-x86_64.AppImage ../texstudio-vim-${GIT_VERSION}-x86_64.AppImage

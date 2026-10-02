@@ -380,7 +380,12 @@ void LatexEditorViewTest::vimCloseElementEscapesInsertMode()
 
     edView->editor->setText("abc", false);
     edView->editor->setCursorPosition(0, 0, false);
+    edView->window()->show();
+    edView->window()->raise();
+    edView->window()->activateWindow();
     edView->editor->setFocus();
+    QVERIFY(QTest::qWaitForWindowActive(edView->window()));
+    QVERIFY(edView->editor->hasFocus());
 
     QTest::keyClick(edView->editor, Qt::Key_I);
     QTest::keyClicks(edView->editor, "X");
@@ -405,7 +410,12 @@ void LatexEditorViewTest::vimCloseElementIsConsumedInNormalMode()
 
     edView->editor->setText("abc", false);
     edView->editor->setCursorPosition(0, 1, false);
+    edView->window()->show();
+    edView->window()->raise();
+    edView->window()->activateWindow();
     edView->editor->setFocus();
+    QVERIFY(QTest::qWaitForWindowActive(edView->window()));
+    QVERIFY(edView->editor->hasFocus());
 
     QVERIFY(edView->closeElement());
     QEQUAL(edView->editor->document()->text(), QString("abc"));

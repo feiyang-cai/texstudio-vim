@@ -146,6 +146,15 @@ QString TestManager::execute(TestLevel level, LatexEditorView* edView, QCodeEdit
 	if (!allPassed)
 		tr="*** THERE SEEM TO BE FAILED TESTS! ***\n\n\n\n"+tr;
 
+    // Keep a platform-independent report even when a GUI build routes qDebug
+    // to the system debugger or fails during application shutdown.
+    const QString diagnosticDir = qEnvironmentVariable("TEXSTUDIO_TEST_SCREENSHOT_DIR");
+    if (!diagnosticDir.isEmpty()) {
+        QFile report(diagnosticDir + "/vim-test-report.log");
+        if (report.open(QIODevice::WriteOnly | QIODevice::Truncate))
+            report.write(tr.toUtf8());
+    }
+
 	QFile(QFile::decodeName(tempResult)).remove();
 
 	return tr;

@@ -15,7 +15,12 @@ parser.add_argument("--timeout", type=int, default=180)
 args = parser.parse_args()
 output = Path(args.output).resolve()
 output.mkdir(parents=True, exist_ok=True)
+for diagnostic in ("vim-test-report.log", "vim-desktop.png"):
+    (output / diagnostic).unlink(missing_ok=True)
 environment = os.environ.copy()
+# Windows GUI applications otherwise send Qt diagnostics only to the debugger.
+environment["QT_LOGGING_TO_CONSOLE"] = "1"
+environment["QT_FORCE_STDERR_LOGGING"] = "1"
 environment["TEXSTUDIO_TEST_SCREENSHOT_DIR"] = str(output)
 command = [str(Path(args.executable).resolve()), "--start-always", "--config",
            str(output / "config"), "--auto-tests", "--vim-tests"]
@@ -32,7 +37,8 @@ with (output / "vim-tests.log").open("w", encoding="utf-8") as log:
             os.killpg(process.pid, signal.SIGKILL)
         process.wait()
         sys.exit("Vim tests timed out; see vim-tests.log")
-text = (output / "vim-tests.log").read_text(encoding="utf-8", errors="replace")
+report = output / "vim-test-report.log"
+text = (report if report.exists() else output / "vim-tests.log").read_text(encoding="utf-8", errors="replace")
 totals = re.findall(r"Totals: (\d+) passed, (\d+) failed, (\d+) skipped", text)
 for line in text.splitlines():
     if any(word in line for word in ("Totals:", "FAIL!", "QFATAL", "desktop platform:")):

@@ -29,10 +29,12 @@ with (output / 'desktop.log').open('w') as log:
                                str(config), str(fixture)], stdout=log, stderr=subprocess.STDOUT,
                                start_new_session=True)
     try:
-        window = subprocess.run(['xdotool', 'search', '--sync', '--onlyvisible', '--class',
-                                 '[Tt]e[Xx]studio'], capture_output=True, text=True, timeout=30)
+        window = subprocess.run(['xdotool', 'search', '--sync', '--onlyvisible', '--name',
+                                 'vim-smoke[.]tex.*TeXstudio'], capture_output=True, text=True, timeout=30)
         if window.returncode or not window.stdout.strip():
             raise RuntimeError('No visible TeXstudio window')
+        # The splash screen has the same WM_CLASS but vanishes during startup.
+        # Wait for the loaded fixture's main window instead.
         window_id = window.stdout.splitlines()[0]
         subprocess.run(['xdotool', 'windowactivate', '--sync', window_id], check=True, timeout=10)
         time.sleep(2)
@@ -63,6 +65,7 @@ with (output / 'desktop.log').open('w') as log:
             raise RuntimeError('AppImage exited unexpectedly during editing')
         print('AppImage version, desktop startup, named registers, editing and save passed')
     finally:
+        subprocess.run(['scrot', str(output / 'desktop.png')], check=False)
         if process.poll() is None:
             os.killpg(process.pid, signal.SIGKILL)
             process.wait()

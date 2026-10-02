@@ -123,6 +123,9 @@ The Vim wrapper keeps TeXstudio's insert-mode features active:
 - macro expansion
 - Ctrl-click style links
 
+Ctrl-hover highlighting and Ctrl-click navigation also work in Normal mode,
+without entering Insert mode or changing the document.
+
 ## Current Scope / Known Gaps
 
 Not implemented in this branch:

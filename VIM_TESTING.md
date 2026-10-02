@@ -25,6 +25,7 @@ coverage of every combination. No release is authorized by these tests.
 | Substitution: remembered pattern, undo/redo across lines | `vimExSubstituteCommands`, `vimSubstitutePrompt` | Reuse and complete document restoration |
 | Marks, exact and line jumps, operator marks | `vimMarks` | Cursor and editing assertions |
 | Ex write/quit dispatch, numeric line command | `vimExCommands` | Command signals and cursor assertions |
+| Ctrl-hover and Ctrl-click reference navigation in Normal/Insert/Replace | `vimCtrlClickNavigation` | Actual overlay, navigation signal, unchanged text/mode, Control release cleanup |
 | Insert-mode completion | Focused `LatexCompleterTest` cases | Editor/completion integration |
 
 Coverage still needs expansion for paragraph/pair motions, whole-word */#

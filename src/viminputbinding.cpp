@@ -374,8 +374,13 @@ public:
             return handleInsertMode(event, editor);
         // Native keyboards send modifier presses separately from the character.
         // They must not cancel a register, count, operator or pending motion.
-        if (isModifierKey(event))
+        if (isModifierKey(event)) {
+            // Ctrl enables TeXstudio's link hover and Ctrl-click navigation.
+            // Forward only the modifier event; it must not cancel Vim input.
+            if (event->key() == Qt::Key_Control && m_defaultBinding)
+                m_defaultBinding->keyPressEvent(event, editor);
             return true;
+        }
         if (handleRegisterPrefix(event, editor))
             return true;
 #ifndef Q_OS_MAC

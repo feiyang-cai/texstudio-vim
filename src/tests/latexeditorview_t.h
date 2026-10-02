@@ -18,6 +18,7 @@ class LatexEditorViewTest: public QObject{
         void inMathEnvironment();
         void vimEditingModeSwitches();
         void vimCursorStyles();
+        void vimCtrlClickNavigation();
         void vimInsertEscape();
         void vimVisualLineStaysOnCurrentLine();
         void vimVisualBlockCtrlV();

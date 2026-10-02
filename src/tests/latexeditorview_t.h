@@ -33,6 +33,11 @@ class LatexEditorViewTest: public QObject{
         void vimNormalModeConsumesUnhandledPrintableKeys();
         void vimExSubstituteCommands();
         void vimExCommands();
+        void vimRegisterCommands_data();
+        void vimRegisterCommands();
+        void vimRegisterStore();
+        void vimRegistersSharedAcrossViews();
+        void vimClipboardRegisters();
 };
 
 #endif

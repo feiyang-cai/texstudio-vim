@@ -41,6 +41,22 @@ This branch adds an experimental Vim editing mode for TeXstudio.
 - undo/redo: `u`, `Ctrl-r`
 - repeat: `.`
 
+## Registers (development branch)
+
+- unnamed: `"`
+- named: `a`–`z`; uppercase names append to lowercase registers
+- yank history: `0`
+- line/multiline delete history: `1`–`9`
+- small deletions: `-`
+- black hole: `_`
+- system clipboard: `+`; primary selection (where supported): `*`
+- register prefixes in Normal and Visual modes, e.g. `"ayy`, `"ap`, `"_dd`
+- characterwise, linewise and blockwise payloads shared between documents
+
+Explicit register destinations preserve automatic yank/delete history. Registers
+live for the current application session. Development build instructions and test
+examples are in [VIM_DEVELOPMENT.md](VIM_DEVELOPMENT.md).
+
 ## Visual Modes
 
 - characterwise visual: `v`
@@ -109,7 +125,6 @@ The Vim wrapper keeps TeXstudio's insert-mode features active:
 
 Not implemented in this branch:
 
-- named registers
 - macro recording/replay
 - remapping
 - `.vimrc`

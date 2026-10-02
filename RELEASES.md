@@ -49,10 +49,9 @@ fixes). Reset it to `0` when adopting a new upstream version. Keep the upstream
 beta/alpha/rc designation, for example `texstudio-vim-4.9.9beta2-r1`. The fork
 revision is separate from upstream's beta number and Git commits since the tag.
 
-The original `texstudio-vim-4.9.8` and `texstudio-vim-4.9.9beta2` releases remain
-available as compatibility aliases for the r0 baseline. Their tags and downloads
-are unchanged. The r0 releases rebuild that same Vim baseline with revision-aware
-release metadata and filenames.
+The legacy unnumbered `texstudio-vim-4.9.8` and `texstudio-vim-4.9.9beta2` tags
+remain as compatibility aliases for the r0 baseline. Existing tags are not moved.
+A tag alone does not establish that a downloadable GitHub release has been published.
 
 Push only the intended branch and fork tags; never use `git push --tags` (which
 would also publish imported upstream tags), force-push, or move an existing release
@@ -67,9 +66,22 @@ git push --atomic origin HEAD:master \
 
 CD builds Windows x86_64 and ARM64 installers/portable archives, Linux AppImage,
 and Intel/Apple Silicon macOS archives. Release publication waits for the reusable
-CI test workflow and every platform build. Only `texstudio-vim-*` tags publish;
+CI test workflow, every platform build, and all nine packaged GUI checks. Only `texstudio-vim-*` tags publish;
 beta/alpha/rc tags are marked prereleases. Windows installers are included even
 when signing credentials are unavailable. The executable and internal application
 bundle names retain the names expected by deployment tools.
 
 Do not substitute upstream release binaries: they do not include Vim support.
+
+## 4.9.9beta2-r1
+
+The r1 release uses upstream 4.9.9beta2 and remains a prerelease. It adds typed
+shared, named and clipboard registers; expands mode, motion, search and
+substitution coverage; fixes cursor boundaries, vertical columns, visual paste,
+repeat, multiline/block undo and redo shortcuts; and preserves Ctrl-hover and
+Ctrl-click navigation in Normal mode. Vim is the default for fresh configurations,
+while saved preferences are preserved. Update notifications use published releases
+from this fork and compare the numeric Vim revision; installation remains manual.
+
+See [VIM_TESTING.md](VIM_TESTING.md) for verified behavior and remaining gaps.
+Publication is gated on Linux CI and all packaged Windows/macOS/Linux GUI checks.

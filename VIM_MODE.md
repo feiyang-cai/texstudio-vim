@@ -2,9 +2,11 @@
 
 This branch adds an experimental Vim editing mode for TeXstudio.
 
-## Enable
+## Default and configuration
 
-`Options > Configure TeXstudio > Editor > Editing Mode > Vim (experimental)`
+Vim is the default editing mode for fresh configurations in texstudio-vim.
+Existing saved editing-mode preferences are preserved. To change the mode, use
+`Options > Configure TeXstudio > Editor > Editing Mode`.
 
 ## Supported Modes
 

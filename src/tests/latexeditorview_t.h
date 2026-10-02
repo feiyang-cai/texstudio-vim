@@ -40,6 +40,15 @@ class LatexEditorViewTest: public QObject{
         void vimRegistersSharedAcrossViews();
         void vimClipboardRegisters();
         void vimDesktopClipboard();
+        void vimDocumentedModes_data();
+        void vimDocumentedModes();
+        void vimSubstituteFlags_data();
+        void vimSubstituteFlags();
+        void vimSearchNavigation();
+        void vimSubstituteConfirmation();
+        void vimSubstitutePrompt();
+        void vimDocumentedMotions_data();
+        void vimDocumentedMotions();
 };
 
 #endif

@@ -140,7 +140,24 @@ with (output / 'application.log').open('w') as log:
             owner = ctypes.c_ulong()
             foreground = user32.GetForegroundWindow()
             user32.GetWindowThreadProcessId(ctypes.c_void_p(foreground), ctypes.byref(owner))
-            (output / 'focus.json').write_text(json.dumps({'expected_pid': process.pid, 'foreground_pid': owner.value}))
+            title = ctypes.create_unicode_buffer(user32.GetWindowTextLengthW(foreground) + 1)
+            user32.GetWindowTextW(foreground, title, len(title))
+            details = {'expected_pid': process.pid, 'foreground_pid': owner.value,
+                       'foreground_title': title.value, 'activation': input_driver.activation}
+            kernel = ctypes.windll.kernel32
+            kernel.OpenProcess.argtypes = [ctypes.c_ulong, ctypes.c_int, ctypes.c_ulong]
+            kernel.OpenProcess.restype = ctypes.c_void_p
+            kernel.QueryFullProcessImageNameW.argtypes = [ctypes.c_void_p, ctypes.c_ulong, ctypes.c_wchar_p, ctypes.POINTER(ctypes.c_ulong)]
+            kernel.CloseHandle.argtypes = [ctypes.c_void_p]
+            handle = kernel.OpenProcess(0x1000, False, owner.value)
+            if handle:
+                buffer = ctypes.create_unicode_buffer(2048)
+                length = ctypes.c_ulong(len(buffer))
+                if kernel.QueryFullProcessImageNameW(handle, 0, buffer, ctypes.byref(length)):
+                    details['foreground_image'] = buffer.value
+                kernel.CloseHandle(handle)
+            (output / 'focus.json').write_text(json.dumps(details))
+            print('Desktop focus:', json.dumps(details))
             if owner.value != process.pid:
                 raise RuntimeError('Desktop focus did not reach the packaged application')
         input_driver.press('esc')

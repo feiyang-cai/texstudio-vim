@@ -11,6 +11,7 @@ import time
 import zipfile
 
 import pyautogui as gui
+from package_identity import package_identity
 
 input_driver = gui
 
@@ -49,8 +50,14 @@ else:
 
 version = subprocess.run([str(executable), '--version'], capture_output=True, text=True, timeout=60)
 (output / 'version.log').write_text(version.stdout + version.stderr)
-if version.returncode or os.environ['BUILD_SHA'][:7] not in version.stdout:
-    raise SystemExit('Packaged executable has an unexpected version; see version.log')
+if version.returncode:
+    raise SystemExit('Packaged executable failed --version; see version.log')
+try:
+    identity = package_identity(version.stdout, os.environ['BUILD_SHA'], archives[0].name)
+except ValueError as error:
+    raise SystemExit(str(error)) from error
+(output / 'identity.json').write_text(json.dumps({'method': identity, 'sha': os.environ['BUILD_SHA'],
+                                               'archive': archives[0].name, 'version': version.stdout}))
 
 fixture = output / 'vim-native-smoke.tex'
 fixture.write_text('one\ntwo\nthree\n', encoding='utf-8')

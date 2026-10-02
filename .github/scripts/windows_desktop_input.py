@@ -96,13 +96,16 @@ class WindowsDesktopInput:
         target = api.GetWindowThreadProcessId(hwnd, None)
         foreground = api.GetWindowThreadProcessId(api.GetForegroundWindow(), None)
         attached = []
+        self.activation = {'target_thread': target, 'foreground_thread': foreground, 'current_thread': current, 'attachments': []}
         try:
             for thread in {target, foreground} - {current, 0}:
-                if api.AttachThreadInput(current, thread, True):
+                success = bool(api.AttachThreadInput(current, thread, True))
+                self.activation['attachments'].append({'thread': thread, 'success': success, 'error': ctypes.windll.kernel32.GetLastError()})
+                if success:
                     attached.append(thread)
             api.ShowWindow(hwnd, 9)
             api.BringWindowToTop(hwnd)
-            api.SetForegroundWindow(hwnd)
+            self.activation['foreground_set'] = bool(api.SetForegroundWindow(hwnd))
             api.SetFocus(hwnd)
         finally:
             for thread in reversed(attached):

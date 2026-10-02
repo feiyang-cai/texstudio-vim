@@ -26,9 +26,13 @@ I did not manually design and review every code path to production standard. Use
 ## Downloads
 
 - Releases: [GitHub Releases](https://github.com/feiyang-cai/texstudio-vim/releases)
-- Fork release tags: `texstudio-vim-4.9.8` and `texstudio-vim-4.9.9beta2` (prerelease).
+- Fork release tags: `texstudio-vim-4.9.8-r0` and `texstudio-vim-4.9.9beta2-r0` (prerelease).
 - Download filenames start with `texstudio-vim-`; each build includes the Vim mode documented below.
 - Release artifacts for supported platforms are intended to be distributed from GitHub releases for this fork, including macOS, Linux, and Windows.
+
+## Versioning
+
+Releases use `texstudio-vim-<upstream-version>-r<fork-revision>`. `r0` is the Vim baseline for each upstream version; subsequent fork updates become `r1`, `r2`, and so on. The upstream version and fork revision are independent. The original unnumbered releases remain available as equivalents of `r0`. See [RELEASES.md](RELEASES.md) for the release process.
 
 ## Feedback
 

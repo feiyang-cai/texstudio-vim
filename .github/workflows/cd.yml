@@ -665,6 +665,10 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           name: ${{ github.ref_name }}
+          body: |
+            Native experimental Vim editing for TeXstudio. Release names identify the upstream base and the independent fork revision: `texstudio-vim-<upstream-version>-rN`.
+
+            `r0` is the current Vim baseline; subsequent fork updates on the same upstream base increment `rN`. Enable Vim in Options > Configure TeXstudio > Editor > Editing Mode. See [Vim support](https://github.com/feiyang-cai/texstudio-vim/blob/master/VIM_MODE.md) and [release versioning](https://github.com/feiyang-cai/texstudio-vim/blob/master/RELEASES.md).
           fail_on_unmatched_files: true
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
           files: ./*

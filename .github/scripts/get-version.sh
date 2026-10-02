@@ -23,6 +23,10 @@ case "$RELEASE_TAG" in
     *) GIT_VERSION=${TXS_VERSION} ;;
 esac
 # Legacy releases are the r0 baseline; numbered tags carry their own revision.
+# Branch builds use the source revision, including an unreleased revision bump.
+if [ "${GITHUB_REF_TYPE:-}" != "tag" ]; then
+    GIT_VERSION="${GIT_VERSION%-r*}-r${FORK_REVISION}"
+fi
 case "$GIT_VERSION" in
     *-r[0-9]*) ;;
     *) GIT_VERSION="${GIT_VERSION}-r${FORK_REVISION}" ;;

@@ -85,3 +85,10 @@ from this fork and compare the numeric Vim revision; installation remains manual
 
 See [VIM_TESTING.md](VIM_TESTING.md) for verified behavior and remaining gaps.
 Publication is gated on Linux CI and all packaged Windows/macOS/Linux GUI checks.
+
+## Release order
+
+Publish `texstudio-vim-4.9.8-r1` first as the stable upstream-base release, then
+`texstudio-vim-4.9.9beta2-r1` as a prerelease. Both carry the same r1 Vim changes
+and require their own successful builds and packaged desktop checks. The beta
+release must not replace the stable release in GitHub's latest stable channel.

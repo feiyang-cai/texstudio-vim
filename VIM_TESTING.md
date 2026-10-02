@@ -43,11 +43,13 @@ on Ubuntu 22.04/24.04, Debian 12/13 and Fedora 43. Native Windows/macOS jobs unp
 the portable archive or application bundle and drive a visible window using
 PyAutoGUI and host OS input APIs. Every packaged test uses a fresh configuration,
 checks the commit in the executable version, and verifies saved text after named
-registers, Insert/dot, Replace, global substitution, and forward/backward searches.
+registers, Insert/dot, Replace, character/line/block Visual editing and undo,
+global substitution with undo/redo, and forward/backward searches.
 Screenshots, application logs and intermediate saved results are retained.
 
 `Packaged desktop retest` can reuse an existing CD build when application sources
-are unchanged, allowing CI-only desktop fixes to be checked without recompiling.
+are unchanged, allowing CI-only desktop fixes to be checked without recompiling on all nine
+packaged desktop environments.
 It verifies that subsequent changes affect only CI/documentation and records the
 package commit. Windows runner setup disables the first-login privacy wizard on
 the disposable CI VM so it cannot steal keyboard focus.

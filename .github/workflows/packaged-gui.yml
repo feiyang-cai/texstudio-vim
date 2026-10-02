@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - .github/scripts/smoke-native-package.py
+      - .github/scripts/smoke-appimage.py
       - .github/scripts/windows_desktop_input.py
       - .github/scripts/prepare-windows-gui.ps1
       - .github/scripts/select-gui-build.py
@@ -77,4 +78,48 @@ jobs:
         with:
           name: packaged-retest-${{ matrix.runner }}
           path: native-smoke-results/
+          if-no-files-found: warn
+
+  linux:
+    name: AppImage retest (${{ matrix.name }})
+    needs: select
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: ubuntu-22.04
+            image: ubuntu:22.04
+          - name: ubuntu-24.04
+            image: ubuntu:24.04
+          - name: debian-12
+            image: debian:12
+          - name: debian-13
+            image: debian:13
+          - name: fedora-43
+            image: fedora:43
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: texstudio-linux
+          path: appimage
+          run-id: ${{ needs.select.outputs.run_id }}
+          github-token: ${{ github.token }}
+      - name: Packaged desktop smoke test
+        env:
+          SMOKE_NAME: ${{ matrix.name }}
+          SMOKE_IMAGE: ${{ matrix.image }}
+          BUILD_SHA: ${{ needs.select.outputs.sha }}
+        run: >-
+          docker run --rm --volume "$PWD:/work" --workdir /work
+          --env SMOKE_NAME --env BUILD_SHA "$SMOKE_IMAGE"
+          bash .github/scripts/smoke-appimage-container.sh
+      - name: Save desktop diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: appimage-retest-${{ matrix.name }}
+          path: smoke-results/
           if-no-files-found: warn

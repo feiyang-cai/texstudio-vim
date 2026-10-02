@@ -25,7 +25,7 @@ else:
     branch = quote(os.environ['GITHUB_REF_NAME'], safe='')
     candidates = get(f'/actions/workflows/cd.yml/runs?event=push&branch={branch}&per_page=20')['workflow_runs']
 
-required = {'texstudio-vim-win-qt6-zip', 'texstudio-vim-win-arm-qt6-zip',
+required = {'texstudio-linux', 'texstudio-vim-win-qt6-zip', 'texstudio-vim-win-arm-qt6-zip',
             'texstudio-osx', 'texstudio-vim-osx-m1'}
 for run in candidates:
     sha = run['head_sha']

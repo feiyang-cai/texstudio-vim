@@ -9,6 +9,7 @@
 #include "qdocument.h"
 #include "qeditor.h"
 #include "testutil.h"
+#include "vimregisters.h"
 #include <QtTest/QtTest>
 
 namespace {
@@ -147,6 +148,53 @@ void LatexEditorViewTest::vimEditingModeSwitches()
     edView->updateSettings();
 }
 
+void LatexEditorViewTest::vimCtrlClickNavigation()
+{
+    if (skipVimUiTestInQuickRuns()) return;
+    const int oldMode = edView->getConfig()->editingMode;
+    edView->getConfig()->editingMode = LatexEditorViewConfig::VimEditing;
+    edView->updateSettings();
+    edView->editor->setText("\\label{target}\n\\ref{target}", false);
+    edView->document->startSyntaxChecker();
+    edView->document->synChecker.waitForQueueProcess();
+    edView->editor->setFocus();
+    edView->editor->setCursorPosition(1, 7, false);
+    QWidget *viewport = edView->editor->viewport();
+    const QPoint point(qRound(edView->editor->cursor().line().cursorToDocumentOffset(7).x()),
+                       qRound(edView->editor->lineRect(1).center().y()));
+    edView->checkForLinkOverlay(edView->editor->cursor());
+    QVERIFY(edView->hasLinkOverlay());
+    QTest::mouseMove(viewport, point);
+    QSignalSpy navigation(edView, SIGNAL(gotoDefinition(QDocumentCursor)));
+    QVERIFY(navigation.isValid());
+    const QString text = edView->editor->document()->text();
+    for (const QString &mode : {QString("NORMAL"), QString("INSERT"), QString("REPLACE")}) {
+        QTest::keyClick(edView->editor, Qt::Key_Escape);
+        if (mode == "INSERT") QTest::keyClick(edView->editor, Qt::Key_I);
+        if (mode == "REPLACE") QTest::keyClicks(edView->editor, "R");
+        QTest::mouseMove(viewport, point);
+        QTest::keyPress(edView->editor, Qt::Key_Control, Qt::ControlModifier);
+        QVERIFY(edView->editor->hasMouseTracking());
+        // A mouse move while Control is held must discover the actual ref token.
+        QMouseEvent hover(QEvent::MouseMove, QPointF(point), QPointF(viewport->mapToGlobal(point)),
+                          Qt::NoButton, Qt::NoButton, Qt::ControlModifier);
+        QApplication::sendEvent(viewport, &hover);
+        QVERIFY(edView->hasLinkOverlay());
+        QCOMPARE(edView->getLinkOverlay().type, LinkOverlay::RefOverlay);
+        const int previous = navigation.count();
+        QTest::mouseClick(viewport, Qt::LeftButton, Qt::ControlModifier, point);
+        QCOMPARE(navigation.count(), previous + 1);
+        QCOMPARE(edView->editor->inputModeLabel(), mode);
+        QCOMPARE(edView->editor->document()->text(), text);
+        QTest::keyRelease(edView->editor, Qt::Key_Control);
+        QVERIFY(!edView->editor->hasMouseTracking());
+        QVERIFY(!edView->hasLinkOverlay());
+    }
+    QTest::keyClick(edView->editor, Qt::Key_Escape);
+    edView->getConfig()->editingMode = oldMode;
+    edView->updateSettings();
+}
+
 void LatexEditorViewTest::vimCursorStyles()
 {
     if (skipVimUiTestInQuickRuns())
@@ -199,12 +247,12 @@ void LatexEditorViewTest::vimInsertEscape()
     QTest::keyClicks(edView->editor, "X");
     QTest::keyClick(edView->editor, Qt::Key_Escape);
 
-    QEQUAL(edView->editor->document()->text(), QString("Xabc"));
+    QEQUAL(edView->editor->document()->textLines().join("\n"), QString("Xabc"));
     QEQUAL(edView->editor->inputModeLabel(), QString("NORMAL"));
     QEQUAL(edView->editor->cursor().columnNumber(), 0);
 
     QTest::keyClick(edView->editor, Qt::Key_X);
-    QEQUAL(edView->editor->document()->text(), QString("abc"));
+    QEQUAL(edView->editor->document()->textLines().join("\n"), QString("abc"));
 
     edView->getConfig()->editingMode = oldMode;
     edView->updateSettings();
@@ -239,7 +287,7 @@ void LatexEditorViewTest::vimVisualLineStaysOnCurrentLine()
 
     QTest::keyClick(edView->editor, Qt::Key_D);
     // The source had no trailing newline; deleting its tail keeps that property.
-    QEQUAL(edView->editor->document()->text(), QString("alpha"));
+    QEQUAL(edView->editor->document()->textLines().join("\n"), QString("alpha"));
     QEQUAL(edView->editor->inputModeLabel(), QString("NORMAL"));
 
     edView->getConfig()->editingMode = oldMode;
@@ -322,9 +370,13 @@ void LatexEditorViewTest::vimVisualBlockDeleteAffectsAllRows()
     QTest::keyClick(edView->editor, Qt::Key_J);
     QTest::keyClick(edView->editor, Qt::Key_D);
 
-    QEQUAL(edView->editor->document()->text(), QString("lpha\neta\ngamma"));
+    QEQUAL(edView->editor->document()->textLines().join("\n"), QString("lpha\neta\ngamma"));
     QEQUAL(edView->editor->inputModeLabel(), QString("NORMAL"));
     QEQUAL(edView->editor->cursorMirrorCount(), 0);
+    QTest::keyClicks(edView->editor, "u");
+    QEQUAL(edView->editor->document()->textLines().join("\n"), QString("alpha\nbeta\ngamma"));
+    QTest::keyClick(edView->editor, Qt::Key_R, Qt::ControlModifier);
+    QEQUAL(edView->editor->document()->textLines().join("\n"), QString("lpha\neta\ngamma"));
 
     edView->getConfig()->editingMode = oldMode;
     edView->updateSettings();
@@ -360,7 +412,7 @@ void LatexEditorViewTest::vimVisualBlockInsertAtStart()
     QTest::keyClicks(edView->editor, "X");
     QTest::keyClick(edView->editor, Qt::Key_Escape);
 
-    QEQUAL(edView->editor->document()->text(), QString("Xalpha\nXbeta\ngamma"));
+    QEQUAL(edView->editor->document()->textLines().join("\n"), QString("Xalpha\nXbeta\ngamma"));
     QEQUAL(edView->editor->inputModeLabel(), QString("NORMAL"));
     QEQUAL(edView->editor->cursorMirrorCount(), 0);
 
@@ -379,13 +431,18 @@ void LatexEditorViewTest::vimCloseElementEscapesInsertMode()
 
     edView->editor->setText("abc", false);
     edView->editor->setCursorPosition(0, 0, false);
+    edView->window()->show();
+    edView->window()->raise();
+    edView->window()->activateWindow();
     edView->editor->setFocus();
+    QVERIFY(QTest::qWaitForWindowActive(edView->window()));
+    QVERIFY(edView->editor->hasFocus());
 
     QTest::keyClick(edView->editor, Qt::Key_I);
     QTest::keyClicks(edView->editor, "X");
 
     QVERIFY(edView->closeElement());
-    QEQUAL(edView->editor->document()->text(), QString("Xabc"));
+    QEQUAL(edView->editor->document()->textLines().join("\n"), QString("Xabc"));
     QEQUAL(edView->editor->inputModeLabel(), QString("NORMAL"));
     QEQUAL(edView->editor->cursor().columnNumber(), 0);
 
@@ -404,10 +461,15 @@ void LatexEditorViewTest::vimCloseElementIsConsumedInNormalMode()
 
     edView->editor->setText("abc", false);
     edView->editor->setCursorPosition(0, 1, false);
+    edView->window()->show();
+    edView->window()->raise();
+    edView->window()->activateWindow();
     edView->editor->setFocus();
+    QVERIFY(QTest::qWaitForWindowActive(edView->window()));
+    QVERIFY(edView->editor->hasFocus());
 
     QVERIFY(edView->closeElement());
-    QEQUAL(edView->editor->document()->text(), QString("abc"));
+    QEQUAL(edView->editor->document()->textLines().join("\n"), QString("abc"));
     QEQUAL(edView->editor->inputModeLabel(), QString("NORMAL"));
     QEQUAL(edView->editor->cursor().columnNumber(), 1);
 
@@ -438,7 +500,7 @@ void LatexEditorViewTest::vimPromptEnterDoesNotInsertNewline()
     QTest::keyClicks(promptEdit, "2");
     QTest::keyClick(promptEdit, Qt::Key_Return);
 
-    QEQUAL(edView->editor->document()->text(), QString("alpha\nbeta\ngamma"));
+    QEQUAL(edView->editor->document()->textLines().join("\n"), QString("alpha\nbeta\ngamma"));
     QEQUAL(edView->editor->cursor().lineNumber(), 1);
     QEQUAL(edView->editor->inputModeLabel(), QString("NORMAL"));
 
@@ -540,7 +602,7 @@ void LatexEditorViewTest::vimMarks()
     QCoreApplication::sendEvent(edView->editor, &linewiseDeleteToMark);
     QTest::keyClick(edView->editor, Qt::Key_A);
 
-    QEQUAL(edView->editor->document()->text(), QString(""));
+    QEQUAL(edView->editor->document()->textLines().join("\n"), QString(""));
     QEQUAL(edView->editor->inputModeLabel(), QString("NORMAL"));
 
     edView->editor->setText("one\ntwo\nthree", false);
@@ -555,7 +617,7 @@ void LatexEditorViewTest::vimMarks()
     QTest::keyClick(edView->editor, Qt::Key_A);
     QTest::keyClick(edView->editor, Qt::Key_P);
 
-    QEQUAL(edView->editor->document()->text(), QString("one\ntwo\nthree\none\ntwo\nthree\n"));
+    QEQUAL(edView->editor->document()->textLines().join("\n"), QString("one\ntwo\nthree\none\ntwo\nthree"));
     QEQUAL(edView->editor->inputModeLabel(), QString("NORMAL"));
 
     edView->getConfig()->editingMode = oldMode;
@@ -578,7 +640,7 @@ void LatexEditorViewTest::vimDeleteLastLineMovesToPreviousLine()
     QTest::keyClick(edView->editor, Qt::Key_D);
     QTest::keyClick(edView->editor, Qt::Key_D);
 
-    QEQUAL(edView->editor->document()->text(), QString("one\n  two"));
+    QEQUAL(edView->editor->document()->textLines().join("\n"), QString("one\n  two"));
     QEQUAL(edView->editor->cursor().lineNumber(), 1);
     QEQUAL(edView->editor->cursor().columnNumber(), 2);
     QEQUAL(edView->editor->inputModeLabel(), QString("NORMAL"));
@@ -603,7 +665,7 @@ void LatexEditorViewTest::vimLinewisePasteKeepsCursorOnInsertedText()
     QTest::keyClicks(edView->editor, "Y");
     QTest::keyClick(edView->editor, Qt::Key_P);
 
-    QEQUAL(edView->editor->document()->text(), QString("    alpha\n    alpha\nbeta\ngamma"));
+    QEQUAL(edView->editor->document()->textLines().join("\n"), QString("    alpha\n    alpha\nbeta\ngamma"));
     QEQUAL(edView->editor->cursor().lineNumber(), 1);
     QEQUAL(edView->editor->cursor().columnNumber(), 4);
     QEQUAL(edView->editor->inputModeLabel(), QString("NORMAL"));
@@ -627,7 +689,7 @@ void LatexEditorViewTest::vimNormalModeConsumesUnhandledPrintableKeys()
 
     QTest::keyClicks(edView->editor, "H");
 
-    QEQUAL(edView->editor->document()->text(), QString("abc"));
+    QEQUAL(edView->editor->document()->textLines().join("\n"), QString("abc"));
     QEQUAL(edView->editor->inputModeLabel(), QString("NORMAL"));
 
     edView->getConfig()->editingMode = oldMode;
@@ -647,19 +709,19 @@ void LatexEditorViewTest::vimExSubstituteCommands()
     edView->editor->setCursorPosition(0, 0, false);
 
     QVERIFY(edView->executeVimExCommand("s/foo/X/"));
-    QEQUAL(edView->editor->document()->text(), QString("X foo\nfoo foo\nbar"));
+    QEQUAL(edView->editor->document()->textLines().join("\n"), QString("X foo\nfoo foo\nbar"));
 
     QVERIFY(edView->executeVimExCommand("%s/foo/Y/g"));
-    QEQUAL(edView->editor->document()->text(), QString("X Y\nY Y\nbar"));
+    QEQUAL(edView->editor->document()->textLines().join("\n"), QString("X Y\nY Y\nbar"));
 
     edView->editor->setText("foo foo\nfoo foo\nfoo foo", false);
     QVERIFY(edView->executeVimExCommand("1,2s/foo/Z/"));
-    QEQUAL(edView->editor->document()->text(), QString("Z foo\nZ foo\nfoo foo"));
+    QEQUAL(edView->editor->document()->textLines().join("\n"), QString("Z foo\nZ foo\nfoo foo"));
 
     edView->executeVimSearch("foo", false);
     edView->editor->setCursorPosition(2, 0, false);
     QVERIFY(edView->executeVimExCommand("s//Q/g"));
-    QEQUAL(edView->editor->document()->text(), QString("Z foo\nZ foo\nQ Q"));
+    QEQUAL(edView->editor->document()->textLines().join("\n"), QString("Z foo\nZ foo\nQ Q"));
 
     edView->getConfig()->editingMode = oldMode;
     edView->updateSettings();
@@ -700,6 +762,504 @@ void LatexEditorViewTest::vimExCommands()
 
     edView->getConfig()->editingMode = oldMode;
     edView->updateSettings();
+}
+
+
+void LatexEditorViewTest::vimRegisterCommands_data()
+{
+    QTest::addColumn<QString>("initial");
+    QTest::addColumn<QString>("keys");
+    QTest::addColumn<QString>("expected");
+    QTest::newRow("named character yank") << "abc" << "\"ayl\"ap" << "aabc";
+    QTest::newRow("named line yank survives delete") << "one\ntwo\nthree" << "\"ayyjdd\"aP" << "one\none\nthree";
+    QTest::newRow("uppercase append character") << "abc" << "\"ayl\"Ayl\"ap" << "aaabc";
+    QTest::newRow("uppercase append lines") << "one\ntwo\nthree" << "\"ayyj\"Ayy\"aP" << "one\none\ntwo\ntwo\nthree";
+    QTest::newRow("black hole preserves unnamed") << "abc" << "yl\"_xp" << "bac";
+    QTest::newRow("yank history survives delete") << "one\ntwo\nthree" << "yyjdd\"0P" << "one\none\nthree";
+    QTest::newRow("small delete register") << "abc" << "xyl\"-p" << "bac";
+    QTest::newRow("numbered delete rotation") << "one\ntwo\nthree" << "dddd\"2P" << "one\nthree";
+    QTest::newRow("gg from last line") << "one\ntwo\nthree" << "Gggdd" << "two\nthree";
+    QTest::newRow("replace with command character") << "abc" << "rx" << "xbc";
+    QTest::newRow("replace with digit") << "abc" << "r1" << "1bc";
+    QTest::newRow("find command character") << "abcabc" << "fax" << "abcbc";
+    QTest::newRow("named paste count") << "abc" << "\"ayl\"a3p" << "aaaabc";
+    QTest::newRow("count before register") << "one\ntwo\nthree" << "2\"ayyG\"aP" << "one\ntwo\none\ntwo\nthree";
+    QTest::newRow("visual named yank") << "abc" << "vl\"ay\"aP" << "ababc";
+    QTest::newRow("visual paste uses original source") << "abc" << "ylvlp" << "ac";
+    QTest::newRow("explicit visual paste") << "abc" << "\"ayl vl\"ap" << "ac";
+    QTest::newRow("replace does not overwrite yank") << "abc" << "ylrzp" << "zabc";
+    QTest::newRow("register selection ends after command") << "abc" << "\"aylx\"ap" << "bac";
+    QTest::newRow("repeat named deletion") << "abcd" << "\"ax.\"aP" << "bcd";
+    QTest::newRow("repeat named paste") << "abc" << "\"ayl\"ap." << "aaabc";
+    QTest::newRow("visual paste preserves named source") << "abc" << "\"ayl vl\"ap\"aP" << "aac";
+    QTest::newRow("visual paste last character") << "abc" << "yl$vp" << "aba";
+    QTest::newRow("visual paste undo") << "abc" << "ylvlpu" << "abc";
+    QTest::newRow("empty visual paste is harmless") << "abc" << "vl\"zp" << "abc";
+    QTest::newRow("repeat named line delete") << "one\ntwo\nthree" << "\"add.\"aP" << "two\nthree";
+    QTest::newRow("line paste at EOF") << "one\ntwo" << "yyGp" << "one\ntwo\none";
+    QTest::newRow("counted paste undo") << "abc" << "\"ayl\"a3pu" << "abc";
+    QTest::newRow("named delete text object") << "word next" << "\"adiw" << " next";
+    QTest::newRow("delete word end inclusive") << "word next" << "de" << " next";
+    QTest::newRow("delete next word exclusive") << "word next" << "dw" << "next";
+    QTest::newRow("delete counted words") << "one two\nthree" << "d2w" << "three";
+    QTest::newRow("yank word end") << "word next" << "yeP" << "wordword next";
+    QTest::newRow("left stays on line") << "one\ntwo" << "j99h" << "one\ntwo";
+    QTest::newRow("text object named yank") << "word next" << "\"ayiw\"aP" << "wordword next";
+}
+
+void LatexEditorViewTest::vimRegisterCommands()
+{
+    if (skipVimUiTestInQuickRuns())
+        return;
+    QFETCH(QString, initial);
+    QFETCH(QString, keys);
+    QFETCH(QString, expected);
+    const int oldMode = edView->getConfig()->editingMode;
+    edView->getConfig()->editingMode = LatexEditorViewConfig::VimEditing;
+    edView->updateSettings();
+    vimRegisters() = VimRegisters();
+    edView->editor->setText(initial, false);
+    edView->editor->setCursorPosition(0, 0, false);
+    edView->editor->setFocus();
+    QTest::keyClicks(edView->editor, keys);
+    const QString actual = edView->editor->document()->textLines().join("\n");
+    const QString mode = edView->editor->inputModeLabel();
+    edView->getConfig()->editingMode = oldMode;
+    edView->updateSettings();
+    QCOMPARE(actual, expected);
+    QCOMPARE(mode, QString("NORMAL"));
+}
+
+void LatexEditorViewTest::vimPhysicalModifierEvents()
+{
+    if (skipVimUiTestInQuickRuns())
+        return;
+    LatexEditorViewConfig config = *edView->getConfig();
+    config.editingMode = LatexEditorViewConfig::VimEditing;
+    LatexDocument document;
+    LatexEditorView view(nullptr, &config, &document);
+    view.editor->setText("one\ntwo\nthree", false);
+    view.editor->setCursorPosition(0, 0, false);
+    vimRegisters() = VimRegisters();
+    QTest::keyClicks(view.editor, "\"ayyjdd\"a");
+    QTest::keyPress(view.editor, Qt::Key_Shift);
+    QTest::keyClicks(view.editor, "P", Qt::ShiftModifier);
+    QTest::keyRelease(view.editor, Qt::Key_Shift);
+    QCOMPARE(view.editor->document()->textLines().join("\n"), QString("one\none\nthree"));
+    // Shift is also separate when selecting an uppercase append destination.
+    QTest::keyClick(view.editor, Qt::Key_QuoteDbl, Qt::ShiftModifier);
+    QTest::keyPress(view.editor, Qt::Key_Shift);
+    QTest::keyClicks(view.editor, "A", Qt::ShiftModifier);
+    QTest::keyRelease(view.editor, Qt::Key_Shift);
+    QTest::keyClicks(view.editor, "yy");
+    QCOMPARE(vimRegisters().read('a').text, QString("one\none\n"));
+    QTest::keyClicks(view.editor, "d");
+    QTest::keyPress(view.editor, Qt::Key_Control);
+    QTest::keyRelease(view.editor, Qt::Key_Control);
+    QTest::keyClicks(view.editor, "d");
+    QCOMPARE(view.editor->document()->textLines().join("\n"), QString("one\nthree"));
+    // Typing uppercase text must also remain repeatable with dot.
+    view.editor->setText("abc", false);
+    view.editor->setCursorPosition(0, 0, false);
+    QTest::keyClicks(view.editor, "i");
+    QTest::keyPress(view.editor, Qt::Key_Shift);
+    QTest::keyClicks(view.editor, "X", Qt::ShiftModifier);
+    QTest::keyRelease(view.editor, Qt::Key_Shift);
+    QTest::keyClick(view.editor, Qt::Key_BracketLeft, Qt::ControlModifier);
+    QCOMPARE(view.editor->inputModeLabel(), QString("NORMAL"));
+    QTest::keyClicks(view.editor, "l.");
+    QCOMPARE(view.editor->document()->textLines().join("\n"), QString("XXabc"));
+}
+
+void LatexEditorViewTest::vimRegisterStore()
+{
+    VimRegisters registers;
+    const VimRegister first{VimRegisterType::LineWise, "first\n", {}};
+    const VimRegister second{VimRegisterType::LineWise, "second\n", {}};
+    registers.write('"', first, true);
+    registers.write('"', second, false);
+    QCOMPARE(registers.read('0').text, first.text);
+    QCOMPARE(registers.read('1').text, second.text);
+    registers.write('_', first, false);
+    QCOMPARE(registers.read('"').text, second.text);
+    QCOMPARE(registers.read('1').text, second.text);
+    registers.write('a', first, true);
+    registers.write('A', second, true);
+    QCOMPARE(registers.read('a').text, QString("first\nsecond\n"));
+    QCOMPARE(registers.read('A').text, registers.read('a').text);
+    QCOMPARE(registers.read('0').text, first.text);
+    const VimRegister block{VimRegisterType::BlockWise, "a\nb", {"a", "b"}};
+    registers.write('b', block, true);
+    registers.write('B', block, true);
+    QCOMPARE(registers.read('b').blocks, QStringList({"aa", "bb"}));
+    QCOMPARE(registers.read('b').type, VimRegisterType::BlockWise);
+    for (int i = 1; i <= 10; ++i)
+        registers.write('"', {VimRegisterType::LineWise, QString::number(i) + "\n", {}}, false);
+    QCOMPARE(registers.read('1').text, QString("10\n"));
+    QCOMPARE(registers.read('9').text, QString("2\n"));
+    registers.write('"', {VimRegisterType::CharacterWise, "x", {}}, false);
+    QCOMPARE(registers.read('-').text, QString("x"));
+    QCOMPARE(registers.read('1').text, QString("10\n"));
+}
+
+void LatexEditorViewTest::vimRegistersSharedAcrossViews()
+{
+    if (skipVimUiTestInQuickRuns())
+        return;
+    LatexEditorViewConfig config = *edView->getConfig();
+    config.editingMode = LatexEditorViewConfig::VimEditing;
+    LatexDocument firstDocument, secondDocument;
+    LatexEditorView first(nullptr, &config, &firstDocument);
+    LatexEditorView second(nullptr, &config, &secondDocument);
+    first.editor->setText("source", false);
+    first.editor->setCursorPosition(0, 0, false);
+    QTest::keyClicks(first.editor, "\"zyiw");
+    second.editor->setText("target", false);
+    second.editor->setCursorPosition(0, 0, false);
+    QTest::keyClicks(second.editor, "\"zP");
+    QCOMPARE(second.editor->document()->textLines().join("\n"), QString("sourcetarget"));
+    QTest::keyClicks(second.editor, "\"");
+    // This view is isolated from the main window's global Escape action.
+    QTest::keyClick(second.editor, Qt::Key_BracketLeft, Qt::ControlModifier);
+    QTest::keyClicks(second.editor, "x");
+    QCOMPARE(second.editor->document()->textLines().join("\n"), QString("sourctarget"));
+    QCOMPARE(second.editor->inputModeLabel(), QString("NORMAL"));
+    QCOMPARE(vimRegisters().read('z').text, QString("source"));
+}
+
+void LatexEditorViewTest::vimClipboardRegisters()
+{
+    if (skipVimUiTestInQuickRuns())
+        return;
+    QClipboard *clipboard = QApplication::clipboard();
+    const QString previous = clipboard->text();
+    const int oldMode = edView->getConfig()->editingMode;
+    edView->getConfig()->editingMode = LatexEditorViewConfig::VimEditing;
+    edView->updateSettings();
+    edView->editor->setText("one\ntwo", false);
+    edView->editor->setCursorPosition(0, 0, false);
+    QTest::keyClicks(edView->editor, "\"+yy");
+    const QString yanked = clipboard->text();
+    QTest::keyClicks(edView->editor, "j\"+P");
+    const QString pasted = edView->editor->document()->textLines().join("\n");
+    clipboard->setText("external");
+    edView->editor->setText("target", false);
+    edView->editor->setCursorPosition(0, 0, false);
+    QTest::keyClicks(edView->editor, "\"+P");
+    const QString externalPaste = edView->editor->document()->textLines().join("\n");
+    const VimRegister block{VimRegisterType::BlockWise, "a\nb", {"a", "b"}};
+    vimRegisters().write('+', block, true);
+    const VimRegister restored = vimRegisters().read('+');
+    clipboard->setText(previous);
+    edView->getConfig()->editingMode = oldMode;
+    edView->updateSettings();
+    QCOMPARE(yanked, QString("one\n"));
+    QCOMPARE(pasted, QString("one\none\ntwo"));
+    QCOMPARE(externalPaste, QString("externaltarget"));
+    QCOMPARE(restored.type, VimRegisterType::BlockWise);
+    QCOMPARE(restored.blocks, block.blocks);
+}
+
+void LatexEditorViewTest::vimDesktopClipboard()
+{
+    if (skipVimUiTestInQuickRuns())
+        return;
+    qInfo() << "desktop platform:" << QGuiApplication::platformName()
+            << "primary selection:" << QApplication::clipboard()->supportsSelection();
+    LatexEditorViewConfig config = *edView->getConfig();
+    config.editingMode = LatexEditorViewConfig::VimEditing;
+    LatexDocument document;
+    LatexEditorView view(nullptr, &config, &document);
+    view.resize(900, 500);
+    view.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&view));
+    view.editor->setText("original", false);
+    // Register payloads use LF, while saving must retain the document format.
+    view.editor->document()->setLineEndingDirect(QDocument::Windows, true);
+    view.editor->setCursorPosition(0, 0, false);
+    view.editor->setFocus();
+    QClipboard *clipboard = QApplication::clipboard();
+    const QString previous = clipboard->text();
+    clipboard->setText(QString::fromUtf8("αβ\r\n第二行\r\n"));
+    const VimRegister external = vimRegisters().read('+');
+    QTest::keyClicks(view.editor, "\"+P");
+    const QString actual = view.editor->document()->textLines().join("\n");
+    clipboard->setText(previous);
+    QCOMPARE(external.text, QString::fromUtf8("αβ\n第二行\n"));
+    QCOMPARE(external.type, VimRegisterType::LineWise);
+    QCOMPARE(actual, QString::fromUtf8("αβ\n第二行\noriginal"));
+    QCOMPARE(view.editor->document()->text(), QString::fromUtf8("αβ\r\n第二行\r\noriginal"));
+
+    const VimRegister payload{VimRegisterType::LineWise, "primary\n", {}};
+    vimRegisters().write('*', payload, true);
+    const VimRegister restored = vimRegisters().read('*');
+    QCOMPARE(restored.text, payload.text);
+    QCOMPARE(restored.type, payload.type);
+    const QString screenshotDir = qEnvironmentVariable("TEXSTUDIO_TEST_SCREENSHOT_DIR");
+    if (!screenshotDir.isEmpty()) {
+        QVERIFY(QDir().mkpath(screenshotDir));
+        QTest::qWait(50);
+        QVERIFY(view.grab().save(screenshotDir + "/vim-desktop.png"));
+    }
+    view.hide();
+}
+
+
+void LatexEditorViewTest::vimDocumentedModes_data()
+{
+    QTest::addColumn<QString>("keys");
+    QTest::addColumn<QString>("mode");
+    QTest::addColumn<QString>("expected");
+    QTest::newRow("insert") << "iZ" << "INSERT" << "Zabc";
+    QTest::newRow("append") << "aZ" << "INSERT" << "aZbc";
+    QTest::newRow("insert-start") << "lIZ" << "INSERT" << "Zabc";
+    QTest::newRow("append-end") << "AZ" << "INSERT" << "abcZ";
+    QTest::newRow("open-below") << "oZ" << "INSERT" << "abc\nZ";
+    QTest::newRow("open-above") << "OZ" << "INSERT" << "Z\nabc";
+    QTest::newRow("replace-overwrite") << "RXY" << "REPLACE" << "XYc";
+    QTest::newRow("visual-char") << "vld" << "NORMAL" << "c";
+    QTest::newRow("visual-line") << "Vd" << "NORMAL" << "";
+    QTest::newRow("single-replace") << "rZ" << "NORMAL" << "Zbc";
+    QTest::newRow("substitute-char") << "sZ" << "INSERT" << "Zbc";
+    QTest::newRow("change-line") << "ccZ" << "INSERT" << "Z";
+    QTest::newRow("delete-end") << "lD" << "NORMAL" << "a";
+    QTest::newRow("change-end") << "lCZ" << "INSERT" << "aZ";
+}
+
+void LatexEditorViewTest::vimDocumentedModes()
+{
+    if (skipVimUiTestInQuickRuns()) return;
+    QFETCH(QString, keys);
+    QFETCH(QString, mode);
+    QFETCH(QString, expected);
+    LatexEditorViewConfig config = *edView->getConfig();
+    config.editingMode = LatexEditorViewConfig::VimEditing;
+    config.autoindent = false;
+    config.parenComplete = false;
+    LatexDocument document;
+    LatexEditorView view(nullptr, &config, &document);
+    view.editor->setText("abc", false);
+    view.editor->setCursorPosition(0, 0, false);
+    QTest::keyClicks(view.editor, keys);
+    QCOMPARE(view.editor->inputModeLabel(), mode);
+    QCOMPARE(document.textLines().join("\n"), expected);
+    QTest::keyClick(view.editor, Qt::Key_BracketLeft, Qt::ControlModifier);
+    QCOMPARE(view.editor->inputModeLabel(), QString("NORMAL"));
+}
+
+void LatexEditorViewTest::vimSubstituteFlags_data()
+{
+    QTest::addColumn<QString>("command");
+    QTest::addColumn<QString>("expected");
+    QTest::addColumn<bool>("handled");
+    QTest::newRow("current-first") << "s/foo/X/" << "X foo\nFOO foo\nfoo" << true;
+    QTest::newRow("current-global") << "s/foo/X/g" << "X X\nFOO foo\nfoo" << true;
+    QTest::newRow("all-lines") << "%s/foo/X/g" << "X X\nFOO X\nX" << true;
+    QTest::newRow("numeric-range") << "2,3s/foo/X/" << "foo foo\nFOO X\nX" << true;
+    QTest::newRow("case-insensitive") << "%s/foo/X/gi" << "X X\nX X\nX" << true;
+    QTest::newRow("case-sensitive") << "%s/foo/X/gI" << "X X\nFOO X\nX" << true;
+    QTest::newRow("alternate-delimiter") << "s#foo#X#g" << "X X\nFOO foo\nfoo" << true;
+    QTest::newRow("matched-text") << "s/foo/[&]/" << "[foo] foo\nFOO foo\nfoo" << true;
+    QTest::newRow("regex") << "%s/f.o/X/g" << "X X\nFOO X\nX" << true;
+    QTest::newRow("invalid-flag") << "s/foo/X/z" << "foo foo\nFOO foo\nfoo" << false;
+    QTest::newRow("missing-pattern") << "s/absent/X/" << "foo foo\nFOO foo\nfoo" << false;
+}
+
+void LatexEditorViewTest::vimSubstituteFlags()
+{
+    if (skipVimUiTestInQuickRuns()) return;
+    QFETCH(QString, command);
+    QFETCH(QString, expected);
+    QFETCH(bool, handled);
+    LatexEditorViewConfig config = *edView->getConfig();
+    config.editingMode = LatexEditorViewConfig::VimEditing;
+    LatexDocument document;
+    LatexEditorView view(nullptr, &config, &document);
+    view.editor->setText("foo foo\nFOO foo\nfoo", false);
+    view.editor->setCursorPosition(0, 0, false);
+    QCOMPARE(view.executeVimExCommand(command), handled);
+    QCOMPARE(document.textLines().join("\n"), expected);
+}
+
+
+void LatexEditorViewTest::vimSearchNavigation()
+{
+    if (skipVimUiTestInQuickRuns()) return;
+    LatexEditorViewConfig config = *edView->getConfig();
+    config.editingMode = LatexEditorViewConfig::VimEditing;
+    LatexDocument document;
+    LatexEditorView view(nullptr, &config, &document);
+    view.editor->setText("start\nneedle\nother\nneedle\nend", false);
+    view.editor->setCursorPosition(0, 0, false);
+    QTest::keyClicks(view.editor, "/");
+    QWidget *panel = view.findChild<QWidget *>("vimPromptPanel");
+    QVERIFY(panel);
+    QLineEdit *prompt = panel->findChild<QLineEdit *>();
+    QVERIFY(prompt);
+    QTest::keyClicks(prompt, "needle");
+    QTest::keyClick(prompt, Qt::Key_Return);
+    QCOMPARE(view.editor->cursor().lineNumber(), 1);
+    QTest::keyClicks(view.editor, "n");
+    QCOMPARE(view.editor->cursor().lineNumber(), 3);
+    QTest::keyClicks(view.editor, "N");
+    QCOMPARE(view.editor->cursor().lineNumber(), 1);
+    view.editor->setCursorPosition(4, 0, false);
+    QTest::keyClicks(view.editor, "?");
+    QTest::keyClicks(prompt, "needle");
+    QTest::keyClick(prompt, Qt::Key_Return);
+    QCOMPARE(view.editor->cursor().lineNumber(), 3);
+    QTest::keyClicks(view.editor, "n");
+    QCOMPARE(view.editor->cursor().lineNumber(), 1);
+    QTest::keyClicks(view.editor, "N");
+    QCOMPARE(view.editor->cursor().lineNumber(), 3);
+    // Cancelling a prompt must leave both text and cursor untouched.
+    const int line = view.editor->cursor().lineNumber();
+    QTest::keyClicks(view.editor, "/");
+    QTest::keyClicks(prompt, "end");
+    QTest::keyClick(prompt, Qt::Key_BracketLeft, Qt::ControlModifier);
+    QCOMPARE(view.editor->cursor().lineNumber(), line);
+    QCOMPARE(document.textLines().join("\n"), QString("start\nneedle\nother\nneedle\nend"));
+}
+
+void LatexEditorViewTest::vimSubstitutePrompt()
+{
+    if (skipVimUiTestInQuickRuns()) return;
+    LatexEditorViewConfig config = *edView->getConfig();
+    config.editingMode = LatexEditorViewConfig::VimEditing;
+    LatexDocument document;
+    LatexEditorView view(nullptr, &config, &document);
+    view.editor->setText("foo foo\nfoo", false);
+    QTest::keyClicks(view.editor, ":");
+    QWidget *panel = view.findChild<QWidget *>("vimPromptPanel");
+    QVERIFY(panel);
+    QLineEdit *prompt = panel->findChild<QLineEdit *>();
+    QVERIFY(prompt);
+    QTest::keyClicks(prompt, "%s/foo/X/g");
+    QTest::keyClick(prompt, Qt::Key_Return);
+    QCOMPARE(document.textLines().join("\n"), QString("X X\nX"));
+    QCOMPARE(view.editor->inputModeLabel(), QString("NORMAL"));
+    QTest::keyClicks(view.editor, "u");
+    QCOMPARE(document.textLines().join("\n"), QString("foo foo\nfoo"));
+    QKeyEvent redoOverride(QEvent::ShortcutOverride, Qt::Key_R, Qt::ControlModifier);
+    QCoreApplication::sendEvent(view.editor, &redoOverride);
+    QVERIFY(redoOverride.isAccepted());
+    QTest::keyClick(view.editor, Qt::Key_R, Qt::ControlModifier);
+    QCOMPARE(document.textLines().join("\n"), QString("X X\nX"));
+#ifdef Q_OS_MAC
+    QTest::keyClicks(view.editor, "u");
+    QKeyEvent physicalControlRedo(QEvent::ShortcutOverride, Qt::Key_R, Qt::MetaModifier);
+    QCoreApplication::sendEvent(view.editor, &physicalControlRedo);
+    QVERIFY(physicalControlRedo.isAccepted());
+    QTest::keyClick(view.editor, Qt::Key_R, Qt::MetaModifier);
+    QCOMPARE(document.textLines().join("\n"), QString("X X\nX"));
+#endif
+    QTest::keyClicks(view.editor, ":");
+    QTest::keyClicks(prompt, "s/X/Y/z");
+    QTest::keyClick(prompt, Qt::Key_Return);
+    QCOMPARE(document.textLines().join("\n"), QString("X X\nX"));
+    QVERIFY(!panel->isHidden());
+    prompt->selectAll();
+    QTest::keyClicks(prompt, "%s/X/Y/g");
+    QTest::keyClick(prompt, Qt::Key_Return);
+    QCOMPARE(document.textLines().join("\n"), QString("Y Y\nY"));
+}
+
+
+void LatexEditorViewTest::vimDocumentedMotions_data()
+{
+    QTest::addColumn<QString>("text");
+    QTest::addColumn<int>("startLine");
+    QTest::addColumn<int>("startColumn");
+    QTest::addColumn<QString>("keys");
+    QTest::addColumn<int>("line");
+    QTest::addColumn<int>("column");
+    const QString text = "  one two\nabc def\nlast";
+    QTest::newRow("left") << text << 0 << 3 << "h" << 0 << 2;
+    QTest::newRow("right-count") << text << 0 << 0 << "3l" << 0 << 3;
+    QTest::newRow("down") << text << 0 << 3 << "j" << 1 << 3;
+    QTest::newRow("up") << text << 1 << 3 << "k" << 0 << 3;
+    QTest::newRow("down-clamps-column") << text << 0 << 8 << "2j" << 2 << 3;
+    QTest::newRow("vertical-restores-column") << QString("abcdef\nx\nabcdef") << 0 << 4 << "jj" << 2 << 4;
+    QTest::newRow("vertical-count-restores-column") << QString("abcdef\nx\nabcdef") << 0 << 4 << "2j" << 2 << 4;
+    QTest::newRow("line-start") << text << 0 << 5 << "0" << 0 << 0;
+    QTest::newRow("first-nonblank") << text << 0 << 0 << "^" << 0 << 2;
+    QTest::newRow("line-end") << text << 0 << 0 << "$" << 0 << 8;
+    QTest::newRow("first-line") << text << 2 << 0 << "gg" << 0 << 0;
+    QTest::newRow("last-line") << text << 0 << 0 << "G" << 2 << 0;
+    QTest::newRow("counted-line") << text << 0 << 0 << "2G" << 1 << 0;
+    QTest::newRow("word-forward") << text << 0 << 2 << "w" << 0 << 6;
+    QTest::newRow("word-backward") << text << 0 << 6 << "b" << 0 << 2;
+    QTest::newRow("word-end") << text << 0 << 2 << "e" << 0 << 4;
+    QTest::newRow("word-count") << text << 0 << 2 << "2w" << 1 << 0;
+    const QString find = "abaca";
+    QTest::newRow("find-forward") << find << 0 << 0 << "fa" << 0 << 2;
+    QTest::newRow("find-backward") << find << 0 << 4 << "Fa" << 0 << 2;
+    QTest::newRow("till-forward") << find << 0 << 0 << "ta" << 0 << 1;
+    QTest::newRow("till-backward") << find << 0 << 4 << "Ta" << 0 << 3;
+    QTest::newRow("find-repeat") << find << 0 << 0 << "fa;" << 0 << 4;
+    QTest::newRow("find-reverse") << find << 0 << 0 << "fa;," << 0 << 2;
+    QTest::newRow("find-count") << find << 0 << 0 << "2fa" << 0 << 4;
+    QTest::newRow("find-missing") << find << 0 << 0 << "fz" << 0 << 0;
+    QTest::newRow("left-boundary") << text << 0 << 0 << "9h" << 0 << 0;
+    QTest::newRow("right-boundary") << text << 0 << 0 << "99l" << 0 << 8;
+}
+
+void LatexEditorViewTest::vimDocumentedMotions()
+{
+    if (skipVimUiTestInQuickRuns()) return;
+    QFETCH(QString, text);
+    QFETCH(int, startLine);
+    QFETCH(int, startColumn);
+    QFETCH(QString, keys);
+    QFETCH(int, line);
+    QFETCH(int, column);
+    LatexEditorViewConfig config = *edView->getConfig();
+    config.editingMode = LatexEditorViewConfig::VimEditing;
+    LatexDocument document;
+    LatexEditorView view(nullptr, &config, &document);
+    view.editor->setText(text, false);
+    view.editor->setCursorPosition(startLine, startColumn, false);
+    QTest::keyClicks(view.editor, keys);
+    QCOMPARE(view.editor->cursor().lineNumber(), line);
+    QCOMPARE(view.editor->cursor().columnNumber(), column);
+    QCOMPARE(document.textLines().join("\n"), text);
+}
+
+
+void LatexEditorViewTest::vimSubstituteConfirmation()
+{
+    if (skipVimUiTestInQuickRuns()) return;
+    LatexEditorViewConfig config = *edView->getConfig();
+    config.editingMode = LatexEditorViewConfig::VimEditing;
+    LatexDocument document;
+    LatexEditorView view(nullptr, &config, &document);
+    view.editor->setText("foo foo foo", false);
+    int confirmations = 0;
+    bool unexpectedDialog = false;
+    QTimer responder;
+    QObject::connect(&responder, &QTimer::timeout, [&]() {
+        for (QWidget *widget : QApplication::topLevelWidgets()) {
+            QMessageBox *box = qobject_cast<QMessageBox *>(widget);
+            if (!box || !box->isVisible()) continue;
+            if (box->standardButtons().testFlag(QMessageBox::Yes)
+                    && box->standardButtons().testFlag(QMessageBox::No)) {
+                ++confirmations;
+                box->button(confirmations == 2 ? QMessageBox::No : QMessageBox::Yes)->click();
+            } else {
+                unexpectedDialog = true;
+                box->reject();
+            }
+        }
+    });
+    responder.start(10);
+    const bool handled = view.executeVimExCommand("s/foo/X/gc");
+    responder.stop();
+    QVERIFY(handled);
+    QVERIFY(!unexpectedDialog);
+    QCOMPARE(confirmations, 3);
+    QCOMPARE(document.textLines().join("\n"), QString("X foo X"));
+    QTest::keyClicks(view.editor, "u");
+    QCOMPARE(document.textLines().join("\n"), QString("foo foo foo"));
 }
 
 #endif

@@ -111,7 +111,7 @@ if(GIT_FOUND)
        OUTPUT_VARIABLE ${prefix}_WC_LATEST_TAG
        OUTPUT_STRIP_TRAILING_WHITESPACE
        ERROR_QUIET)
-    execute_process(COMMAND ${GIT_EXECUTABLE} describe --tags
+    execute_process(COMMAND ${GIT_EXECUTABLE} describe --tags --long
        WORKING_DIRECTORY ${dir}
        OUTPUT_VARIABLE ${prefix}_WC_LATEST_TAG_LONG
        OUTPUT_STRIP_TRAILING_WHITESPACE

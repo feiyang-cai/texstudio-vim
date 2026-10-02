@@ -2,9 +2,11 @@
 
 This branch adds an experimental Vim editing mode for TeXstudio.
 
-## Enable
+## Default and configuration
 
-`Options > Configure TeXstudio > Editor > Editing Mode > Vim (experimental)`
+Vim is the default editing mode for fresh configurations in texstudio-vim.
+Existing saved editing-mode preferences are preserved. To change the mode, use
+`Options > Configure TeXstudio > Editor > Editing Mode`.
 
 ## Supported Modes
 
@@ -40,6 +42,22 @@ This branch adds an experimental Vim editing mode for TeXstudio.
 - paste: `p`, `P`
 - undo/redo: `u`, `Ctrl-r`
 - repeat: `.`
+
+## Registers (development branch)
+
+- unnamed: `"`
+- named: `a`–`z`; uppercase names append to lowercase registers
+- yank history: `0`
+- line/multiline delete history: `1`–`9`
+- small deletions: `-`
+- black hole: `_`
+- system clipboard: `+`; primary selection (where supported): `*`
+- register prefixes in Normal and Visual modes, e.g. `"ayy`, `"ap`, `"_dd`
+- characterwise, linewise and blockwise payloads shared between documents
+
+Explicit register destinations preserve automatic yank/delete history. Registers
+live for the current application session. Development build instructions and test
+examples are in [VIM_DEVELOPMENT.md](VIM_DEVELOPMENT.md).
 
 ## Visual Modes
 
@@ -105,11 +123,13 @@ The Vim wrapper keeps TeXstudio's insert-mode features active:
 - macro expansion
 - Ctrl-click style links
 
+Ctrl-hover highlighting and Ctrl-click navigation also work in Normal mode,
+without entering Insert mode or changing the document.
+
 ## Current Scope / Known Gaps
 
 Not implemented in this branch:
 
-- named registers
 - macro recording/replay
 - remapping
 - `.vimrc`
@@ -118,4 +138,36 @@ Not implemented in this branch:
 - full blockwise append semantics like Vim's multi-cursor `A`
 - full Vim regex and ex command parity
 
-This mode is intended as an opt-in experimental editor mode and does not change default TeXstudio behavior.
+Vim remains experimental, but is the default for fresh texstudio-vim configurations.
+Existing saved editing-mode preferences are preserved.
+
+## Development testing
+
+`Vim desktop tests` builds a Debug editor and runs the focused Vim, completion,
+and version suites on native Windows x86_64/ARM64 and macOS Intel/Apple Silicon
+runners. Linux CI runs the suite both offscreen and in an X11 desktop. Reports
+and a Unicode clipboard screenshot are saved as workflow artifacts.
+
+CD additionally exercises the packaged Linux x86_64 AppImage in Ubuntu 22.04/24.04,
+Debian 12/13, and Fedora 43 containers on hosted Linux runners. Each check verifies
+the commit identity, desktop startup, named registers, Insert/dot, Replace, all
+three Visual modes, search, substitution, undo/redo, and saving through keyboard input. These distribution checks use containers, not separate virtual
+machines, and do not cover hardware acceleration or a full installed TeX system.
+
+Branch builds are test artifacts. Publishing a release requires explicit approval
+and a version tag; passing these checks alone does not publish or bump a version.
+
+## Update notifications
+
+The update checker reads published releases from `feiyang-cai/texstudio-vim`
+and links to this fork's release downloads. It ignores drafts, upstream-only tags,
+and development commit snapshots. It compares the upstream version and channel
+before the numeric Vim revision, so `texstudio-vim-4.9.9beta2-r1` updates r0 of the
+same beta. Stable, release-candidate and development preferences still apply.
+Checks use the most recent 100 releases returned by GitHub. A release must use
+our `texstudio-vim-<upstream-version>-r<revision>` tag format; beta/RC releases
+should be marked as prereleases.
+
+Automatic checking shows a notification and download link. It does not download
+or install the new application automatically. Existing installations receive
+this fork-specific checker only after installing a build containing this change.

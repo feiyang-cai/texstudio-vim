@@ -1,0 +1,97 @@
+name: Vim desktop tests
+on:
+  push:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Desktop platforms to test
+        type: choice
+        default: all
+        options: [all, macos, windows]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vim-desktop-${{ github.ref }}-${{ github.event_name }}-${{ inputs.platform || 'all' }}
+  cancel-in-progress: true
+
+jobs:
+  macos:
+    if: github.event_name != 'workflow_dispatch' || inputs.platform == 'all' || inputs.platform == 'macos'
+    name: Vim desktop (${{ matrix.runner }})
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15-intel, macos-14]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      - name: Dependencies
+        run: brew install cmake ninja qt hunspell poppler pkg-config
+      - name: Configure
+        run: >-
+          cmake -S . -B build-vim -G Ninja
+          -DCMAKE_PREFIX_PATH="$(brew --prefix qt);$(brew --prefix hunspell)"
+          -DCMAKE_DISABLE_FIND_PACKAGE_QuaZip-Qt6=ON -DCMAKE_DISABLE_FIND_PACKAGE_QuaZip=ON
+          -DCMAKE_BUILD_TYPE=Debug -DTEXSTUDIO_ENABLE_TESTS=ON
+          -DTEXSTUDIO_BUILD_ADWAITA=OFF -DTEXSTUDIO_ENABLE_CRASH_HANDLER=OFF
+      - name: Build
+        run: cmake --build build-vim --parallel 2
+      - name: Native desktop Vim tests
+        run: python3 .github/scripts/run-vim-tests.py build-vim/texstudio.app/Contents/MacOS/texstudio
+      - name: Save diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: vim-tests-${{ matrix.runner }}
+          path: vim-test-results/
+          if-no-files-found: warn
+
+  windows:
+    if: github.event_name != 'workflow_dispatch' || inputs.platform == 'all' || inputs.platform == 'windows'
+    name: Vim desktop (${{ matrix.runner }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-latest
+            msystem: UCRT64
+            package: mingw-w64-ucrt-x86_64
+          - runner: windows-11-arm
+            msystem: CLANGARM64
+            package: mingw-w64-clang-aarch64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: ${{ matrix.msystem }}
+          update: true
+          install: >-
+            git ${{ matrix.package }}-cmake ${{ matrix.package }}-toolchain
+            ${{ matrix.package }}-ninja ${{ matrix.package }}-qt6-base
+            ${{ matrix.package }}-qt6-declarative ${{ matrix.package }}-qt6-tools
+            ${{ matrix.package }}-qt6-svg ${{ matrix.package }}-quazip-qt6
+            ${{ matrix.package }}-hunspell ${{ matrix.package }}-python
+      - name: Configure
+        run: >-
+          cmake -S . -B build-vim -G Ninja -DCMAKE_BUILD_TYPE=Debug
+          -DTEXSTUDIO_ENABLE_TESTS=ON -DTEXSTUDIO_BUILD_ADWAITA=OFF
+          -DTEXSTUDIO_ENABLE_CRASH_HANDLER=OFF
+      - name: Build
+        run: cmake --build build-vim --parallel 2
+      - name: Native desktop Vim tests
+        run: python .github/scripts/run-vim-tests.py build-vim/texstudio.exe
+      - name: Save diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: vim-tests-${{ matrix.runner }}
+          path: vim-test-results/
+          if-no-files-found: warn

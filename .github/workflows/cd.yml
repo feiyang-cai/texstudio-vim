@@ -6,6 +6,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: cd-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
 env:
   OSX_QT_VERSION: 6.11.2
   OSX_POPPLER_VERSION: 26.09.0
@@ -432,6 +436,94 @@ jobs:
           name: release-linux
           path: texstudio-vim-${{ steps.package.outputs.GIT_VERSION }}-x86_64.AppImage
 
+  native-package-smoke:
+    name: Packaged GUI (${{ matrix.runner }})
+    needs: [build-win10, build-win10-arm, macosx, macosxM1]
+    if: github.event_name == 'push'
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-latest
+            artifact: texstudio-vim-win-qt6-zip
+          - runner: windows-11-arm
+            artifact: texstudio-vim-win-arm-qt6-zip
+          - runner: macos-15-intel
+            artifact: texstudio-osx
+          - runner: macos-14
+            artifact: texstudio-vim-osx-m1
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v8
+        with:
+          name: ${{ matrix.artifact }}
+          path: native-package
+      - name: Prepare disposable Windows desktop
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: .github/scripts/prepare-windows-gui.ps1
+      - name: Desktop input dependencies
+        run: python -m pip install pyautogui pillow
+      - name: Packaged OS keyboard and mouse tests
+        env:
+          BUILD_SHA: ${{ github.sha }}
+        run: python .github/scripts/smoke-native-package.py
+      - name: Save GUI diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: packaged-gui-${{ matrix.runner }}
+          path: native-smoke-results/
+          if-no-files-found: warn
+
+  appimage-smoke:
+    name: AppImage desktop (${{ matrix.name }})
+    needs: build-linux-release
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: ubuntu-22.04
+            image: ubuntu:22.04
+          - name: ubuntu-24.04
+            image: ubuntu:24.04
+          - name: debian-12
+            image: debian:12
+          - name: debian-13
+            image: debian:13
+          - name: fedora-43
+            image: fedora:43
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: texstudio-linux
+          path: appimage
+      - name: Packaged desktop smoke test
+        env:
+          SMOKE_NAME: ${{ matrix.name }}
+          SMOKE_IMAGE: ${{ matrix.image }}
+          BUILD_SHA: ${{ github.sha }}
+        run: >-
+          docker run --rm --volume "$PWD:/work" --workdir /work
+          --env SMOKE_NAME --env BUILD_SHA "$SMOKE_IMAGE"
+          bash .github/scripts/smoke-appimage-container.sh
+      - name: Save desktop diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: appimage-smoke-${{ matrix.name }}
+          path: smoke-results/
+          if-no-files-found: warn
+
   ############################
 
   macosx:
@@ -643,7 +735,7 @@ jobs:
       actions: write # for GeekyEggo/delete-artifact to delete artifacts
       contents: write # for softprops/action-gh-release to create GitHub release
     name: Release
-    needs: [verify, build-win10, build-win10-arm, build-linux-release, macosx, macosxM1] # build-linux-win,macosx-qt5 is disabled
+    needs: [verify, build-win10, build-win10-arm, build-linux-release, macosx, macosxM1, native-package-smoke, appimage-smoke]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/texstudio-vim-')
     steps:
@@ -668,7 +760,7 @@ jobs:
           body: |
             Native experimental Vim editing for TeXstudio. Release names identify the upstream base and the independent fork revision: `texstudio-vim-<upstream-version>-rN`.
 
-            `r0` is the current Vim baseline; subsequent fork updates on the same upstream base increment `rN`. Enable Vim in Options > Configure TeXstudio > Editor > Editing Mode. See [Vim support](https://github.com/feiyang-cai/texstudio-vim/blob/master/VIM_MODE.md) and [release versioning](https://github.com/feiyang-cai/texstudio-vim/blob/master/RELEASES.md).
+            `r0` is the original Vim baseline; `r1` expands typed/shared/clipboard registers, editing modes, motions, search and substitution, and fixes undo/redo and Ctrl-click navigation in Normal mode. Vim is the default for fresh configurations; saved editing-mode preferences are preserved. Update notifications use this fork's published releases and compare Vim revisions. Installation of updates remains manual. See [Vim support](https://github.com/feiyang-cai/texstudio-vim/blob/${{ github.ref_name }}/VIM_MODE.md) and [release versioning](https://github.com/feiyang-cai/texstudio-vim/blob/${{ github.ref_name }}/RELEASES.md).
           fail_on_unmatched_files: true
           prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
           files: ./*

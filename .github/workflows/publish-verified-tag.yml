@@ -1,0 +1,79 @@
+name: Publish verified existing tag
+on:
+  push:
+    branches: [release/4.9.8]
+    paths:
+      - .github/release-request.json
+      - .github/workflows/publish-verified-tag.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: verified-tag-publication
+  cancel-in-progress: false
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.request.outputs.tag }}
+      sha: ${{ steps.request.outputs.sha }}
+      run_id: ${{ steps.request.outputs.run_id }}
+      prerelease: ${{ steps.request.outputs.prerelease }}
+      gui_required: ${{ steps.request.outputs.gui_required }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: request
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .github/scripts/read-release-request.py
+  gui:
+    needs: prepare
+    if: needs.prepare.outputs.gui_required == 'true'
+    uses: ./.github/workflows/packaged-gui.yml
+    with:
+      build_run_id: ${{ needs.prepare.outputs.run_id }}
+  publish:
+    needs: [prepare, gui]
+    if: always() && needs.prepare.result == 'success' && (needs.gui.result == 'success' || (needs.gui.result == 'skipped' && needs.prepare.outputs.gui_required == 'false'))
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: release-*
+          merge-multiple: true
+          path: release-payload
+          run-id: ${{ needs.prepare.outputs.run_id }}
+          github-token: ${{ github.token }}
+      - name: Check complete payload and calculate hashes
+        working-directory: release-payload
+        run: |
+          test "$(find . -maxdepth 1 -type f | wc -l)" -eq 7
+          sha256sum * > hashes.txt
+      - id: draft
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ needs.prepare.outputs.tag }}
+          name: ${{ needs.prepare.outputs.tag }}
+          draft: true
+          prerelease: ${{ needs.prepare.outputs.prerelease == 'true' }}
+          fail_on_unmatched_files: true
+          files: release-payload/*
+          body: |
+            TeXstudio with experimental Vim editing. Vim is the default for fresh configurations; saved preferences are preserved.
+
+            r1 adds typed shared, named and clipboard registers, expanded editing/motions/search/substitution, fixes undo/redo and cursor behavior, and supports Ctrl-click navigation in Normal mode. Update notifications use this fork's releases; installation remains manual.
+
+            All 221 focused checks pass on Linux, Windows x64/ARM64 and macOS Intel/Apple Silicon. All nine packaged GUI environments passed before publication. See [Vim support](https://github.com/feiyang-cai/texstudio-vim/blob/${{ needs.prepare.outputs.tag }}/VIM_MODE.md) and [test coverage and gaps](https://github.com/feiyang-cai/texstudio-vim/blob/${{ needs.prepare.outputs.tag }}/VIM_TESTING.md).
+      - name: Publish complete verified draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
+          RELEASE_ID: ${{ steps.draft.outputs.id }}
+        run: python3 .github/scripts/publish-verified-release.py

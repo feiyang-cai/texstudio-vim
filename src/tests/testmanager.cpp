@@ -15,6 +15,8 @@
 #include "qeditor_t.h"
 #include "latexcompleter_t.h"
 #include "latexeditorview_t.h"
+#include "latexeditorview.h"
+#include "latexeditorview_config.h"
 #include "latexeditorview_bm.h"
 #include "latexstyleparser_t.h"
 #include "scriptengine_t.h"
@@ -49,7 +51,7 @@ QString TestManager::performTest(QObject* obj){
         const QMetaObject *meta = obj->metaObject();
         for (int i = 0; i < meta->methodCount(); ++i) {
             const QByteArray name = meta->method(i).name();
-            if (name.startsWith("vim"))
+            if (name.startsWith("vim") && !name.endsWith("_data"))
                 args << QString::fromLatin1(name);
         }
     }
@@ -127,13 +129,20 @@ QString TestManager::execute(TestLevel level, LatexEditorView* edView, QCodeEdit
     QCoreApplication *app = QCoreApplication::instance();
     TestmanagerEventFilter eventFilter;
     app->installNativeEventFilter(&eventFilter);*/
+    const int savedEditingMode = edView->getConfig()->editingMode;
 	for (int i=0; i <tests.size();i++){
+        // General editor suites exercise TeXstudio's standard input binding.
+        // Vim-specific tests select their mode explicitly; restore user state below.
+        edView->getConfig()->editingMode = LatexEditorViewConfig::StandardEditing;
+        edView->updateSettings();
 		emit newMessage(tests[i]->metaObject()->className());
 		qDebug()<<tests[i]->metaObject()->className();
 		QString res=performTest(tests[i]);
 		tr+=res;
 		if (!res.contains(", 0 failed, 0 skipped")) allPassed=false;
 	}
+    edView->getConfig()->editingMode = savedEditingMode;
+    edView->updateSettings();
     if (vimTests) {
         // Do not leave an edited test document that blocks automatic shutdown.
         editor->setText(QString(), false);
@@ -145,6 +154,15 @@ QString TestManager::execute(TestLevel level, LatexEditorView* edView, QCodeEdit
 
 	if (!allPassed)
 		tr="*** THERE SEEM TO BE FAILED TESTS! ***\n\n\n\n"+tr;
+
+    // Keep a platform-independent report even when a GUI build routes qDebug
+    // to the system debugger or fails during application shutdown.
+    const QString diagnosticDir = qEnvironmentVariable("TEXSTUDIO_TEST_SCREENSHOT_DIR");
+    if (!diagnosticDir.isEmpty()) {
+        QFile report(diagnosticDir + "/vim-test-report.log");
+        if (report.open(QIODevice::WriteOnly | QIODevice::Truncate))
+            report.write(tr.toUtf8());
+    }
 
 	QFile(QFile::decodeName(tempResult)).remove();
 

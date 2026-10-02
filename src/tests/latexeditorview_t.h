@@ -18,6 +18,7 @@ class LatexEditorViewTest: public QObject{
         void inMathEnvironment();
         void vimEditingModeSwitches();
         void vimCursorStyles();
+        void vimCtrlClickNavigation();
         void vimInsertEscape();
         void vimVisualLineStaysOnCurrentLine();
         void vimVisualBlockCtrlV();
@@ -33,6 +34,22 @@ class LatexEditorViewTest: public QObject{
         void vimNormalModeConsumesUnhandledPrintableKeys();
         void vimExSubstituteCommands();
         void vimExCommands();
+        void vimRegisterCommands_data();
+        void vimRegisterCommands();
+        void vimPhysicalModifierEvents();
+        void vimRegisterStore();
+        void vimRegistersSharedAcrossViews();
+        void vimClipboardRegisters();
+        void vimDesktopClipboard();
+        void vimDocumentedModes_data();
+        void vimDocumentedModes();
+        void vimSubstituteFlags_data();
+        void vimSubstituteFlags();
+        void vimSearchNavigation();
+        void vimSubstituteConfirmation();
+        void vimSubstitutePrompt();
+        void vimDocumentedMotions_data();
+        void vimDocumentedMotions();
 };
 
 #endif

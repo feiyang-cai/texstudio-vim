@@ -863,8 +863,10 @@ void LatexEditorViewTest::vimRegistersSharedAcrossViews()
     QTest::keyClicks(second.editor, "\"zP");
     QCOMPARE(second.editor->document()->textLines().join("\n"), QString("sourcetarget"));
     QTest::keyClicks(second.editor, "\"");
-    QTest::keyClick(second.editor, Qt::Key_Escape);
+    // This view is isolated from the main window's global Escape action.
+    QTest::keyClick(second.editor, Qt::Key_BracketLeft, Qt::ControlModifier);
     QTest::keyClicks(second.editor, "x");
+    QCOMPARE(second.editor->document()->textLines().join("\n"), QString("ourcetarget"));
     QCOMPARE(second.editor->inputModeLabel(), QString("NORMAL"));
     QCOMPARE(vimRegisters().read('z').text, QString("source"));
 }

@@ -1,6 +1,10 @@
 # GNU extensions for sed are not supported; on Linux, --posix mimics this behaviour
 TXS_VERSION=$(sed -ne 's/^#define TXSVERSION "\(.*\)".*$/\1/p' ../src/utilsVersion.h)
 echo "TXS_VERSION = ${TXS_VERSION}"
+FORK_REVISION=$(cat ../VIM_REVISION)
+case "$FORK_REVISION" in
+    ""|*[!0-9]*) echo "Invalid VIM_REVISION: expected a nonnegative integer" >&2; return 1 ;;
+esac
 
 GIT_HASH=$(git show --no-patch --pretty="%h")
 echo "GIT_HASH = ${GIT_HASH}"
@@ -18,6 +22,11 @@ case "$RELEASE_TAG" in
     texstudio-vim-*) GIT_VERSION=${RELEASE_TAG#texstudio-vim-} ;;
     *) GIT_VERSION=${TXS_VERSION} ;;
 esac
+# Legacy releases are the r0 baseline; numbered tags carry their own revision.
+case "$GIT_VERSION" in
+    *-r[0-9]*) ;;
+    *) GIT_VERSION="${GIT_VERSION}-r${FORK_REVISION}" ;;
+esac
 echo "GIT_VERSION = ${GIT_VERSION}"
 
 DATE_HASH=$(date -u +"%Y%m%d%H%M")
@@ -31,5 +40,5 @@ else
 fi
 echo "RELEASE_DATE = ${RELEASE_DATE}"
 
-VERSION_NAME="${TXS_VERSION}-${DATE_HASH}-git_${GIT_HASH}"
+VERSION_NAME="${GIT_VERSION}-${DATE_HASH}-git_${GIT_HASH}"
 echo "VERSION_NAME = ${VERSION_NAME}"

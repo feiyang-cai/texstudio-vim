@@ -108,6 +108,11 @@ private slots:
 		QTest::addColumn<QStringList>("parts");
 		QTest::addColumn<bool>("valid");
 
+        QTest::newRow("forkStableR0") << "texstudio-vim-4.9.8-r0" << QStringList({"4.9.8","","",""}) << true;
+        QTest::newRow("forkBetaR0") << "texstudio-vim-4.9.9beta2-r0" << QStringList({"4.9.9","beta","2",""}) << true;
+        QTest::newRow("forkStableRevision") << "texstudio-vim-4.9.8-r12-3-g123abc" << QStringList({"4.9.8","","","3"}) << true;
+        QTest::newRow("forkBetaRevision") << "texstudio-vim-4.9.9beta2-r1-3-g123abc" << QStringList({"4.9.9","beta","2","3"}) << true;
+        QTest::newRow("unprefixedRevision") << "4.9.8-r0-5-g123abc" << QStringList({"4.9.8","","","5"}) << true;
         QTest::newRow("forkStable") << "texstudio-vim-4.9.8" << QStringList({"4.9.8","","",""}) << true;
         QTest::newRow("forkBeta") << "texstudio-vim-4.9.9beta2" << QStringList({"4.9.9","beta","2",""}) << true;
         QTest::newRow("forkCommits") << "texstudio-vim-4.9.9beta2-3-g123abc" << QStringList({"4.9.9","beta","2","3"}) << true;

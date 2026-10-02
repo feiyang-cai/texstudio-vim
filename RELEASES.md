@@ -4,8 +4,8 @@ The fork preserves native Vim editing on two upstream release bases:
 
 | Fork tag | Upstream tag | Upstream commit |
 | --- | --- | --- |
-| `texstudio-vim-4.9.8` | `4.9.8` | `00f7c1c3db1d629a854ff5eb8ee25eb402c8178e` |
-| `texstudio-vim-4.9.9beta2` | `4.9.9beta2` | `263f2615005cdbe5c24d4ee9a7c5746f731e25ac` |
+| `texstudio-vim-4.9.8-r0` | `4.9.8` | `00f7c1c3db1d629a854ff5eb8ee25eb402c8178e` |
+| `texstudio-vim-4.9.9beta2-r0` | `4.9.9beta2` | `263f2615005cdbe5c24d4ee9a7c5746f731e25ac` |
 
 4.9.8 is a stable upstream base; the fork's Vim implementation remains experimental.
 4.9.9beta2 is a prerelease. Both include the features and known gaps in
@@ -39,8 +39,20 @@ only intentional fork differences.
 ## Release naming and publishing
 
 Create each fork tag on its own tested merge commit, never on the unmodified
-upstream commit. Use `texstudio-vim-<upstream-version>` for tags and downloadable
-files. The numeric version inside the application follows upstream.
+upstream commit. Use `texstudio-vim-<upstream-version>-r<fork-revision>` for tags and downloadable
+files. The numeric version inside the application follows upstream; the Git
+revision shown in About and `--version` includes the full fork release name.
+
+`r0` is the current Vim baseline. Increment the number in `VIM_REVISION` for
+released fork changes on the same upstream base (including Vim and packaging
+fixes). Reset it to `0` when adopting a new upstream version. Keep the upstream
+beta/alpha/rc designation, for example `texstudio-vim-4.9.9beta2-r1`. The fork
+revision is separate from upstream's beta number and Git commits since the tag.
+
+The original `texstudio-vim-4.9.8` and `texstudio-vim-4.9.9beta2` releases remain
+available as compatibility aliases for the r0 baseline. Their tags and downloads
+are unchanged. The r0 releases rebuild that same Vim baseline with revision-aware
+release metadata and filenames.
 
 Push only the intended branch and fork tags; never use `git push --tags` (which
 would also publish imported upstream tags), force-push, or move an existing release
@@ -49,8 +61,8 @@ the tested commits and these two tags:
 
 ```sh
 git push --atomic origin HEAD:master \
-  refs/tags/texstudio-vim-4.9.8 \
-  refs/tags/texstudio-vim-4.9.9beta2
+  refs/tags/texstudio-vim-4.9.8-r0 \
+  refs/tags/texstudio-vim-4.9.9beta2-r0
 ```
 
 CD builds Windows x86_64 and ARM64 installers/portable archives, Linux AppImage,

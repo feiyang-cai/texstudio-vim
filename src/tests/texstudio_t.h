@@ -2,7 +2,8 @@
 #define TEXSTUDIOTEST_H
 
 #include "mostQtHeaders.h"
-
+#include "latexcompleter.h"
+Q_DECLARE_METATYPE(LatexCompleter::CompletionFlags)
 class TexStudioTest : public QObject
 {
     Q_OBJECT
@@ -13,9 +14,13 @@ private slots:
     void checkIncludes();
     void checkIncludesCached_data();
     void checkIncludesCached();
+    void normalCompletion_data();
+    void normalCompletion();
+    void dragDropTexFileSource();
 
 private:
     bool allTests;
+    LatexCompleter::CompletionFlags gatherCompletionFlags();
 };
 
 #endif // TEXSTUDIOTEST_H

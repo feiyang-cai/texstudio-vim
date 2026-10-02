@@ -1,5 +1,5 @@
 # piton package
-# Matthew Bertucci 2026/01/11 for v4.11
+# Matthew Bertucci 2026/07/02 for v4.14
 
 #include:luacode
 #include:xcolor
@@ -66,6 +66,8 @@ range=%<content%>
 
 # keys for \PitonOptions only
 #keyvals:\PitonOptions
+after-begin-escape=%<code%>
+before-end-escape=%<code%>
 begin-escape-math=%<character%>
 begin-escape=%<character%>
 comment-latex=%<string%>
@@ -107,6 +109,7 @@ end-of-broken-line=%<symbol%>
 env-gobble
 env-used-by-split=%<envname%>
 font-command=%<font commands%>
+font-command +=%<font commands%>
 gobble
 gobble=%<integer%>
 indent-broken-lines
@@ -117,7 +120,9 @@ language=#Python,OCaml,C,SQL,minimal,verbatim,%newpitonlang
 left-margin=##L
 line-numbers
 line-numbers/format=%<font commands%>
+line-numbers/format +=%<font commands%>
 line-numbers/label-empty-lines#true,false
+line-numbers/lmmono10-drawn#true,false
 line-numbers/position=#left,right
 line-numbers/resume
 line-numbers/sep=##L
@@ -139,6 +144,7 @@ show-spaces
 show-spaces-in-strings
 split-on-empty-lines#true,false
 split-separation=%<code%>
+split-separation +=%<code%>
 splittable
 splittable-on-empty-lines#true,false
 splittable=%<integer%>
@@ -188,6 +194,7 @@ UserFunction=%<formatting%>
 Comment.Internal=%<formatting%>
 Comment.Math=%<formatting%>
 Discard=%<formatting%>
+Delim=%<formatting%>
 FormattingType=%<formatting%>
 Identifier.Internal=%<formatting%>
 Identifier=%<formatting%>
@@ -201,6 +208,7 @@ Keyword8=%<formatting%>
 Keyword9=%<formatting%>
 Number.Internal=%<formatting%>
 Prompt=%<formatting%>
+Punct=%<formatting%>
 String.Long.Internal=%<formatting%>
 String.Short.Internal=%<formatting%>
 Tag=%<formatting%>
@@ -245,6 +253,7 @@ UserFunction
 Comment.Internal
 Comment.Math
 Discard
+Delim
 FormattingType
 Identifier
 Identifier.Internal
@@ -258,6 +267,7 @@ Keyword8
 Keyword9
 Number.Internal
 Prompt
+Punct
 String.Long.Internal
 String.Short.Internal
 Tag
@@ -306,3 +316,4 @@ tag=%<<char1><char2>%>
 \PitonBeamerEnvironments#S
 \PitonFileVersion#S
 \PitonFileDate#S
+\PitonSpaceSubstitute#S

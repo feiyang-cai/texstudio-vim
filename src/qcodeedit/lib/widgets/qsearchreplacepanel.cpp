@@ -904,7 +904,11 @@ void QSearchReplacePanel::cFind_textEdited(const QString& text)
 	m_search->setOption(QDocumentSearch::Silent,false);
 
 	if ( m_search->cursor().isNull() )
-		cFind->lineEdit()->setStyleSheet("QLineEdit { background: red; color : white; }");
+        if(m_useNotFoundWorkaround){
+            cFind->lineEdit()->setStyleSheet("QLineEdit { color : red; }");
+        }else{
+            cFind->lineEdit()->setStyleSheet("QLineEdit { background: red; color : white; }");
+        }
 	else if ((m_search->cursor().anchorLineNumber() < cur.anchorLineNumber()) ||
 	         (m_search->cursor().anchorLineNumber() == cur.anchorLineNumber() && m_search->cursor().anchorColumnNumber()<cur.anchorColumnNumber())) {
 		cFind->lineEdit()->setStyleSheet("QLineEdit { background: yellow; color : black; }");
@@ -1052,7 +1056,7 @@ void QSearchReplacePanel::on_cbSelection_toggled(bool on)
 	if ( m_search ) {
 		m_search->setScope(on ? editor()->cursor() : QDocumentCursor());
 		if(on){
-			// deselect cursor to show search scope (which is below cuersor highlight)
+            // deselect cursor to show search scope (which is below cursor highlight)
 			QDocumentCursor cur=editor()->cursor();
 			if(cur.hasSelection()){
 				cur.clearSelection();
@@ -1255,6 +1259,18 @@ void QSearchReplacePanel::updateIcon()
 	cbFilter->setMenu(menu);
 	filterChanged();
 }
+
+void QSearchReplacePanel::activateWin11Workaround(bool enable)
+{
+    m_useNotFoundWorkaround=enable;
+}
+
+/*!
+ * \brief win11 style seems to follow qlineedit background = red
+ * Use red text color instead
+ * \param enable
+ */
+
 /*!
  * \brief check if regular expressions are searched for
  * \return

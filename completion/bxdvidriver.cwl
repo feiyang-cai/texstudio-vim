@@ -1,20 +1,22 @@
 # bxdvidriver package
-# Matthew Bertucci 2022/04/29 for v0.2a
+# Matthew Bertucci 2026/05/22 for v0.3
 
-#include:ifluatex
-#include:ifpdf
-#include:ifvtex
-#include:ifxetex
+#include:iftex
 #include:pdftexcmds
 
-#keyvals:\usepackage/bxpdfver#c
+#keyvals:\usepackage/bxdvidriver#c
 check
 nocheck
+verbose
+noverbose
+alsorawoptions
+noalsorawoptions
 dvips
 xdvi
 dvipdf
 dvipdfm
 dvipdfmx
+dvisvgm
 dvipsone
 dviwindo
 oztex
@@ -22,5 +24,3 @@ textures
 pctexps
 pctex32
 #endkeyvals
-
-\bxDebug{text}#S

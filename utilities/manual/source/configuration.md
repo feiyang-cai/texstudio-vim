@@ -159,7 +159,7 @@ One line per cell
 ## Configuring the latex related commands
 
 LaTeX comes with a number of command line tools to compile and
-manipulate LaTeX documents. The commands section defines there location
+manipulate LaTeX documents. The commands section defines their location
 and arguments.
 
 The default settings should work with the recent and standard LaTeX
@@ -169,17 +169,17 @@ button at the end of the corresponding line and select the command in
 the file browser : TeXstudio will automatically adapt the syntax of the
 command.
 
-You can use a number of special characters / character sequences to
-address the context of the current document. They are expanded at
-runtime:
+You can use a number of special characters or character sequences to
+address the context of the current document. They are expanded at runtime:
 
 |  Special Character                  |  Expands to |
 |  ---------------------------        | ----------- |
-|  `%`                                | filename of the root document for of current document without extension |
+|  `%`                                | filename of the root document for the current document without extension |
 |  `@`                                | current line number |
 |  `?` followed by further characters | See the instruction at the bottom of the configuration dialog. |
 |  `[txs-app-dir]`                    | Location of the TeXstudio executable (useful for portable settings) |
 |  `[txs-settings-dir]`               | Location of the settings file (texstudio.ini) |
+|  `&` as last character              | run command detached, i.e. no blocking further commands |
 
 You can always restore the original settings using the revert button to
 the right.
@@ -288,7 +288,7 @@ program on your computer, if you want to use a command.
 #### Sumatra (Windows only)
 
 Launch Sumatra from TeXstudio and configure Sumatra for inverse search
-: `"(your sumatra path)" -reuse-instance -forward-search "?c:am.tex" @ -inverse-search "\\"(your texstudio path)>\\" \\"%%f\\" -line %%l" "?am.pdf"`
+: `"(your sumatra path)" -reuse-instance -forward-search "?c:am.tex" @ -inverse-search "\\"(your texstudio path)\\" \\"%%f\\" -line %%l" "?am.pdf" &`
 
 Jump to a line in a running Sumatra:
 : `dde:///SUMATRA/control/[ForwardSearch("?am.pdf","?c:am.tex",@,0,0,1)]`
@@ -306,12 +306,12 @@ A possible value for *(your Sumatra path)* is `C:\Program Files\SumatraPDF\Sumat
 #### Foxit Reader
 
 Launch Foxit Reader from TeXstudio
-: `"(your Reader path)" "?am.pdf"`
+: `"(your Reader path)" "?am.pdf" &`
 
 #### Acrobat Reader
 
 Launch Acrobat Reader from TeXstudio
-: `"*(your Reader path)*" "?am.pdf"`
+: `"*(your Reader path)*" "?am.pdf" &`
 
 Navigation and closing are achieved via DDE commands. Since version 10 of
 the adobe products the DDE service name contains a letter for the
@@ -351,7 +351,7 @@ writable when compiling.
 #### Yap (Yet Another Previewer)
 
 Launch Yap from TeXstudio
-: `"(your Yap path)" -1 -s @?c:m.tex %.dvi`
+: `"(your Yap path)" -1 -s @?c:m.tex %.dvi &`
 
 Launch TeXstudio from Yap
 : `"(your TeXstudio path)" "%f" -line %l`
@@ -363,20 +363,20 @@ A possible value for *(your Yap path)* is `C:\\Program Files\\MiKTeX 2.7\\miktex
 #### xdvi
 
 Launch xdvi from TeXstudio
-: `xdvi %.dvi -sourceposition @:?c:m.tex`
+: `xdvi %.dvi -sourceposition @:?c:m.tex &`
 
 Launch xdvi from TeXstudio and enable inverse search
-: `xdvi -editor "texstudio %f -line\" %.dvi -sourceposition @:%.tex`
+: `xdvi -editor "texstudio %f -line\" %.dvi -sourceposition @:%.tex &`
 
 #### kdvi
 
 Launch kdvi from TeXstudio
-: `kdvi "file:%.dvi#src:@ ?c:m.tex"`
+: `kdvi "file:%.dvi#src:@ ?c:m.tex" &`
 
 #### Okular
 
 Launch okular from TeXstudio
-: `okular --unique %.dvi#src:@ ?c:m.tex`
+: `okular --unique %.dvi#src:@ ?c:m.tex &`
 
 Launch TeXstudio from Okular
 : `texstudio %f -line %l`
@@ -384,7 +384,7 @@ Launch TeXstudio from Okular
 #### Skim
 
 Launch Skim from TeXstudio
-: `(your Skim path)/Contents/SharedSupport/displayline @ ?am.pdf ?c:ame`
+: `(your Skim path)/Contents/SharedSupport/displayline @ ?am.pdf ?c:ame &`
 
 Launch TeXstudio from skim
 : Command `/applications/texstudio.app/contents/macos/texstudio`
@@ -397,7 +397,7 @@ A possible value for *(your Skim path)* is `/Applications/Skim.app`
 #### qpdfview
 
 Launch qpdfview from TeXstudio
-: `qpdfview --unique ?am.pdf#src:?c:am.tex:@:0 2> /dev/null`
+: `qpdfview --unique ?am.pdf#src:?c:am.tex:@:0 2> /dev/null &`
 
 Launch TeXstudio from qpdfview
 : `texstudio "%1" -line %2`
@@ -458,7 +458,7 @@ Use command lists only for the meta and user commands listed at
 *Options -> Build*. Do not use them at *Options -> Commands*. The latter
 should just be single commands (i.e. do not use `|` there). While it\'s
 currently working in some cases, generally we do not guarantee this
-behavior. It can have surprising side effects such abortion of
+behavior. It can have surprising side effects such as abortion of
 compilation in some cases. Also, the use of `|` in *Commands* may be
 prohibited completely without further notice in the future.
 ```
@@ -479,12 +479,12 @@ calls `txs:///pdflatex` that calls the actual pdflatex, and then calls
 
 There is no difference between commands defined as command on the
 command config page, commands defined as build on the build config page,
-or commands defined as user commands. They are just separated in the GUI
+or commands defined as user command. They are just separated in the GUI
 to simplify the interface.
 
 This also means that you can change every command as you want, ignoring
 its old definition (you could even change its id, when editing the ini
-file.).
+file).
 
 There are however three always defined internal commands, which can only
 be called and not modified:
@@ -542,8 +542,8 @@ The environment variables available within the execution are the same as
 the ones that are available in the context in which TeXstudio was
 started. In particular this is true for the PATH. On Linux/OS X the PATH
 may depend on the way you started TeXstudio. Programs started from the
-GUI may have a different PATH setting than programs started from a shell
-(because some variables may only defined in the context of a shell (e.g.
+GUI may have a different PATH setting than programs started from a shell,
+because some variables may only be defined in the context of a shell (e.g.
 via `~/.bashrc`).
 
 By default, TeXstudio parses environment variables in your commands. The
@@ -555,7 +555,7 @@ be deactivated in the Build section of the options.
 
 #### Working Directory
 
-The working directory is set to the path of root document.
+The working directory is set to the path of the root document.
 
 #### Shell Functionality
 
@@ -591,7 +591,7 @@ or on Windows:
 
     cmd /C "/path/to/testscript.bat foo > bar"
 
-Alternatively, you can call a wrapper script in the user command
+Alternatively, you can call a wrapper script in the user command:
 
     /path/to/wrapperscript foo bar
 
@@ -716,7 +716,7 @@ all adverbs.
 
 ![advanced LT rules](images/conf_LT_adv.webp)
 
-Independent from LanguageTool, TeXstudio also checks for repeated and
+Independently of LanguageTool, TeXstudio also checks for repeated and
 bad (imprecise/slang) words. For this it needs a list of those words which need to be provided in the "Wordlist Directory" with the name "*language_code*.badWords"
 
 The repetition check looks several words behind and marks repetition of short words in the immediate vicinity and repetition of long words up to 10 words before. These distances and
@@ -766,6 +766,7 @@ The advanced mode offers some additional options:
     to be filled out, placeholders are put at these positions and they
     can be jumped to by using `Ctrl+Right`/`Ctrl+Left`.
 -   Insert Arguments: Insert the typical argument names like *num* & *den* in case of `\frac{num}{den}`
+-   Make user constructs from symbols/math commands: automatically add constrcut like `\mu_a` or `\mathsf{test}` to completer as they are likely reused. Disabling may speed-up reloading files for very large projects.
 
 Usually the auto-detection mechanism works reliably. In rare cases, you may want to force the use of predetermined completion lists.
 
@@ -903,11 +904,11 @@ This program, available for macOS and linux needs to be downloaded and stored on
 ## Set-up scenarios
 ### Separate build folder
 Some users prefer not to clutter the source folder with build files (aux files etc.).
-TexLive,Miktex and TeXstudio support this sceanrio but TeXstudio needs to be configured manually for this.
+TexLive,Miktex and TeXstudio support this scenario but TeXstudio needs to be configured manually for this.
 
 The following configuration assumes pdflatex as compiler and places all build files in a subfolder "build" which sits in the source folder.
 
-1. add `--output-directory=build` to the pdflatex command (options/commands)
+1. add `-output-directory=build` to the pdflatex command (options/commands)
 1. add "build" as additional search folder into log-paths (options/build/build options:log file)
 1. add "build" as additional search folder into pdf-paths (options/build/build options:pdf file)
 
@@ -915,3 +916,19 @@ The resulting configuration should look similar to this:
 ![Command configuration](images/conf_commands_outputDirectory.png)
 
 ![Build configuration](images/conf_build_outputDirectory.png)
+
+```{note}
+Alternatively, most files generated during the build process can be deleted using the Clean dialog (s. `Tools/Clean Auxiliary Files...` menu).
+However, this does not work if the files are stored in a different folder using the method described above.
+```
+
+## Hidden settings
+Some very rarely needed settings are not available via GUI but only directly in the texstudio.ini file.
+Here is a list of some of those settings.
+
+| Setting name | Description | Default setting |
+| ------------ | ----------- | --- |
+| Editor\MaxImageTooltipWidth | Scale large images shown in tooltip previews down to this width | 400 (px) |
+| Editor\RUNAWAYLIMIT | Stop highlighting open arguments after a limited number of lines | 30 (lines) |
+| LogView\RememberChoiceLargeFile | Remembers user choice what to do if the log file is large | 0 (ask) |
+| LogView\WarnIfFileSizeLargerMB | Give out a warning if the log file size is larger than limit | 2.0 (MB) |

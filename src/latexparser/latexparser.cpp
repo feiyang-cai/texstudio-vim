@@ -41,10 +41,14 @@ LatexParser::LatexParser(const LatexParser &other){
     environmentAliases=other.environmentAliases;
     specialDefCommands=other.specialDefCommands;
     mapSpecialArgs=other.mapSpecialArgs;
+    mapSpecialArgumentTypes=other.mapSpecialArgumentTypes;
+    projectDocuments=other.projectDocuments;
+    sectionCommands=other.sectionCommands;
 }
 
 LatexParser &LatexParser::operator=(const LatexParser &other)
 {
+    if (this == &other) return *this;
     commandDefs=other.commandDefs;
     environmentCommands=other.environmentCommands;
     mathStartCommands=other.mathStartCommands;
@@ -56,6 +60,8 @@ LatexParser &LatexParser::operator=(const LatexParser &other)
     specialDefCommands=other.specialDefCommands;
     mapSpecialArgs=other.mapSpecialArgs;
     mapSpecialArgumentTypes=other.mapSpecialArgumentTypes;
+    projectDocuments=other.projectDocuments;
+    sectionCommands=other.sectionCommands;
     return *this;
 }
 LatexParser &LatexParser::getInstance()
@@ -112,7 +118,9 @@ int commentStart(const QString &text)
 /// remove comment from text, take care of multiple backslashes before comment character ...
 QString cutComment(const QString &text)
 {
-    return text.left(commentStart(text));
+    const int cs = commentStart(text);
+    if (cs < 0) return text;
+    return text.left(cs);
 }
 
 /// returns true if the options are complete, false if the scanning ended while still in the options
@@ -194,16 +202,29 @@ QString removeOptionBrackets(const QString &option)
 /*!
  * \brief determines level of structure in a section-command
  * \param cmd latex command
- * \return level of stucture
+ * \return level of structure
  */
-int LatexParser::structureCommandLevel(const QString &cmd) const
+int LatexParser::structureCommandLevel(const QString &cmd)
 {
+    if(sectionCommands.isEmpty()){
+        // not yet cached, do it now
+        cacheStructureCommand();
+    }
+    if(!sectionCommands.contains(cmd)) return -1;
 	for (int i=0; i<=MAX_STRUCTURE_LEVEL; i++) {
 		if (possibleCommands[QString("%structure%1").arg(i)].contains(cmd)) {
 			return i;
 		}
 	}
 	return -1;
+}
+
+void LatexParser::cacheStructureCommand()
+{
+    sectionCommands.clear();
+    for (int i=0; i<=MAX_STRUCTURE_LEVEL; i++) {
+        sectionCommands+=possibleCommands[QString("%structure%1").arg(i)];
+    }
 }
 
 void LatexParser::append(const LatexParser &elem)
@@ -215,7 +236,7 @@ void LatexParser::append(const LatexParser &elem)
 		possibleCommands[key].unite(set);
 		++i;
 	}
-	foreach (const QString key, elem.environmentAliases.keys()) {
+    foreach (const QString &key, elem.environmentAliases.keys()) {
 		QStringList values = elem.environmentAliases.values(key);
 		foreach (const QString value, values) {
 			if (!environmentAliases.contains(key, value))
@@ -235,7 +256,7 @@ void LatexParser::append(const LatexParser &elem)
 #endif
 }
 
-void LatexParser::substract(const LatexParser &elem)
+void LatexParser::subtract(const LatexParser &elem)
 {
 	QHash<QString, QSet<QString> >::const_iterator i = elem.possibleCommands.constBegin();
 	while (i != elem.possibleCommands.constEnd()) {
@@ -254,7 +275,7 @@ void LatexParser::clear()
 	init();
 }
 
-void LatexParser::importCwlAliases(const QString filename)
+void LatexParser::importCwlAliases(const QString &filename)
 {
 	QFile tagsfile(filename);
 	if (tagsfile.open(QFile::ReadOnly)) {
@@ -316,7 +337,7 @@ QString interpretXArgs(const QString &xarg)
     bool braceMode=false;
     for(int i=0;i<xarg.length();++i){
         QChar c=xarg[i];
-        if(c=='{'){
+        if(c=='}'){
             braceMode=false;
         }
         if(braceMode) continue;

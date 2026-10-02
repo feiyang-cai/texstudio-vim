@@ -612,6 +612,7 @@ ConfigManager::ConfigManager(QObject *parent): QObject (parent),
     registerOption("Editor/Completion Auto Insert Math", &completerConfig->autoInsertMathDelimiters, true, &pseudoDialog->checkBoxAutoInsertMathDelimiters);
     registerOption("Editor/Completion Auto Insert Math Start", &completerConfig->startMathDelimiter,"$");
     registerOption("Editor/Completion Auto Insert Math Stop", &completerConfig->stopMathDelimiter,"$");
+    registerOption("Editor/Completion User Constructs", &completeUserConstructs, true, &pseudoDialog->checkBoxCompleteUserConstructs);
 
 
 	registerOption("Editor/Auto Insert LRM", &editorConfig->autoInsertLRM, false, &pseudoDialog->checkBoxAutoLRM);
@@ -705,10 +706,12 @@ ConfigManager::ConfigManager(QObject *parent): QObject (parent),
     registerOption("AIchat/PreferredModel",&ai_preferredModel,"open-mistral-7b",&pseudoDialog->cbAIPreferredModel);
     registerOption("AIchat/CustomURL",&ai_apiurl,"http://localhost:8080/v1/chat/completions",&pseudoDialog->leAIAPIURL);
     registerOption("AIchat/KnownModels",&ai_knownModels,QStringList(),nullptr);
-    registerOption("AIchat/SystemPrompt",&ai_systemPrompt,"text:'''%txsSelectedText%'''\n");
-    registerOption("AIchat/Temperature",&ai_temperature,"0.7");
+    registerOption("AIchat/SystemPrompt",&ai_systemPrompt,"You are an assistant in a latex editor. You generate valid latex code inside an existing documents. You don't explain your result.");
+    registerOption("AIchat/Temperature",&ai_temperature,"-");
+    registerOption("AIchat/maxTokens",&ai_maxTokens,1024);
     registerOption("AIchat/RecordConversation",&ai_recordConversation,true,&pseudoDialog->cbAIRecordConversation);
     registerOption("AIchat/StreamResults",&ai_streamResults,false);
+    registerOption("AIchat/UseFunctions",&ai_useFunctions,true,&pseudoDialog->cbAIUseTools);
     registerOption("AIchat/Width",&ai_width,1000);
     registerOption("AIchat/Height",&ai_height,400);
     registerOption("AIchat/Splitter",&ai_splitter,0.3);
@@ -803,7 +806,7 @@ ConfigManager::ConfigManager(QObject *parent): QObject (parent),
 	registerOption("Preview/EnlargedEmbedded", &viewerEnlarged, false);
 
 	// LogView
-	registerOption("LogView/WarnIfFileSizeLargerMB", &logViewWarnIfFileSizeLargerMB, 2.0);
+    registerOption("LogView/WarnIfFileSizeLargerMB", &logViewWarnIfFileSizeLargerMB, 16.0);
     registerOption("LogView/RememberChoiceLargeFile", &logViewRememberChoice, 0);
 
 #ifndef QT_NO_DEBUG
@@ -883,6 +886,11 @@ QSettings *ConfigManager::readSettings(bool reread)
 		// reset this option when loading any old config.
 		config->remove("texmaker/centralVSplitterState");
 	}
+    QString txsVersionConfigWritten=config->value("version/written_by_TXS_version").toString();
+    if(Version::compareStringVersion(txsVersionConfigWritten,"4.9.4")==Version::Lower){
+        // insert <disable> at position 0
+        ai_provider+=1;
+    }
 
 	config->beginGroup("texmaker");
 	if (config->contains("Files/Auto Detect Encoding Of Loaded Files")) { // import old setting
@@ -2924,8 +2932,16 @@ void ConfigManager::setInterfaceStyle()
         if (modernStyle) {
             ManhattanStyle *style = new ManhattanStyle(newStyle);
             if (style->isValid()) QApplication::setStyle(style);
-        } else
+        } else{
             QApplication::setStyle(newStyle);
+#ifdef Q_OS_WIN32
+            if(newStyle=="windows11"){
+                editorConfig->useWin11Workaround=true;
+            }else{
+                editorConfig->useWin11Workaround=false;
+            }
+#endif
+        }
     }
 
 

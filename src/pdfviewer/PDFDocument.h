@@ -559,6 +559,7 @@ signals:
 	void fileDropped(const QUrl &url);
 
 	void runCommand(const QString &command, const QFileInfo &masterFile, const QFileInfo &currentFile, int linenr);
+    void runCommandAsync(const QString &command, const QFileInfo &masterFile, const QFileInfo &currentFile, int linenr);
 
 	void triggeredAbout();
 	void triggeredManual();

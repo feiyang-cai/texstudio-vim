@@ -359,13 +359,14 @@ signals:
 	void showImgPreview(const QString &fileName);
 	void showFullPreview();
 	void openFile(const QString &name);
+    void openFile(const QString &name,int line);
 	void openFile(const QString &baseName, const QString &defaultExtension);
 	void openCompleter();
 	void thesaurus(int line, int col);
 	void changeDiff(QPoint pt);
 	void spellerChanged(const QString &name);
 	void gotoDefinition(QDocumentCursor c);
-	void findLabelUsages(LatexDocument *contextDoc, const QString &labelText);
+    void findLabelUsages(LatexDocument *contextDoc, const QString &labelText,bool definitionOnly);
     void findSpecialUsages(LatexDocument *doc, const QString &labelText, int type);
 	void syncPDFRequested(QDocumentCursor c);
 	void bookmarkRemoved(QDocumentLineHandle *dlh);

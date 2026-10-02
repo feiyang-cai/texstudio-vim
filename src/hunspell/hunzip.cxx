@@ -1,7 +1,7 @@
 /* ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
- * Copyright (C) 2002-2017 Németh László
+ * Copyright (C) 2002-2022 Németh László
  *
  * The contents of this file are subject to the Mozilla Public License Version
  * 1.1 (the "License"); you may not use this file except in compliance with
@@ -35,9 +35,9 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
+#include <cstdlib>
+#include <cstring>
+#include <cstdio>
 
 #include "hunzip.hxx"
 #include "csutil.hxx"
@@ -50,15 +50,15 @@
 #define MAGIC_ENCRYPT "hz1"
 #define MAGICLEN (sizeof(MAGIC) - 1)
 
-int Hunzip::fail(const char* err, const char* par) {
-  fprintf(stderr, err, par);
+int Hunzip::fail(const char* err, const std::string& par) {
+  fprintf(stderr, err, par.c_str());
   return -1;
 }
 
 Hunzip::Hunzip(const char* file, const char* key)
     : bufsiz(0), lastbit(0), inc(0), inbits(0), outc(0) {
   in[0] = out[0] = line[0] = '\0';
-  filename = mystrdup(file);
+  filename = file;
   if (getcode(key) == -1)
     bufsiz = -1;
   else
@@ -67,14 +67,13 @@ Hunzip::Hunzip(const char* file, const char* key)
 
 int Hunzip::getcode(const char* key) {
   unsigned char c[2];
-  int i, j, n;
-  int allocatedbit = BASEBITREC;
+  int i, j, n, allocatedbit = BASEBITREC;
   const char* enc = key;
 
-  if (!filename)
+  if (filename.empty())
     return -1;
 
-  myopen(fin, filename, std::ios_base::in | std::ios_base::binary);
+  myopen(fin, filename.c_str(), std::ios_base::in | std::ios_base::binary);
   if (!fin.is_open())
     return -1;
 
@@ -98,7 +97,7 @@ int Hunzip::getcode(const char* key) {
       return fail(MSG_KEY, filename);
     enc = key;
   } else
-    key = NULL;
+    key = nullptr;
 
   // read record count
   if (!fin.read(reinterpret_cast<char*>(c), 2))
@@ -136,17 +135,17 @@ int Hunzip::getcode(const char* key) {
         enc = key;
       l ^= *enc;
     }
-    if (!fin.read(in, l / 8 + 1))
+    if (!fin.read(in, (l >> 3) + 1))
       return fail(MSG_FORMAT, filename);
     if (key)
-      for (j = 0; j <= l / 8; j++) {
+      for (j = 0; j <= (l >> 3); j++) {
         if (*(++enc) == '\0')
           enc = key;
         in[j] ^= *enc;
       }
     int p = 0;
     for (j = 0; j < l; j++) {
-      int b = (in[j / 8] & (1 << (7 - (j % 8)))) ? 1 : 0;
+      int b = (in[(j >> 3)] & (1 << (7 - (j & 7)))) ? 1 : 0;
       int oldp = p;
       p = dec[p].v[b];
       if (p == 0) {
@@ -167,10 +166,7 @@ int Hunzip::getcode(const char* key) {
   return 0;
 }
 
-Hunzip::~Hunzip() {
-  if (filename)
-    free(filename);
-}
+Hunzip::~Hunzip() = default;
 
 int Hunzip::getbuf() {
   int p = 0;
@@ -178,10 +174,10 @@ int Hunzip::getbuf() {
   do {
     if (inc == 0) {
       fin.read(in, BUFSIZE);
-      inbits = int(fin.gcount() * 8);
+      inbits = int(fin.gcount() << 3);
     }
     for (; inc < inbits; inc++) {
-      int b = (in[inc / 8] & (1 << (7 - (inc % 8)))) ? 1 : 0;
+      int b = (in[inc >> 3] & (1 << (7 - (inc & 7)))) ? 1 : 0;
       int oldp = p;
       p = dec[p].v[b];
       if (p == 0) {
@@ -194,7 +190,7 @@ int Hunzip::getbuf() {
         }
         out[o++] = dec[oldp].c[0];
         out[o++] = dec[oldp].c[1];
-        if (o == BUFSIZE)
+        if (o >= BUFSIZE)
           return o;
         p = dec[p].v[b];
       }
@@ -204,12 +200,19 @@ int Hunzip::getbuf() {
   return fail(MSG_FORMAT, filename);
 }
 
+bool Hunzip::is_open() {
+  return fin.is_open();
+}
+
 bool Hunzip::getline(std::string& dest) {
   char linebuf[BUFSIZE];
   int l = 0, eol = 0, left = 0, right = 0;
   if (bufsiz == -1)
     return false;
-  while (l < bufsiz && !eol) {
+  // Stop one byte before BUFSIZE so the post-loop linebuf[l] = '\0' below
+  // (and the right-suffix path) always have room for the terminator without
+  // overflowing the stack buffer.
+  while (l < bufsiz && l < BUFSIZE - 1 && !eol) {
     linebuf[l++] = out[outc];
     switch (out[outc]) {
       case '\t':
@@ -236,7 +239,7 @@ bool Hunzip::getline(std::string& dest) {
           if (out[outc] == 30)
             left = 9;
           else
-            left = out[outc];
+            left = static_cast<unsigned char>(out[outc]);
           linebuf[l - 1] = '\n';
           eol = 1;
         }
@@ -246,10 +249,20 @@ bool Hunzip::getline(std::string& dest) {
       bufsiz = fin.is_open() ? getbuf() : -1;
     }
   }
-  if (right)
-    strcpy(linebuf + l - 1, line + strlen(line) - right - 1);
-  else
+  // append suffix from previous line
+  if (right) {
+    size_t prev_len = strlen(line);
+    size_t n = right + 1;
+    if (prev_len < n || l + n >= BUFSIZE)
+      return false;
+    strcpy(linebuf + l - 1, line + prev_len - n);
+  } else {
     linebuf[l] = '\0';
+  }
+
+  // copy into line with left-offset from previous line preserved
+  if (left + strlen(linebuf) >= sizeof(line))
+    return false;
   strcpy(line + left, linebuf);
   dest.assign(line);
   return true;

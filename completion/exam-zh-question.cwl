@@ -1,11 +1,12 @@
 # exam-zh-question package
-# Matthew Bertucci 2025/02/19 for v0.2.5
+# Matthew Bertucci 2026/08/04 for v0.3.6
 
 #include:amsthm
 #include:tcolorbox
 #include:tcolorboxlibrarymost
 #include:xeCJKfntef
 #include:enumitem
+#include:exam-zh-counter
 #include:linegoal
 #include:tikzlibraryshapes.misc
 
@@ -41,7 +42,7 @@ paren={%<键值列表%>}
 paren/show-answer#true,false
 paren/show-paren#true,false
 paren/text-color=#%color
-paren/type=#hfill,none
+paren/type=#hfill,dotfill,none
 fillin={%<键值列表%>}
 fillin/type=#line,paren,circle,rectangle,blank
 fillin/no-answer-type=#blacktriangle,counter,none
@@ -49,6 +50,7 @@ fillin/no-answer-counter-index=%<integer%>
 fillin/no-answer-counter-label=%<label%>
 fillin/show-answer#true,false
 fillin/width=##L
+fillin/width-extra=##L
 fillin/width-type=#fill,normal
 fillin/box-color=#%color
 fillin/text-color=#%color
@@ -105,10 +107,6 @@ hang#true,false
 \paren
 \paren[答案]
 \AddQuestionCounter{LaTeX command%cmd}{internal command%definition}#d
-\circlednumber{数字或计数器名字}
-\circlednumber*{数字或计数器名字}
-\tikzcirclednumber{数字或计数器名字}#S
-\tikzcirclednumber*{数字或计数器名字}#S
 
 \fillin
 \fillin[答案]
@@ -126,6 +124,7 @@ no-answer-counter-index=%<integer%>
 no-answer-counter-label=%<label%>
 show-answer#true,false
 width=##L
+width-extra=##L
 width-type=#fill,normal
 box-color=#%color
 text-color=#%color

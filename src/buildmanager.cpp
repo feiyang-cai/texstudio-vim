@@ -86,7 +86,7 @@ CMD_DEFINE(TERMINAL_EXTERNAL,terminal-external);
 // *INDENT-ON* (astyle-config)
 
 //! These commands should not consist of a command list, but rather a single command.
-//! Otherwise surpising side effects can happen, see https://sourceforge.net/p/texstudio/bugs/2119/
+//! Otherwise surprising side effects can happen, see https://sourceforge.net/p/texstudio/bugs/2119/
 const QStringList atomicCommands = QStringList() << "txs:///latex" << "txs:///pdflatex" << "txs:///xelatex"<< "txs:///lualatex" << "txs:///latexmk";
 
 QString searchBaseCommand(const QString &cmd, QString options, QString texPath="");
@@ -119,7 +119,7 @@ QString CommandInfo::guessCommandLine(const QString texpath) const
 void CommandInfo::setCommandLine(const QString &cmdString)
 {
 	if (cmdString == "<default>") commandLine = guessCommandLine();
-	if (cmdString == BuildManager::tr("<unknown>")) commandLine = "";
+	else if (cmdString == BuildManager::tr("<unknown>")) commandLine = "";
 	else {
 		//force commands to include options (e.g. file name)
 		QString trimmed = cmdString.trimmed();
@@ -222,7 +222,7 @@ QStringList BuildManager::splitOptions(const QString &s)
 	for (i = 0; i < s.length(); i++) {
 		c = s[i];
 		if (inQuote) {
-			if (c == '"' && s[i - 1] != '\\') {
+			if (c == '"' && (i == 0 || s[i - 1] != '\\')) {
 				inQuote = false;
 			}
 		} else {
@@ -286,9 +286,13 @@ QString BuildManager::replaceEnvironmentVariables(const QString &s, const QHash<
 			if (compareNamesToUpper) {
 				varName = varName.toUpper();
 			}
-			QString varContent = variables.value(varName, "");
-            result.replace(match.captured(0), varContent);
-			i += varContent.length();
+            if(variables.contains(varName)){
+                QString varContent = variables.value(varName, "");
+                result.replace(match.captured(0), varContent);
+                i += varContent.length();
+            }else{
+                i += match.capturedLength();
+            }
 		}
 	}
 	return result;
@@ -785,11 +789,11 @@ QString getMiKTeXBinPathInternal()
 			}
 	}
 
-    if(!mikPath.endsWith("\\")){
-        mikPath.append("\\");
-    }
 	// post-process to detect 64bit installation
 	if (!mikPath.isEmpty()) {
+        if (!mikPath.endsWith("\\")) {
+            mikPath.append("\\");
+        }
         if (QDir(mikPath + "x64\\").exists())
             return mikPath + "x64\\";
 		else
@@ -890,7 +894,7 @@ QString searchBaseCommand(const QString &cmd, QString options, QString texPath)
         }
         if (!BuildManager::findFileInPath(fileName).isEmpty())
             return fileName + options; //found in path
-        // additonal search path
+        // additional search path
         QStringList addPaths=BuildManager::resolvePaths(BuildManager::additionalSearchPaths).split(";");
         foreach(const QString& path, addPaths){
             if (QFileInfo::exists(addPathDelimeter(path) + fileName)) {
@@ -1144,7 +1148,7 @@ bool similarCommandInList(const QString &cmd, const QStringList &list)
 	return false;
 }
 
-RunCommandFlags BuildManager::getSingleCommandFlags(const QString &subcmd) const
+RunCommandFlags BuildManager::getSingleCommandFlags(QString &subcmd) const
 {
 	int result = 0;
 	if (similarCommandInList(subcmd, latexCommands)) result |= RCF_COMPILES_TEX;
@@ -1155,7 +1159,11 @@ RunCommandFlags BuildManager::getSingleCommandFlags(const QString &subcmd) const
 #ifdef Q_OS_WIN
 	isAcrobat = subcmd.contains("Acrobat.exe") || subcmd.contains("AcroRd32.exe");
 #endif
-
+    if (subcmd.endsWith("&")){
+        result |= RCF_DETACH;
+        // remove &
+        subcmd.chop(1);
+    }
 	if (viewerCommands.contains(subcmd) && !isAcrobat && singleViewerInstance) result |= RCF_SINGLE_INSTANCE;
 	return static_cast<RunCommandFlags>(result);
 }
@@ -1525,6 +1533,85 @@ void BuildManager::checkLatexConfiguration(bool &noWarnAgain)
 		UtilsUi::txsWarning(message, noWarnAgain);
 	}
 }
+/*! \brief prepend command for asynchronous execution
+ * \param unparsedCommandLine
+ * \param mainFile
+ * \param currentFile
+ * \param currentLine
+ * \return true if command was started, false if not (e.g. no command given)
+ */
+bool BuildManager::prependCommandAsync(const QString &unparsedCommandLine, const QFileInfo &mainFile, const QFileInfo &currentFile, int currentLine)
+{
+    if (unparsedCommandLine.isEmpty()) {
+        emit processNotification(tr("Error: No command given"));
+        return false;
+    }
+    ExpandingOptions options(mainFile, currentFile, currentLine);
+    ExpandedCommands expansion = expandCommandLine(unparsedCommandLine, options);
+    if (options.canceled) return false;
+    if (!checkExpandedCommands(expansion)) return false;
+
+    // purge top command as this is basically its replacement
+    if(m_expandedCommands.commands.size()>0){
+        m_expandedCommands.commands.removeFirst();
+    }
+    // prepend the commands to the queue
+    for (int i = expansion.commands.size()-1; i>=0; --i) {
+        if(i==expansion.commands.size()-1){
+            // skip it is the same command as the top command in the queue
+            if(m_expandedCommands.commands.size()>0 && m_expandedCommands.commands.first().command==expansion.commands.value(i).command){
+                continue;
+            }
+        }
+        m_expandedCommands.commands.prepend(expansion.commands.value(i));
+    }
+    // prepend dummy command to allow top command removal in testAndRunInternalCommand
+    m_expandedCommands.commands.prepend(QString());
+
+    return true;
+}
+/*!
+ * \brief run command asynchronously, i.e. return immediately and emit signals when finished
+ * \param unparsedCommandLine
+ * \param mainFile
+ * \param currentFile
+ * \param currentLine
+ * \param buffer
+ * \param errorMsg
+ * \param returnCmd
+ * \return
+ */
+bool BuildManager::runCommandAsync(const QString &unparsedCommandLine, const QFileInfo &mainFile, const QFileInfo &currentFile, int currentLine, QString *buffer, QString *errorMsg, QObject *returnObj, const char *returnCmd)
+{
+    emit clearLogs();
+
+    if (unparsedCommandLine.isEmpty()) {
+        emit processNotification(tr("Error: No command given"));
+        return false;
+    }
+    ExpandingOptions options(mainFile, currentFile, currentLine);
+    ExpandedCommands expansion = expandCommandLine(unparsedCommandLine, options);
+    if (options.canceled) return false;
+    if (!checkExpandedCommands(expansion)) return false;
+
+    bool latexCompiled = false, pdfChanged = false;
+    for (int i = 0; i < expansion.commands.size(); i++) {
+        latexCompiled |= expansion.commands[i].flags & RCF_COMPILES_TEX;
+        pdfChanged |= expansion.commands[i].flags & RCF_CHANGE_PDF;
+        if (buffer || i != expansion.commands.size() - 1)
+            expansion.commands[i].flags |= RCF_WAITFORFINISHED; // don't let buffer be destroyed before command is finished
+    }
+    if (latexCompiled) {
+        ExpandedCommands temp = expandCommandLine(CMD_INTERNAL_PRE_COMPILE, options);
+        for (int i = temp.commands.size() - 1; i >= 0; i--) expansion.commands.prepend(temp.commands[i]);
+    }
+
+    bool asyncPdf = !(expansion.commands.last().flags & RCF_WAITFORFINISHED) && (expansion.commands.last().flags & RCF_CHANGE_PDF);
+
+    emit beginRunningCommands(expansion.primaryCommand, latexCompiled, pdfChanged, asyncPdf);
+    runCommandInternalAsync(expansion, mainFile, buffer, errorMsg,returnObj,returnCmd);
+    return true;
+}
 
 bool BuildManager::runCommand(const QString &unparsedCommandLine, const QFileInfo &mainFile, const QFileInfo &currentFile, int currentLine, QString *buffer, QTextCodec *codecForBuffer , QString *errorMsg)
 {
@@ -1611,7 +1698,6 @@ bool BuildManager::runCommandInternal(const ExpandedCommands &expandedCommands, 
 		p->subCommandFlags = cur.flags;
         connect(p, SIGNAL(finished(int,QProcess::ExitStatus)), SLOT(emitEndRunningSubCommandFromProcessX(int)));
 
-
 		p->setStdoutBuffer(buffer);
         p->setStderrBuffer(errorMsg);
 		p->setStdoutCodec(codecForBuffer);
@@ -1623,16 +1709,8 @@ bool BuildManager::runCommandInternal(const ExpandedCommands &expandedCommands, 
 		p->startCommand();
 		if (!p->waitForStarted(1000)) return false;
 
-		if (latexCompiler || (!lastCommandToRun && !singleInstance) )
-			if (!waitForProcess(p)) {
-				p->deleteLater();
-				return false;
-			}
-
-		if (waitForCommand) { //what is this? does not really make any sense (waiting is done in the block above) and breaks multiple single-instance pdf viewer calls (30 sec delay)
-			p->waitForFinished();
-			p->deleteLater();
-		}
+        p->waitForFinished();
+        p->deleteLater();
 
 		bool rerunnable = (cur.flags & RCF_RERUN) && (cur.flags & RCF_RERUNNABLE);
 		if (rerunnable || latexCompiler) {
@@ -1655,12 +1733,157 @@ bool BuildManager::runCommandInternal(const ExpandedCommands &expandedCommands, 
 	}
 	return true;
 }
+/*!
+ * \brief run internally commands asynchronously, i.e. return immediately and emit signals when finished
+ * \param expandedCommands
+ * \param mainFile
+ * \param buffer
+ * \param errorMsg
+ * \param returnCmd
+ * \return
+ */
+void BuildManager::runCommandInternalAsync(const ExpandedCommands &expandedCommands, const QFileInfo &mainFile, QString *buffer, QString *errorMsg, QObject *returnObject,const char *returnCmd)
+{
+    m_expandedCommands=expandedCommands;
+    m_mainFile=mainFile;
+    m_buffer=buffer;
+    m_errorMsg=errorMsg;
+    m_returnCmdObj=returnObject;
+    m_returnCmd=returnCmd;
+    m_remainingReRunCount = autoRerunLatex;
+    runNextCommandInternalAsync();
+}
+/*!
+ * \brief check if any command is currently running
+ * \return
+ */
+bool BuildManager::busyRunningCommands() const
+{
+    return !m_expandedCommands.commands.isEmpty();
+}
 
 void BuildManager::emitEndRunningSubCommandFromProcessX(int)
 {
 	ProcessX *p = qobject_cast<ProcessX *>(sender());
 	REQUIRE(p); //p can be NULL (although sender() is not null) ! If multiple single instance viewers are in a command. Why? should not happen
 	emit endRunningSubCommand(p, p->subCommandPrimary, p->subCommandName, p->subCommandFlags);
+}
+/*!
+ * \brief run next command in queue
+ */
+void BuildManager::runNextCommandInternalAsync()
+{
+    if(m_expandedCommands.commands.isEmpty()) {
+        emit endRunningCommands(m_expandedCommands.primaryCommand, false, true, false); // specultively assume that pdf could have been changed
+        return;
+    }
+    CommandToRun cur = m_expandedCommands.commands.first();
+
+    while (cur.command.isEmpty() || testAndRunInternalCommandAsync(cur.command, m_mainFile)){
+        m_expandedCommands.commands.removeFirst();
+        if(m_expandedCommands.commands.isEmpty()) {
+            emit endRunningCommands(m_expandedCommands.primaryCommand, false, true, false); // specultively assume that pdf could have been changed
+            return;
+        }
+        cur = m_expandedCommands.commands.first();
+    }
+
+    bool singleInstance = cur.flags & RCF_SINGLE_INSTANCE;
+    if (singleInstance && runningCommands.contains(cur.command)) return; //TODO checkout
+    bool latexCompiler = cur.flags & RCF_COMPILES_TEX;
+    bool lastCommandToRun = (m_expandedCommands.commands.size() == 1);
+    bool waitForCommand = latexCompiler || (!lastCommandToRun && !singleInstance) || cur.flags & RCF_WAITFORFINISHED;
+    bool detach = cur.flags & RCF_DETACH;
+
+    ProcessX *p = newProcessInternal(cur.command, m_mainFile, singleInstance);
+    if(p==nullptr){
+        m_expandedCommands.commands.clear();
+        return;
+    }
+    p->subCommandName = cur.parentCommand;
+    p->subCommandPrimary = m_expandedCommands.primaryCommand;
+    p->subCommandFlags = cur.flags;
+    connect(p, SIGNAL(finished(int,QProcess::ExitStatus)), SLOT(emitEndRunningSubCommandFromProcessX(int)));
+
+
+    p->setStdoutBuffer(m_buffer);
+    p->setStderrBuffer(m_errorMsg);
+
+    emit beginRunningSubCommand(p, m_expandedCommands.primaryCommand, cur.parentCommand, cur.flags);
+
+    connect(p, SIGNAL(finished(int,QProcess::ExitStatus)), p, SLOT(deleteLater()));
+    if(!detach){
+        connect(p, SIGNAL(finished(int,QProcess::ExitStatus)), this, SLOT(runNextCommandInternalAsyncFinished(int,QProcess::ExitStatus)));
+    }
+
+    processWaitedFor=p;
+
+    p->startCommand();
+    if (!p->waitForStarted(1000)){
+        m_expandedCommands.commands.clear();
+        processWaitedFor=nullptr;
+        return;
+    }
+    if(detach){
+        QMetaObject::invokeMethod(this, "runNextCommandInternalAsyncFinished",Q_ARG(int,0),Q_ARG(QProcess::ExitStatus,QProcess::NormalExit));
+    }
+}
+/*!
+ * \brief continue after process finished, check if rerun is needed and run next command
+ * \param exitCode
+ * \param exitStatus
+ */
+void BuildManager::runNextCommandInternalAsyncFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    processWaitedFor = nullptr;
+    if(exitCode!=0 || exitStatus != QProcess::NormalExit){
+        emit processNotification(tr("Error: Command failed with error code %1").arg(exitCode));
+        //return;
+    }
+    if(m_expandedCommands.commands.isEmpty()){
+        emit endRunningCommands(m_expandedCommands.primaryCommand, false, false, false);
+        if(m_returnCmdObj && m_returnCmd){
+            QMetaObject::invokeMethod(m_returnCmdObj, m_returnCmd,Q_ARG(int,exitCode),Q_ARG(QProcess::ExitStatus,exitStatus));
+        }
+        return;
+    }
+    CommandToRun cur = m_expandedCommands.commands.first();
+    bool latexCompiler = cur.flags & RCF_COMPILES_TEX;
+    bool lastCommandToRun = (m_expandedCommands.commands.size() == 1);
+    bool rerunnable = (cur.flags & RCF_RERUN) && (cur.flags & RCF_RERUNNABLE);
+    bool runNext=!lastCommandToRun;
+    if (m_remainingReRunCount>0 && (rerunnable || latexCompiler)) {
+        LatexCompileResult result = LCR_NORMAL;
+        emit latexCompiled(&result);
+        if (result == LCR_ERROR){
+            lastCommandToRun=true;
+        }
+        if (result == LCR_RERUN_WITH_BIBLIOGRAPHY) {
+            ExpandingOptions options(m_mainFile, m_mainFile, 0);
+            ExpandedCommands expansion = expandCommandLine(CMD_BIBLIOGRAPHY, options);
+            if (!checkExpandedCommands(expansion)) return;
+            // prepend commands
+            for (int i = expansion.commands.size() - 1; i >= 0; i--) m_expandedCommands.commands.prepend(expansion.commands[i]);
+        }
+        if(result == LCR_RERUN || result == LCR_RERUN_WITH_BIBLIOGRAPHY){
+            m_remainingReRunCount--;
+            if(m_remainingReRunCount>0){
+                runNext=false;
+            }
+        }
+    }
+    if(runNext){
+        m_expandedCommands.commands.removeFirst();
+    }
+    if(lastCommandToRun){
+        emit endRunningCommands(m_expandedCommands.primaryCommand, latexCompiler, cur.flags & RCF_CHANGE_PDF, false);
+        if(m_returnCmdObj && m_returnCmd){
+            QMetaObject::invokeMethod(m_returnCmdObj, m_returnCmd,Q_ARG(int,exitCode),Q_ARG(QProcess::ExitStatus,exitStatus));
+        }
+        m_expandedCommands.commands.clear();
+        return;
+    }
+    runNextCommandInternalAsync();
 }
 
 
@@ -1705,28 +1928,6 @@ ProcessX *BuildManager::newProcessInternal(const QString &cmd, const QFileInfo &
 	return proc;
 }
 
-bool BuildManager::waitForProcess(ProcessX *p)
-{
-	REQUIRE_RET(p, false);
-	REQUIRE_RET(!processWaitedFor, false);
-	// Waiting on a Qt event loop avoids spinlock and high CPU usage, and allows user interaction
-	// and UI responsiveness while compiling.
-	// We have to check the process running state before we start waiting for processFinished
-	// because it is possible that the process has already ended and we would wait forever.
-	// We have to start listening for processFinished before we check the running state in
-	// order to avoid a race condition.
-	QEventLoop loop;
-	connect(p, SIGNAL(processFinished()), &loop, SLOT(quit()));
-	if (p->isRunning()) {
-		processWaitedFor = p;
-		emit buildRunning(true);
-		loop.exec(); //exec will delay execution until the signal has arrived
-		emit buildRunning(false);
-		processWaitedFor = nullptr;
-	}
-	return true;
-}
-
 bool BuildManager::waitingForProcess() const
 {
 	return processWaitedFor;
@@ -1737,6 +1938,8 @@ void BuildManager::killCurrentProcess()
 	if (!processWaitedFor) return;
 	processWaitedFor->kill();
     processWaitedFor = nullptr;
+    m_expandedCommands.commands.clear();
+    emit endRunningCommands("", false, false, false);
 }
 
 QString BuildManager::createTemporaryFileName()
@@ -1848,7 +2051,7 @@ void BuildManager::preview(const QString &preamble, const PreviewSource &source,
 				//write preamble
 				QTemporaryFile *tf = new QTemporaryFile(tempPath + "hXXXXXX.tex");
 				REQUIRE(tf);
-                if(!tf->open()) return; // opening file failed
+				if(!tf->open()) return; // opening file failed
 				QTextStream out(tf);
                 if (outputCodec) {
                     out << outputCodec->fromUnicode(preamble_mod);
@@ -2271,6 +2474,28 @@ bool BuildManager::testAndRunInternalCommand(const QString &cmd, const QFileInfo
 		return true;
 	}
 	return false;
+}
+/*!
+ * \brief call txs for internal commands
+ * Special variant to run commands asynchronously, this basically only affects conditionally recompile bibliography
+ * \param cmd
+ * \param mainFile
+ * \return
+ */
+bool BuildManager::testAndRunInternalCommandAsync(const QString &cmd, const QFileInfo &mainFile)
+{
+    int space = cmd.indexOf(' ');
+    QString cmdId, options;
+    if (space == -1 ) cmdId = cmd;
+    else {
+        cmdId = cmd.left(space);
+        options = cmd.mid(space + 1);
+    }
+    if (internalCommands.contains(cmdId)) {
+        emit runInternalCommandAsync(cmdId, mainFile, options);
+        return true;
+    }
+    return false;
 }
 
 QString BuildManager::findCompiledFile(const QString &compiledFilename, const QFileInfo &mainFile)

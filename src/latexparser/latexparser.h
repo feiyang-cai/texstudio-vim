@@ -2,10 +2,11 @@
 #define Header_Latex_Parser
 
 #include "commanddescription.h"
+class LatexDocument;
 
 
 /*!
- * \brief class for storing latex syntax informtion and latex parsing
+ * \brief class for storing latex syntax information and latex parsing
  *
  * The latex parsing is less important since the token based system, but the storage of syntax information is still used.
  */
@@ -32,7 +33,8 @@ public:
 	{
 		return MAX_STRUCTURE_LEVEL;
 	}
-    int structureCommandLevel(const QString &cmd) const;
+    int structureCommandLevel(const QString &cmd);
+    void cacheStructureCommand();
 
 	QSet<QString> environmentCommands; ///< used by LatexReader only, obsolete
 	QSet<QString> optionCommands; ///< used by LatexReader only, obsolete
@@ -46,13 +48,15 @@ public:
 	QMap<int, QString> mapSpecialArgs;
     enum ArgumentType { singleArgument, commaSeparated, multiElement };
     QMap<int, ArgumentType> mapSpecialArgumentTypes; ///< map special argument numbers to argument types
+    QList<LatexDocument*> projectDocuments; ///< list of documents in the project, used for all document related parsing, e.g. for finding labels, references, citations, etc.
+    QSet<QString> sectionCommands; ///< commands for section. Cached for quick access.
 
 	CommandDescriptionHash commandDefs; ///< command definitions
 
 	void append(const LatexParser &elem); ///< append values
-	void substract(const LatexParser &elem); ///< remove values
+    void subtract(const LatexParser &elem); ///< remove values
 	void clear(); ///< set to default values
-    void importCwlAliases(const QString filename); ///< import package aliases from disc
+    void importCwlAliases(const QString &filename); ///< import package aliases from disk
 };
 Q_DECLARE_METATYPE(LatexParser)
 

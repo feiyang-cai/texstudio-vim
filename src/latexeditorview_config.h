@@ -67,6 +67,8 @@ public:
 
 	bool fullCompilePreview;
 
+    bool useWin11Workaround=false; // on win11 style, qlinedit background does not change color, use text color instead
+
     QString regExpTodoComment;
 
 	void settingsChanged();

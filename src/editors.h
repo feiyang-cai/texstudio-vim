@@ -33,6 +33,7 @@ public:
 	void setCurrentEditor(LatexEditorView *edView, bool setFocus = true);
 
 	QList<LatexEditorView *> editors();
+    QList<LatexEditorView *> topEditors();
 	int tabGroupIndexFromEditor(LatexEditorView *edView) const;
 	void moveToTabGroup(LatexEditorView *edView, int groupIndex, int targetIndex);
     void moveAllToGroupZeroifEmpty();
@@ -41,6 +42,7 @@ public:
 
 signals:
 	void currentEditorChanged();
+    void visibleEditorsChanged(); /// notify that new/other editors are visible though not active
 	void editorAboutToChangeByTabClick(LatexEditorView *from, LatexEditorView *to);
 	void closeCurrentEditorRequested();
 	void listOfEditorsChanged();

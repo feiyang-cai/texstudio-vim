@@ -30,7 +30,7 @@ authors_dict = {author['key']: author for author in data["authors"]}
 # Create a dictionary for quick lookup of topics by ID
 topics_dict = {topic['key']: topic for topic in data["topics"]}
 
-# Create a dictionary for quick lookup of topics by ID
+# Create a dictionary for quick lookup of licenses by ID
 license_dict = {license['key']: license for license in data["licenses"]}
 
 # Process the packages data
@@ -55,7 +55,7 @@ for package in packages:
     if 'license' in package_data:
         licenses = package_data['license']
         if isinstance(licenses, list):
-            package_data['license'] = [license_dict[a] for a in licenses]
+            package_data['license'] = [license_dict.get(a,"") for a in licenses]
         else:
             if licenses in license_dict:
                 package_data['license'] = license_dict[licenses]

@@ -33,7 +33,7 @@ QStringList Version::parseGitData(const QString &data) {
 }
 
 QStringList Version::stringVersion2Parts(const QString &str) {
-    QRegularExpression rx("^((\\d+)(\\.\\d+)*)([a-zA-Z]+)?(\\d*)?(-(\\d+)-)?($|[^.])");	// version tag, ex: 4.3.0beta1, git revison, ex: 4.3.0beta1-24-g5c925a387
+    QRegularExpression rx("^(?:texstudio-vim-|upstream/)?((\\d+)(\\.\\d+)*)([a-zA-Z]+)?(\\d*)?(-(\\d+)-)?($|[^.])");	// version tag, ex: 4.3.0beta1, git revison, ex: 4.3.0beta1-24-g5c925a387
 
     QRegularExpressionMatch rxMatch = rx.match(str);
     if (rxMatch.hasMatch()) {

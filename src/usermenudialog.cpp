@@ -348,9 +348,9 @@ void UserMenuDialog::slotAdd()
     item->setToolTip(0,tr("Disable Shortcut and Trigger"));
     item->setText(0,"");
     Macro m;
-    m.setCheckState(Qt::Unchecked);
+    m.setCheckState(Qt::Checked);
     item->setData(0,Qt::UserRole,QVariant::fromValue(m));
-    item->setCheckState(0,Qt::Unchecked);
+    item->setCheckState(0,Qt::Checked);
     ui.treeWidget->addTopLevelItem(item);
     ui.treeWidget->setCurrentItem(item);
 }
@@ -450,10 +450,25 @@ void UserMenuDialog::slotMoveDown()
 void UserMenuDialog::importMacro()
 {
     QStringList fileNames = QFileDialog::getOpenFileNames(this,tr("Import macros"), "", tr("txs macro files (*.txsMacro)"));
+    bool singleFile = fileNames.size() == 1;
+    // check if last macro is empty
+    // remove if true
+    if(ui.treeWidget->topLevelItemCount()>0){
+        QTreeWidgetItem *lastItem=ui.treeWidget->topLevelItem(ui.treeWidget->topLevelItemCount()-1);
+        QVariant v=lastItem->data(0,Qt::UserRole);
+        if(v.isValid()){
+            Macro m=v.value<Macro>();
+            if(m.isEmpty()){
+                // remove last item
+                ui.treeWidget->takeTopLevelItem(ui.treeWidget->topLevelItemCount()-1);
+                delete lastItem;
+            }
+        }
+    }
     for(const QString &fileName:fileNames){
         Macro m;
         m.load(fileName);
-        addMacro(m,true);
+        addMacro(m,singleFile);
     }
 }
 

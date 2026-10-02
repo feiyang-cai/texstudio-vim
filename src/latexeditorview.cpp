@@ -508,7 +508,7 @@ bool LatexDefaultInputBinding::contextMenuEvent(QContextMenuEvent *event, QEdito
 				if (act->objectName().endsWith("removePreviewLatex")) {
                     // inline preview context menu supplies the calling point in doc coordinates as data
                     LatexEditorView::s_contextMenuRow = editor->document()->indexOf(editor->lineAtPosition(posInDocCoordinates));
-                    // slight performance penalty for use of lineNumber(), which is not stictly necessary because
+                    // slight performance penalty for use of lineNumber(), which is not strictly necessary because
                     // we convert it back to a QDocumentLine, but easier to handle together with the other cases
 					contextMenu->addAction(act);
 					removePreviewActionFound = true;
@@ -621,6 +621,8 @@ bool LatexDefaultInputBinding::contextMenuEvent(QContextMenuEvent *event, QEdito
                 fn=path+fn;
             }
 			QAction *act = new QAction(LatexEditorView::tr("Open %1").arg(tk.getText()), contextMenu);
+            // encode cursor position into filename/user data
+            fn=QString("%1##%2").arg(fn).arg(cursor.lineNumber());
             act->setData(fn);
 			edView->connect(act, SIGNAL(triggered()), edView, SLOT(openExternalFile()));
 			contextMenu->addAction(act);
@@ -630,6 +632,8 @@ bool LatexDefaultInputBinding::contextMenuEvent(QContextMenuEvent *event, QEdito
 			QAction *act = new QAction(LatexEditorView::tr("Open Bibliography"), contextMenu);
 			QString bibFile;
 			bibFile = tk.getText() + ".bib";
+            // encode cursor position into filename/user data
+            bibFile=QString("%1##%2").arg(bibFile).arg(cursor.lineNumber());
 			act->setData(bibFile);
 			edView->connect(act, SIGNAL(triggered()), edView, SLOT(openExternalFile()));
 			contextMenu->addAction(act);
@@ -672,7 +676,25 @@ bool LatexDefaultInputBinding::contextMenuEvent(QContextMenuEvent *event, QEdito
 				contextMenu->addAction(act);
 			}
 		}
-        if (/* tk.type==Tokens::bibRef || TODO: bibliography references not yet handled by token system */tk.type >= Token::specialArg || tk.type == Token::labelRef) {
+        if (tk.type == Token::label || tk.type == Token::labelRef) {
+            // check if one or more definition exist and adapt menu text accordingly
+            int cnt = edView->document->countLabels(tk.getText());
+            if(cnt==1 && tk.type==Token::labelRef){
+                QAction *act = new QAction(LatexEditorView::tr("Go to Definition"), contextMenu);
+                act->setData(QVariant().fromValue<QDocumentCursor>(cursor));
+                edView->connect(act, SIGNAL(triggered()), edView, SLOT(emitGotoDefinitionFromAction()));
+                contextMenu->addAction(act);
+            }
+            if(cnt>1){
+                QAction *act = new QAction(LatexEditorView::tr("Find Definitions"), contextMenu);
+                act->setData(tk.getText());
+                act->setProperty("doc", QVariant::fromValue<LatexDocument *>(edView->document));
+                act->setProperty("definitionOnly", true);
+                edView->connect(act, SIGNAL(triggered()), edView, SLOT(emitFindLabelUsagesFromAction()));
+                contextMenu->addAction(act);
+            }
+        }
+        if (/* tk.type==Tokens::bibRef || TODO: bibliography references not yet handled by token system */tk.type >= Token::specialArg) {
 			QAction *act = new QAction(LatexEditorView::tr("Go to Definition"), contextMenu);
 			act->setData(QVariant().fromValue<QDocumentCursor>(cursor));
 			edView->connect(act, SIGNAL(triggered()), edView, SLOT(emitGotoDefinitionFromAction()));
@@ -682,11 +704,12 @@ bool LatexDefaultInputBinding::contextMenuEvent(QContextMenuEvent *event, QEdito
 			QAction *act = new QAction(LatexEditorView::tr("Find Usages"), contextMenu);
 			act->setData(tk.getText());
 			act->setProperty("doc", QVariant::fromValue<LatexDocument *>(edView->document));
+            act->setProperty("definitionOnly", false);
 			edView->connect(act, SIGNAL(triggered()), edView, SLOT(emitFindLabelUsagesFromAction()));
 			contextMenu->addAction(act);
 		}
         if (tk.type >= Token::specialArg) {
-            // finnd usage
+            // find usage
             QAction *act = new QAction(LatexEditorView::tr("Find Usages"), contextMenu);
             act->setData(tk.getText());
             act->setProperty("doc", QVariant::fromValue<LatexDocument *>(edView->document));
@@ -3990,7 +4013,7 @@ void LatexEditorView::updatePackageFormats()
         QList<QFormatRange> li = dlh->getOverlays(-1);
         QString curLineText = dlh->text();
         TokenList tl = dlh->getCookieLocked(QDocumentLine::LEXER_COOKIE).value<TokenList>();
-        for (const Token &tk : tl) {
+        foreach (const Token &tk , tl) {
             if(tk.type != Token::package && tk.type!=Token::beamertheme && tk.type!=Token::documentclass) continue;
             QString preambel;
             if (tk.type == Token::beamertheme) { // special treatment for  \usetheme
@@ -4151,6 +4174,7 @@ void LatexEditorView::updateSettings()
 	editor->setDisplayModifyTime(false);
 	searchReplacePanel->setUseLineForSearch(config->useLineForSearch);
 	searchReplacePanel->setSearchOnlyInSelection(config->searchOnlyInSelection);
+    searchReplacePanel->activateWin11Workaround(config->useWin11Workaround);
     QDocument::WhiteSpaceMode wsMode=config->showWhitespace ? (QDocument::ShowTrailing | QDocument::ShowLeading | QDocument::ShowTabs) : QDocument::ShowNone;
     if(config->showIndentGuides){
         wsMode = wsMode | QDocument::ShowIndentGuides;
@@ -4254,13 +4278,25 @@ void LatexEditorView::requestCitation()
 void LatexEditorView::openExternalFile()
 {
 	QAction *act = qobject_cast<QAction *>(sender());
-	QString name = act->data().toString();
+    QString userData = act->data().toString();
+    // split filename and line number at "##"
+    QStringList parts=userData.split("##");
+    QString name = act->data().toString();
+    int line=-1;
+    if(parts.size()==2){
+        name=parts[0];
+        bool ok;
+        line=parts[1].toInt(&ok);
+        if(!ok){
+            line=-1;
+        }
+    }
     name.replace("\\string~",QDir::homePath());
     if(document->getStateImportedFile()){
         name+="#";
     }
 	if (!name.isEmpty())
-		emit openFile(name);
+        emit openFile(name,line);
 }
 
 void LatexEditorView::openPackageDocumentation(QString package)
@@ -4322,7 +4358,8 @@ void LatexEditorView::emitFindLabelUsagesFromAction()
 	if (!action) return;
 	QString labelText = action->data().toString();
 	LatexDocument *doc = action->property("doc").value<LatexDocument *>();
-	emit findLabelUsages(doc, labelText);
+    bool definitionOnly=action->property("definitionOnly").toBool();
+    emit findLabelUsages(doc, labelText,definitionOnly);
 }
 
 void LatexEditorView::emitFindSpecialUsagesFromAction()
@@ -4455,8 +4492,9 @@ void LatexEditorView::mayNeedToOpenCompleter(bool fromSingleChar)
     if(fromSingleChar){
         lst << Token::labelRef;
     }
-	if (lst.contains(type))
+    if (lst.contains(type) || type>=Token::specialArg){
 		emit openCompleter();
+    }
     if (ts.isEmpty() || fromSingleChar)
 		return;
 	ts.pop();
@@ -4471,6 +4509,10 @@ void LatexEditorView::mayNeedToOpenCompleter(bool fromSingleChar)
 void LatexEditorView::documentContentChanged(int linenr, int count)
 {
 	Q_ASSERT(editor);
+    // skip if not visible
+    if(!document->syntaxCheckerRunning()){
+        return;
+    }
 	QDocumentLine startline = editor->document()->line(linenr);
 	if ((linenr >= 0 || count < editor->document()->lines()) && editor->cursor().isValid() &&
 	        !editor->cursor().atLineStart() && editor->cursor().line().text().trimmed().length() > 0 &&
@@ -4630,11 +4672,6 @@ void LatexEditorView::documentContentChanged(int linenr, int count)
 				if (tk.type == Token::label && config->inlineReferenceChecking) {
 					QDocumentLineHandle *dlh = tk.dlh;
 					QString ref = dlh->text().mid(tk.start, tk.length);
-					int cnt = document->countLabels(ref);
-					if (cnt > 1) {
-						dlh->addOverlay(QFormatRange(tk.start, tk.length, referenceMultipleFormat));
-					} else dlh->addOverlay(QFormatRange(tk.start, tk.length, referencePresentFormat));
-                    // look for corresponding references and adapt format respectively
                     document->updateRefsLabels(ref);
 					addedOverlayReference = true;
 				}
@@ -4696,7 +4733,7 @@ void LatexEditorView::checkGrammar(int linenr, int count)
         if (lookBehind > 0) lookBehind--;
         if (lookBehind > linenr) lookBehind = linenr;
 
-        changedLines.reserve(linenr + count + lookBehind + 1);
+        //changedLines.reserve(linenr + count + lookBehind + 1);
 
         int truefirst = linenr - lookBehind;
         for (int i = linenr - lookBehind; i < editor->document()->lineCount(); i++) {
@@ -5081,17 +5118,25 @@ void LatexEditorView::mouseHovered(QPoint pos)
 				QMultiHash<QDocumentLineHandle *, int> result = document->getLabels(value);
                 if(!result.isEmpty()){
                     QDocumentLineHandle *mLine = result.keys().constFirst();
-                    int l = mLine->document()->indexOf(mLine);
-                    LatexDocument *doc = qobject_cast<LatexDocument *> (editor->document());
-                    if (mLine->document() != editor->document()) {
-                        doc = document->parent->findDocument(mLine->document());
-                        if (doc) mText = tr("<p style='white-space:pre'><b>Filename: %1</b>\n").arg(doc->getFileName());
+                    if(mLine){
+                        int l = mLine->document()->indexOf(mLine);
+                        LatexDocument *doc = qobject_cast<LatexDocument *> (editor->document());
+                        if (mLine->document() != editor->document()) {
+                            doc = document->parent->findDocument(mLine->document());
+                            if (doc) mText = tr("<p style='white-space:pre'><b>Filename: %1</b>\n").arg(doc->getFileName());
+                        }
+                        if (doc)
+                            mText += doc->exportAsHtml(doc->cursor(qMax(0, l - 2), 0, l + 2), true, true, 60);
+                    }else{
+                        // cached document, just show fileName
+                        LatexDocument *targetDoc=document->getDocumentForLabel(value);
+                        if(targetDoc){
+                            mText = tr("<p style='white-space:pre'><b>Filename: %1</b>\n<i>not loaded</i>").arg(targetDoc->getFileName());
+                        }
                     }
-                    if (doc)
-                        mText += doc->exportAsHtml(doc->cursor(qMax(0, l - 2), 0, l + 2), true, true, 60);
                 }
 			}
-			QToolTip::showText(editor->mapToGlobal(editor->mapFromFrame(pos)), mText);
+            QToolTip::showText(editor->mapToGlobal(editor->mapFromFrame(pos)), mText,this);
 		}
 		if (tk.type == Token::label) {
 			handled = true;
@@ -5978,59 +6023,65 @@ void LatexEditorViewConfig::settingsChanged()
 	if (lastFontFamily == fontFamily && lastFontSize == fontSize) return;
 
 	QFont f(fontFamily, fontSize);
-#if (QT_VERSION>=QT_VERSION_CHECK(6,0,0))
+/*#if (QT_VERSION>=QT_VERSION_CHECK(6,0,0))
     f.setStyleHint(QFont::Courier);
 #else
 	f.setStyleHint(QFont::Courier, QFont::ForceIntegerMetrics);
-#endif
+#endif*/
 
 	f.setKerning(false);
 
-    QList<QFontMetrics> fms; // QFontMetric should be okay as it is just used to check for monospace font.
+    QList<QFontMetricsF> fms; // QFontMetric should be okay as it is just used to check for monospace font.
 	for (int b = 0; b < 2; b++) for (int i = 0; i < 2; i++) {
 			QFont ft(f);
 			ft.setBold(b);
 			ft.setItalic(i);
-            fms << QFontMetrics(ft);
+            fms << QFontMetricsF(ft);
 		}
 
 	bool lettersHaveDifferentWidth = false, sameLettersHaveDifferentWidth = false;
-	int letterWidth = UtilsUi::getFmWidth(fms.first(), 'a');
+    qreal letterWidth = UtilsUi::getFmWidth(fms.first(), 'a');
 
 	const QString lettersToCheck("abcdefghijklmnoqrstuvwxyzABCDEFHIJKLMNOQRSTUVWXYZ_+ 123/()=.,;#");
-	QVector<QMap<QChar, int> > widths;
+    QVector<QMap<QChar, qreal> > widths;
 	widths.resize(fms.size());
 
 	foreach (const QChar &c, lettersToCheck) {
 		for (int fmi = 0; fmi < fms.size(); fmi++) {
-			const QFontMetrics &fm = fms[fmi];
-			int currentWidth = UtilsUi::getFmWidth(fm, c);
+            const QFontMetricsF &fm = fms[fmi];
+            qreal currentWidth = UtilsUi::getFmWidth(fm, c);
 			widths[fmi].insert(c, currentWidth);
 			if (currentWidth != letterWidth) lettersHaveDifferentWidth = true;
 			QString testString;
 			for (int i = 1; i < 10; i++) {
 				testString += c;
-				int stringWidth = UtilsUi::getFmWidth(fm, testString);
-				if (stringWidth % i != 0) sameLettersHaveDifferentWidth = true;
-				if (currentWidth != stringWidth / i) sameLettersHaveDifferentWidth = true;
+                qreal stringWidth = UtilsUi::getFmWidth(fm, testString);
+                if (qAbs(currentWidth * i - stringWidth)>0.01){
+                    sameLettersHaveDifferentWidth = true;
+                }
 			}
-			if (lettersHaveDifferentWidth && sameLettersHaveDifferentWidth) break;
+            if (lettersHaveDifferentWidth && sameLettersHaveDifferentWidth) break;
 		}
 		if (lettersHaveDifferentWidth && sameLettersHaveDifferentWidth) break;
 	}
 	const QString ligatures[2] = {"aftt", "afit"};
 	for (int l = 0; l < 2 && !sameLettersHaveDifferentWidth; l++) {
 		for (int fmi = 0; fmi < fms.size(); fmi++) {
-			int expectedWidth = 0;
+            qreal expectedWidth = 0;
 			for (int i = 0; i < ligatures[l].size() && !sameLettersHaveDifferentWidth; i++) {
 				expectedWidth += widths[fmi].value(ligatures[l][i]);
-				if (expectedWidth != UtilsUi::getFmWidth(fms[fmi], ligatures[l].left(i + 1))) sameLettersHaveDifferentWidth = true;
+                if (qAbs(expectedWidth - UtilsUi::getFmWidth(fms[fmi], ligatures[l].left(i + 1)))>0.01){
+                    sameLettersHaveDifferentWidth = true;
+                }
 			}
 		}
 	}
 
-	if (!QFontInfo(f).fixedPitch()) hackDisableFixedPitch = false; //won't be enabled anyways
-	else hackDisableFixedPitch = lettersHaveDifferentWidth || sameLettersHaveDifferentWidth;
+    if (!QFontInfo(f).fixedPitch()){
+        hackDisableFixedPitch = false; //won't be enabled anyways
+    } else {
+        hackDisableFixedPitch = lettersHaveDifferentWidth || sameLettersHaveDifferentWidth;
+    }
 	hackDisableWidthCache = sameLettersHaveDifferentWidth;
 
 #if defined( Q_OS_LINUX ) || defined( Q_OS_WIN )

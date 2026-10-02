@@ -141,8 +141,9 @@ void SyntaxCheck::run()
 
 		StackEnvironment activeEnv = newLine.prevEnv;
 		Ranges newRanges;
+        QVector<QParenthesis> m_parens;
 
-        checkLine(line, newRanges, activeEnv, newLine.dlh, tl, newLine.stack, newLine.ticket,commentStart.first);
+        checkLine(line, newRanges, activeEnv, newLine.dlh, tl, newLine.stack, newLine.ticket,commentStart.first,m_parens);
 		// place results
         if (newLine.clearOverlay){
             QList<int> fmtList={syntaxErrorFormat,SpellerUtility::spellcheckErrorFormat};
@@ -178,6 +179,36 @@ void SyntaxCheck::run()
             // add comment hightlight if present
             if(commentStart.first>=0){
                 newLine.dlh->addOverlayNoLock(QFormatRange(commentStart.first, newLine.dlh->length()-commentStart.first, mFormatList["comment"]));
+            }
+            // update parenthesis
+            if(!m_parens.isEmpty()){
+                // merge original parenthesis vector with new additions
+                // skip duplicates
+                QVector<QParenthesis> original_parens=newLine.dlh->parenthesisNoLock();
+                // remove id 61 as it was added by syntaxcheck earlier
+                for(int i=0;i<original_parens.size();++i){
+                    if(original_parens[i].id==61){
+                        // remove
+                        original_parens.remove(i);
+                        --i;
+                    }
+                }
+                QVector<QParenthesis> result;
+                int i=0;
+                for(int j=0;j<m_parens.length();++j){
+                    while(i<original_parens.size() && original_parens[i].offset<m_parens[j].offset){
+                        result<<original_parens[i];
+                        ++i;
+                    }
+                    if(i<original_parens.size() && m_parens[j].offset==original_parens[i].offset){
+                        ++i;
+                    }
+                    result<<m_parens[j];
+                }
+                for(;i<original_parens.size();++i){
+                    result<<original_parens[i];
+                }
+                newLine.dlh->setParenthesisNoLock(result);
             }
 			// active envs
 			QVariant oldEnvVar = newLine.dlh->getCookie(QDocumentLine::STACK_ENVIRONMENT_COOKIE);
@@ -231,7 +262,8 @@ QString SyntaxCheck::getErrorAt(QDocumentLineHandle *dlh, int pos, StackEnvironm
 	TokenList tl = dlh->getCookieLocked(QDocumentLine::LEXER_COOKIE).value<TokenList>();
     QPair<int,int> commentStart = dlh->getCookieLocked(QDocumentLine::LEXER_COMMENTSTART_COOKIE).value<QPair<int,int> >();
 	Ranges newRanges;
-    checkLine(line, newRanges, activeEnv, dlh, tl, stack, dlh->getCurrentTicket(),commentStart.first);
+    QVector<QParenthesis> m_parens;
+    checkLine(line, newRanges, activeEnv, dlh, tl, stack, dlh->getCurrentTicket(),commentStart.first,m_parens);
 	// add Error for unclosed env
 	QVariant var = dlh->getCookieLocked(QDocumentLine::UNCLOSED_ENVIRONMENT_COOKIE);
 	if (var.isValid()) {
@@ -250,13 +282,11 @@ QString SyntaxCheck::getErrorAt(QDocumentLineHandle *dlh, int pos, StackEnvironm
 	// find Error at Position
 	ErrorType result = ERR_none;
 	foreach (const Error &elem, newRanges) {
+        if (elem.type == ERR_highlight) continue;
 		if (elem.range.second + elem.range.first < pos) continue;
 		if (elem.range.first > pos) break;
 		result = elem.type;
 	}
-    if(result==ERR_highlight){
-        result=ERR_none; // filter out accidental highlight detection (test only)
-    }
 	// now generate Error message
 
 	QStringList messages;  // indices have to match ErrorType
@@ -276,6 +306,7 @@ QString SyntaxCheck::getErrorAt(QDocumentLineHandle *dlh, int pos, StackEnvironm
 			<< tr("unrecognized key in key option")
 			<< tr("unrecognized value in key option")
             << tr("command outside suitable env")
+            << tr("semicolon in previous tikz command missing")
             << tr("spelling")
             << "highlight"; // mock message for arbitrary highlight. Will not be shown.
 	Q_ASSERT(messages.length() == ERR_MAX);
@@ -618,7 +649,7 @@ bool SyntaxCheck::stackContainsDefinition(const TokenStack &stack) const
 * \param stack token stack at start of line
 * \param ticket ticket number for current processed line
 */
-void SyntaxCheck::checkLine(const QString &line, Ranges &newRanges, StackEnvironment &activeEnv, QDocumentLineHandle *dlh, TokenList &tl, TokenStack stack, int ticket,int commentStart)
+void SyntaxCheck::checkLine(const QString &line, Ranges &newRanges, StackEnvironment &activeEnv, QDocumentLineHandle *dlh, TokenList &tl, TokenStack stack, int ticket, int commentStart, QVector<QParenthesis> &m_parens)
 {
 	// do syntax check on that line
     //int cols = containsEnv(*ltxCommands, "tabular", activeEnv);
@@ -637,7 +668,7 @@ void SyntaxCheck::checkLine(const QString &line, Ranges &newRanges, StackEnviron
             */
         }
     }
-    QVector<QParenthesis> m_parens;
+
     // check command-words
 	for (int i = 0; i < tl.length(); i++) {
         Token &tk = tl[i];
@@ -749,11 +780,26 @@ void SyntaxCheck::checkLine(const QString &line, Ranges &newRanges, StackEnviron
 			QStringList forbiddenSymbols;
 			forbiddenSymbols<<"^"<<"_";
             if(forbiddenSymbols.contains(word) && !checkMathEnvActive(activeEnv) && tk.subtype!=Token::formula){
+                // also skip for specialArg defined
+                if(tk.subtype >= Token::specialArg){
+                    QString special = ltxCommands->mapSpecialArgs.value(int(tk.subtype - Token::specialArg));
+                    if (ltxCommands->possibleCommands[special].contains(word)) {
+                        continue; // skip check for special args which are not defined as math commands
+                    }
+                }
 				Error elem;
 				elem.range = QPair<int, int>(tk.start, tk.length);
 				elem.type = ERR_MathCommandOutsideMath;
 				newRanges.append(elem);
 			}
+            // closing semicolon for tikz nodes
+            if(word==";" && topEnv("%node", activeEnv)>0){
+                // check if there is a node command in the line
+                if(topEnv("%node",activeEnv)>0 && activeEnv.top().level==tk.level){
+                    activeEnv.pop(); // remove node env from stack
+                }
+            }
+
 		}
         // rainbow delimiter
         if(mShowRainbowDelimiter && tk.type==Token::braces){
@@ -1134,7 +1180,6 @@ void SyntaxCheck::checkLine(const QString &line, Ranges &newRanges, StackEnviron
 			activeEnv.push(tp);
 		}
 
-
         if (tk.type == Token::command) {
             QString word = line.mid(tk.start, tk.length);
             if (word.contains('@')) {
@@ -1146,12 +1191,22 @@ void SyntaxCheck::checkLine(const QString &line, Ranges &newRanges, StackEnviron
 			Token tkEnvName;
 
 			if (word == "\\begin" || word == "\\end") {
+                // special treatment for tikz node check, missing colon
+                if(word=="\\end"&& topEnv("%node",activeEnv)>0){
+                    Error elem;
+                    elem.type = ERR_semicolonMissing;
+                    elem.range = QPair<int, int>(tk.start, tk.length);
+                    newRanges.append(elem);
+                    activeEnv.pop();
+                }
 				// check complete expression e.g. \begin{something}
 				if (tl.length() > i + 1 && tl.at(i + 1).type == Token::braces) {
 					tkEnvName = tl.at(i + 1);
 					word = word + line.mid(tkEnvName.start, tkEnvName.length);
 				}
+
 			}
+
             // special treatment for \ExplSyntaxOn, \ExplSyntaxOff
             // \ProvidesExplPackage, \ProvidesExplClass and \ProvidesExplFile
             // activate latex3 mode which ignores _ in commandnames
@@ -1334,6 +1389,26 @@ void SyntaxCheck::checkLine(const QString &line, Ranges &newRanges, StackEnviron
                 }
                 continue;
             }
+            // special treatment for tikz nodes, to check for ending semicolon
+            if(ltxCommands->possibleCommands["%semicolonEnd"].contains(word)){
+                if(topEnv("%node",activeEnv)>0 && tk.level == activeEnv.top().level){
+                    Error elem;
+                    elem.type = ERR_semicolonMissing;
+                    elem.range = QPair<int, int>(tk.start, tk.length);
+                    newRanges.append(elem);
+                    activeEnv.pop();
+                }
+                Environment env;
+                env.name = "%node";
+                env.id = 1; // to be changed
+                env.dlh = dlh;
+                env.ticket = ticket;
+                env.level = tk.level;
+                env.startingColumn=tk.start+tk.length;
+                activeEnv.push(env);
+                continue;
+            }
+
 			if (!checkCommand(word, activeEnv)) {
 				Error elem;
 				if (tkEnvName.type == Token::braces) {
@@ -1557,35 +1632,7 @@ void SyntaxCheck::checkLine(const QString &line, Ranges &newRanges, StackEnviron
 			}
 		}
 	}
-    if(!m_parens.isEmpty()){
-        // merge original parenthesis vector with new additions
-        // skip duplicates
-        QVector<QParenthesis> original_parens=dlh->parenthesis();
-        // remove id 61 as it was added by syntaxcheck earlier
-        for(int i=0;i<original_parens.size();++i){
-            if(original_parens[i].id==61){
-                // remove
-                original_parens.remove(i);
-                --i;
-            }
-        }
-        QVector<QParenthesis> result;
-        int i=0;
-        for(int j=0;j<m_parens.length();++j){
-            while(i<original_parens.size() && original_parens[i].offset<m_parens[j].offset){
-                result<<original_parens[i];
-                ++i;
-            }
-            if(i<original_parens.size() && m_parens[j].offset==original_parens[i].offset){
-                ++i;
-            }
-            result<<m_parens[j];
-        }
-        for(;i<original_parens.size();++i){
-            result<<original_parens[i];
-        }
-        dlh->setParenthesis(result);
-    }
+
     if(!activeEnv.isEmpty()){
         //check active env for env highlighting (math,verbatim)
         QStack<Environment>::Iterator it=activeEnv.begin();

@@ -1,5 +1,5 @@
 # lete-sans-math package
-# Matthew Bertucci 2025/08/31 for v0.50
+# Matthew Bertucci 2026/08/24 for v0.62
 
 #include:iftex
 #include:unicode-math
@@ -44,23 +44,29 @@ Scale=%<factor%>
 \gggtr#m
 \gtreqqslantless#m
 \gtreqslantless#m
+\gtrsimslant#*m
 \gvertneqq#m
+\lateslant#*m
 \leadsto#m
 \lesseqqslantgtr#m
 \lesseqslantgtr#m
+\lesssimslant#*m
 \lhd#m
 \llless#m
 \lozenge#m
 \lvertneqq#m
-\mbfdotlessi#m
-\mbfdotlessj#m
-\mbfimath#m
-\mbfjmath#m
-\mithbar#m
-\mupvarg#m
-\mbfvarg#m
-\mitvarg#m
-\mbfitvarg#m
+\mbfdotlessi#*m
+\mbfdotlessj#*m
+\mbfimath#*m
+\mbfitvarg#*m
+\mbfjmath#*m
+\mbfscrl#*m
+\mbfvarg#*m
+\mithbar#*m
+\mitvarg#*m
+\mitvarl#*m
+\mupvarg#*m
+\mupvarzero#*m
 \ngeqq#m
 \ngeqqslant#m
 \ngeqslant#m
@@ -83,8 +89,11 @@ Scale=%<factor%>
 \shortmid#m
 \shortparallel#m
 \shortparallelslant#m
+\simslantgtr#*m
+\simslantless#*m
 \smallfrown#m
 \smallsmile#m
+\smteslant#*m
 \square#m
 \thickapprox#m
 \thicksim#m
@@ -96,6 +105,32 @@ Scale=%<factor%>
 \varsubsetneqq#m
 \varsupsetneq#m
 \varsupsetneqq#m
+\vertnasymp#*m
+\vertncong#*m
+\vertne#*m
+\vertnequiv#*m
+\vertngeq#*m
+\vertngtr#*m
+\vertngtrless#*m
+\vertngtrsim#*m
+\vertnleq#*m
+\vertnless#*m
+\vertnlessgtr#*m
+\vertnlesssim#*m
+\vertnni#*m
+\vertnotin#*m
+\vertnprec #*m
+\vertnpreccurlyeq#*m
+\vertnsim#*m
+\vertnsimeq#*m
+\vertnsubset#*m
+\vertnsubseteq#*m
+\vertnsucc#*m
+\vertnsucccurlyeq#*m
+\vertnsupset#*m
+\vertnsupseteq#*m
+\vertntrianglelefteq#*m
+\vertntrianglerighteq#*m
 
 # symbols provided besides default (see unicode-math.cwl)
 \acwcirclearrow#m
@@ -484,6 +519,7 @@ Scale=%<factor%>
 \modtwosum#m
 \mscre#*m
 \mscrg#*m
+\mscrl#*m
 \mscro#*m
 \neovnwarrow#m
 \neovsearrow#m

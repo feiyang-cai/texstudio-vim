@@ -20,9 +20,9 @@ sed -i -e'/export PYTH/d' appdir/AppRun # workaroun python issue #4061
 # ./linuxdeployqt-continuous-x86_64.AppImage appdir/usr/share/applications/*.desktop -bundle-non-qt-libs -extra-plugins=iconengines/libqsvgicon.so -appimage
 # ./linuxdeployqt-continuous-x86_64.AppImage appdir/usr/share/applications/*.desktop -appimage
 ./appimagetool-*.AppImage ./appdir # create actual appimage
-cp TeXstudio-${VERSION}-x86_64.AppImage ../texstudio-${VERSION}-x86_64.AppImage
-cp TeXstudio-${VERSION}-x86_64.AppImage ../texstudio-${GIT_VERSION}-x86_64.AppImage
+cp TeXstudio-${VERSION}-x86_64.AppImage ../texstudio-vim-${VERSION}-x86_64.AppImage
+cp TeXstudio-${VERSION}-x86_64.AppImage ../texstudio-vim-${GIT_VERSION}-x86_64.AppImage
 sha256sum appdir/usr/bin/texstudio 
-sha256sum ../texstudio-${VERSION}-x86_64.AppImage 
+sha256sum ../texstudio-vim-${VERSION}-x86_64.AppImage 
 
 

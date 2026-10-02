@@ -1,5 +1,5 @@
 # l3draw package
-# Matthew Bertucci 2025/06/30
+# Matthew Bertucci 2026-06-02
 
 \draw_set_baseline:n {%<⟨length⟩%>}#/%expl3
 \draw_begin:#/%expl3
@@ -18,13 +18,12 @@
 \draw_set_join_round:#/%expl3
 \draw_layer_begin:n {%<⟨layer⟩%>}#/%expl3
 \draw_layer_end:#/%expl3
-\draw_layer_new:n {%<⟨layer⟩%>}#/%expl3
 \draw_set_linewidth:n {%<⟨width⟩%>}#/%expl3
 \draw_set_miterlimit:n {%<⟨factor⟩%>}#/%expl3
 \draw_set_nonzero_rule:#/%expl3
-\draw_path_arc:nnn {%<⟨angle1⟩%>} {%<⟨angle2⟩%>} {%<⟨radius⟩%>}#/%expl3
-\draw_path_arc:nnnn {%<⟨angle1⟩%>} {%<⟨angle2⟩%>} {%<⟨radius-a⟩%>} {%<⟨radius-b⟩%>}#/%expl3
-\draw_path_arc_axes:nnn {%<⟨angle1⟩%>} {%<⟨angle2⟩%>} {%<⟨vector1⟩%>} {%<⟨vector2⟩%>}#/%expl3
+\draw_path_arc:nnn {%<⟨radius⟩%>} {%<⟨angle1⟩%>} {%<⟨angle2⟩%>}#/%expl3
+\draw_path_arc:nnnn {%<⟨radius-a⟩%>} {%<⟨radius-b⟩%>} {%<⟨angle1⟩%>} {%<⟨angle2⟩%>}#/%expl3
+\draw_path_arc_axes:nnn {%<⟨vector1⟩%>} {%<⟨vector2⟩%>} {%<⟨angle1⟩%>} {%<⟨angle2⟩%>}#/%expl3
 \draw_path_canvas_curveto:nnn {%<⟨control1⟩%>} {%<⟨control2⟩%>} {%<⟨end⟩%>}#/%expl3
 \draw_path_canvas_lineto:n {%<⟨canvas point⟩%>}#/%expl3
 \draw_path_canvas_moveto:n {%<⟨canvas point⟩%>}#/%expl3
@@ -35,6 +34,8 @@
 \draw_path_curveto:nnn {%<⟨control1⟩%>} {%<⟨control2⟩%>} {%<⟨end⟩%>}#/%expl3
 \draw_path_ellipse:nnn {%<⟨center⟩%>} {%<⟨vector1⟩%>} {%<⟨vector2⟩%>}#/%expl3
 \draw_path_grid:nnnn {%<⟨xstep⟩%>} {%<⟨ystep⟩%>} {%<⟨lower-left⟩%>} {%<⟨upper-right⟩%>}#/%expl3
+\draw_path_lastx:#/%expl3
+\draw_path_lasty:#/%expl3
 \draw_path_lineto:n {%<⟨point⟩%>}#/%expl3
 \draw_path_moveto:n {%<⟨point⟩%>}#/%expl3
 \draw_path_rectangle:nn {%<⟨lower-left⟩%>} {%<⟨displacement⟩%>}#/%expl3
@@ -43,7 +44,10 @@
 \draw_path_scope_begin:#/%expl3
 \draw_path_scope_end:#/%expl3
 \draw_path_use:n {%<⟨action(s)⟩%>}#/%expl3
-\draw_point_interpolate_curve:nnnnnn {%<⟨part⟩%>} {%<⟨start⟩%>} {%<⟨control1⟩%>} {%<⟨control2⟩%>} {%<⟨end⟩%>}#/%expl3
+\draw_point:n {%<⟨point⟩%>}#/%expl3
+\draw_point_interpolate_arc_axes:nnnnnn {%<⟨part⟩%>} {%<⟨center⟩%>} {%<⟨axis1⟩%>} {%<⟨axis2⟩%>} {%<⟨start⟩%>} {%<⟨end⟩%>}#/%expl3
+\draw_point_interpolate_curve:nnnn {%<⟨part⟩%>} {%<⟨start⟩%>} {%<⟨control⟩%>} {%<⟨end⟩%>}#/%expl3
+\draw_point_interpolate_curve:nnnnn {%<⟨part⟩%>} {%<⟨start⟩%>} {%<⟨control1⟩%>} {%<⟨control2⟩%>} {%<⟨end⟩%>}#/%expl3
 \draw_point_interpolate_distance:nnn {%<⟨distance⟩%>} {%<⟨point expr1⟩%>} {%<⟨point expr2⟩%>}#/%expl3
 \draw_point_interpolate_line:nnn {%<⟨part⟩%>} {%<⟨point1⟩%>} {%<⟨point2⟩%>}#/%expl3
 \draw_point_intersect_circles:nnnnn {%<⟨center1⟩%>} {%<⟨radius1⟩%>} {%<⟨center2⟩%>} {%<⟨radius2⟩%>} {%<⟨root⟩%>}#/%expl3

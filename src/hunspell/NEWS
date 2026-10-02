@@ -1,3 +1,50 @@
+2026-05-04: Hunspell 1.7.3 release:
+  - Fix stack-buffer-overflow in Hunzip::getline (reported and fixed
+    by MarkLee131)
+  - Fix stack overflow in compound_check on Hungarian dictionaries
+    under certain conditions (reported by Anthropic via Ada Logics)
+  - Fix UB when SFX condition starts with '^' (#1095)
+  - Bounds-check continuation bytes in u8_u16 (#1110)
+  - oss-fuzz timeout/OOM hardenings
+  - Fix #715 CHECKCOMPOUNDCASE considers digits uppercase
+  - Fix #748 hzip: cannot write file
+  - Fix #1024 std::string bounds check
+  - Fix #1044 tools/analyze crash
+  - Fix #1076 flags 65520/65521 wrongly rejected
+  - Fix #1058 don't suggest the input word as its own correction
+  - Fix #1002 exact word marked as a near miss
+  - Fix tdf#125600 dotted-I regression
+  - Partial Unicode table refresh for Mc combining marks (#1057)
+  - Add Hunspell_add_with_flags / Hunspell::add_with_flags
+  - New SPELL_BEST_SUG flag, MAXBREAKDEPTH limit
+  - Replace clock() with std::chrono for suggestion time limits (#716)
+  - Improve exception safety (#587)
+  - Document analyze/stem/generate requirements (#554)
+  - Report iconv direction on private dic load failures (#619)
+  - Show dic load errors unconditionally (#1012)
+  - Rename es_EU to eu (#1113)
+  - Build fixes: out-of-tree, Windows ARM64, MSVC hzip tmpfile (#919),
+    --disable-shared with mingw32 (#698), iconv on msys2 (#723),
+    ncurses with separate tinfo
+  - New fuzzers: hzfuzzer, persdicfuzzer, parserfuzzer, affdicfuzzer
+  - Coverity-flagged fixes
+  - Merge in weblate translations
+
+2022-12-29: Hunspell 1.7.2 release:
+  - #517 add SPELL_COMPOUND bit to BREAK-based compounding
+  - tdf#136306 don't accept/suggest typos as 3-or-more-word compound words
+  - Fix regression in CHECKCOMPOUNDREP
+  - Add suffix_suggest to the C API
+  - Code modernization (std::string, std::vector, new/delete)
+  - #838 update copyright shown in UI
+  - Merge in weblate translations
+
+2022-08-22: Hunspell 1.7.1 release:
+  - Merge chromium fix for #714 OOB string write in hunspell
+  - Merge firefox fix for #756 various issues parsing incomplete aff files
+  - Fix #492 crash with hunspell -l -r
+  - Merge in weblate translations
+
 2018-11-12: Hunspell 1.7.0 release:
 
   New features and bug fixes by László Németh, supported by FSF.hu Foundation:

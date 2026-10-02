@@ -60,6 +60,12 @@ Main features of Hunspell command line tool, developed by László Németh:
 
 See man hunspell, man 3 hunspell, man 5 hunspell for complete manual.
 
+Translations: Hunspell has been translated into several languages already. If your language is missing or incomplete, please use [Weblate](https://hosted.weblate.org/engage/hunspell/) to help translate Hunspell.
+
+<a href="https://hosted.weblate.org/engage/hunspell/">
+<img src="https://hosted.weblate.org/widgets/hunspell/-/translations/horizontal-auto.svg" alt="Stanje prijevoda" />
+</a>
+
 # Dependencies
 
 Build only dependencies:
@@ -91,11 +97,15 @@ Then run the following commands:
     sudo make install
     sudo ldconfig
 
+For a non-root install, use `DESTDIR` so libtool skips `ldconfig`:
+
+    make install DESTDIR="$HOME/hunspell-root"
+
 For dictionary development, use the `--with-warnings` option of
 configure.
 
 For interactive user interface of Hunspell executable, use the
-`--with-ui option`.
+`--with-ui` option.
 
 Optional developer packages:
 
@@ -115,7 +125,12 @@ dependencies are build with that.
     brew install autoconf automake libtool gettext
     brew link gettext --force
 
-Then run autoreconf, configure, make. See above.
+Then run:
+
+    autoreconf -vfi
+    ./configure
+    make
+    sudo make install
 
 # Compiling on Windows
 
@@ -124,10 +139,14 @@ Then run autoreconf, configure, make. See above.
 Download Msys2, update everything and install the following
     packages:
 
-    pacman -S base-devel mingw-w64-x86_64-toolchain mingw-w64-x86_64-libtool
+    pacman -S base-devel mingw-w64-x86_64-toolchain mingw-w64-x86_64-libtool \
+              mingw-w64-x86_64-libiconv mingw-w64-x86_64-gettext
 
 Open Mingw-w64 Win64 prompt and compile the same way as on Linux, see
-above.
+above. Without `mingw-w64-x86_64-libiconv` the build still succeeds but
+the `hunspell` tool cannot convert between dictionary encodings, so any
+test or dictionary that declares a non-UTF-8 `SET` (e.g. ISO8859-1/2/15)
+will fail at runtime.
 
 ## Compiling in Cygwin environment
 
@@ -285,6 +304,16 @@ Example for morphological generation:
     generate(mouse, cats) = mice
     generate(mouse, cats) = mouses
 
+Note: morphological generation, stemming and analysis only work with
+dictionaries whose entries carry morphological description fields
+(`po:`, `st:`, `is:`, `ts:`, `al:`, `ds:`, `dp:` etc.; see man hunspell.5).
+The example above relies on the older en_US dictionary linked earlier in
+this README, which still ships these fields. Most current distributions
+of en_US, fr, nl and hu_HU do not, and `analyze`, `stem` and `generate`
+will return empty results for them. This is a dictionary property, not
+a library bug. See `tests/morph.aff` and `tests/morph.dic` for a minimal
+example.
+
 # Using Hunspell library with GCC
 
 Including in your program:
@@ -297,6 +326,18 @@ Linking with Hunspell static library:
     # or better, use pkg-config
     g++ $(pkg-config --cflags --libs hunspell) example.cxx
 
+# Installing Hunspell (vcpkg)
+
+Alternatively, you can build and install hunspell using [vcpkg](https://github.com/Microsoft/vcpkg/) dependency manager:
+
+    git clone https://github.com/Microsoft/vcpkg.git
+    cd vcpkg
+    ./bootstrap-vcpkg.sh
+    ./vcpkg integrate install
+    ./vcpkg install hunspell
+
+The hunspell port in vcpkg is kept up to date by Microsoft team members and community contributors. If the version is out of date, please [create an issue or pull request](https://github.com/Microsoft/vcpkg) on the vcpkg repository.
+
 ## Dictionaries
 
 Hunspell (MySpell) dictionaries:
@@ -304,8 +345,8 @@ Hunspell (MySpell) dictionaries:
   - https://wiki.documentfoundation.org/Language_support_of_LibreOffice
   - http://cgit.freedesktop.org/libreoffice/dictionaries
   - http://extensions.libreoffice.org
-  - http://extensions.openoffice.org
-  - http://wiki.services.openoffice.org/wiki/Dictionaries
+  - https://extensions.openoffice.org
+  - https://wiki.openoffice.org/wiki/Dictionaries
 
 Aspell dictionaries (conversion: man 5 hunspell):
 

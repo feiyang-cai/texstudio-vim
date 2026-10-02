@@ -1,5 +1,5 @@
 # ltx-talk class
-# Matthew Bertucci 2026/01/31 for v0.4.0
+# Matthew Bertucci 2026/08/25 for v0.6.0
 
 #include:pdfmanagement
 #include:relsize
@@ -15,6 +15,7 @@ aspect-ratio=%<width:height%>
 frame-title-arg
 mode=#handout,projector
 handout
+supplementary-frames=#appendix,in-place,omit
 #endkeyvals
 
 #ifOption:frame-title-arg
@@ -82,10 +83,15 @@ handout
 
 \action<action spec>{text}
 \action{text}
+\againframe{name}#*
+\againframe[options%keyvals]{name}#*
+\againframe<overlay spec>{name}#*
+\againframe<overlay spec>[options%keyvals]{name}#*
 \alert<overlay spec>{text}
 \alert{text}
 \alt<overlay spec>{default text%text}{alternative text%text}
 \alt{default text%text}{alternative text%text}
+\appendix<mode spec>
 \author[options%keyvals]{names}
 \color<overlay spec>[model]{color}
 \color<overlay spec>{color}
@@ -113,6 +119,7 @@ handout
 \maketitle[options%keyvals]
 \mathcolor<overlay spec>[model]{color}{math}
 \mathcolor<overlay spec>{color}{math}
+\newtheorem*{envname}{caption%text}#N
 \only<overlay spec>{text}
 \only{text}
 \onslide
@@ -120,6 +127,10 @@ handout
 \pagecolor<overlay spec>{color}
 \pause
 \pause[overlay spec]
+\reuseframe{name}
+\reuseframe[options%keyvals]{name}
+\reuseframe<overlay spec>{name}
+\reuseframe<overlay spec>[options%keyvals]{name}
 \subtitle[options%keyvals]{text}
 \subtitle{text}
 \temporal<overlay spec>{before slide text%text}{default text%text}{after slide text%text}
@@ -154,9 +165,18 @@ t
 vertical-alignment=#bottom,center,top
 #endkeyvals
 
-#keyvals:\begin{frame},\begin{frame*}
+#keyvals:\begin{frame},\begin{frame*},\reuseframe
+action-spec=%<action spec%>
+auto-break#true,false
+auto-break-coverage=%<number%>
 tag-slides=%<spec%>
 vertical-alignment=#bottom,center,stretch,top
+supplementary-frame#true,false
+#endkeyvals
+
+#keyvals:\begin{frame},\begin{frame*}
+name=%<name%>
+label=%<name%>
 #endkeyvals
 
 #keyvals:\author#c
@@ -176,6 +196,7 @@ element-order=
 frame-style=
 horizontal-alignment=
 vertical-alignment=
+frame-title-arg=
 #endkeyvals
 
 #keyvals:\subtitle#c
@@ -190,6 +211,7 @@ short-title=%<text%>
 \begin{block}{title%text}
 \begin{block}<action spec>{title%text}
 \end{block}
+\appendixmarker#*
 \DeclareColor{name%specialDef}[model]{color-spec}#s#%color
 \DeclareColor{name%specialDef}{color}#s#%color
 \insertsection#*
@@ -197,6 +219,7 @@ short-title=%<text%>
 \insertsubsubsection#*
 \mode<mode spec>{text}
 \mode{text}
+\theappendixframe#*
 \thepauses#*
 \theslide#*
 

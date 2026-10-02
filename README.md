@@ -26,7 +26,8 @@ I did not manually design and review every code path to production standard. Use
 ## Downloads
 
 - Releases: [GitHub Releases](https://github.com/feiyang-cai/texstudio-vim/releases)
-- Current planned prerelease tag: `v4.9.3beta1-vim-preview1`
+- Fork release tags: `texstudio-vim-4.9.8` and `texstudio-vim-4.9.9beta2` (prerelease).
+- Download filenames start with `texstudio-vim-`; each build includes the Vim mode documented below.
 - Release artifacts for supported platforms are intended to be distributed from GitHub releases for this fork, including macOS, Linux, and Windows.
 
 ## Feedback

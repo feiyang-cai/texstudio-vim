@@ -254,6 +254,20 @@ QList<LatexEditorView *> Editors::editors()
 	}
 	return editors;
 }
+/*!
+ * \brief give all editors which are at top of their tabs
+ * \return
+ */
+QList<LatexEditorView *> Editors::topEditors()
+{
+    QList<LatexEditorView *> editors;
+    foreach (TxsTabWidget *tabGroup, tabGroups) {
+        if (tabGroup->count() > 0) {
+            editors.append(qobject_cast<LatexEditorView *>(tabGroup->currentWidget()));
+        }
+    }
+    return editors;
+}
 
 void Editors::setCurrentEditorFromAction()
 {
@@ -486,6 +500,7 @@ void Editors::moveToOtherTabGroup()
 	// NOTE: This code assumes exactly two tabGroups
 	int otherGroupIndex = (tabGroups[0] == tabWidgetFromEditor(edView)) ? 1 : 0;
 	moveToTabGroup(edView, tabGroups[otherGroupIndex], -1);
+    emit visibleEditorsChanged();
 }
 
 void Editors::moveAllToOtherTabGroup() {
@@ -515,6 +530,7 @@ void Editors::moveAllOthersToOtherTabGroup() {
             moveToTabGroup(edView, tabGroups[otherGroupIndex], -1);
         }
     }
+    emit visibleEditorsChanged();
 }
 
 
@@ -683,7 +699,7 @@ void EditorChangeProxy::release()
 		}
 	} else {
 		// can only happen if the above mentioned blocking pattern was not used.
-		qDebug("WARNING: trying to realease an unblocked EditorChangeProxy. This hints at inconsistent code.");
+        qDebug("WARNING: trying to release an unblocked EditorChangeProxy. This hints at inconsistent code.");
 	}
 }
 

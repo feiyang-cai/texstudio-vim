@@ -8,7 +8,16 @@ echo "GIT_HASH = ${GIT_HASH}"
 GIT_DATE=$(git show --no-patch --pretty="%ci")
 echo "GIT_DATE = ${GIT_DATE}"
 
-GIT_VERSION=$(git describe --tags --abbrev=0 --always)
+# Use the triggering fork tag, never an imported upstream tag or another release.
+if [ "${GITHUB_REF_TYPE:-}" = "tag" ]; then
+    RELEASE_TAG=${GITHUB_REF_NAME}
+else
+    RELEASE_TAG=$(git describe --tags --match 'texstudio-vim-*' --abbrev=0 2>/dev/null || true)
+fi
+case "$RELEASE_TAG" in
+    texstudio-vim-*) GIT_VERSION=${RELEASE_TAG#texstudio-vim-} ;;
+    *) GIT_VERSION=${TXS_VERSION} ;;
+esac
 echo "GIT_VERSION = ${GIT_VERSION}"
 
 DATE_HASH=$(date -u +"%Y%m%d%H%M")

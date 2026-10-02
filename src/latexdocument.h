@@ -117,10 +117,11 @@ public:
 	Q_INVOKABLE bool isBibItem(const QString &name);
 	Q_INVOKABLE QString findFileFromBibId(const QString &name); ///< find bib-file from bibid
 	Q_INVOKABLE QMultiHash<QDocumentLineHandle *, int> getLabels(const QString &name); ///< get line/column from label name
+    QMultiHash<QDocumentLineHandle *, int> getLabels(const QString &name,int &count); ///< get line/column from label name plus number of labels with this name
 	Q_INVOKABLE QMultiHash<QDocumentLineHandle *, int> getRefs(const QString &name); ///< get line/column from reference name
 	Q_INVOKABLE QMultiHash<QDocumentLineHandle *, int> getBibItems(const QString &name);
     LatexDocument *getDocumentForLabel(const QString &name); ///< get document from label name
-    int countCommandDefintions(const QString &name, const QString word=""); ///< count how many time a certain command is defined, used for checking for duplicates
+    int countCommandDefinitions(const QString &name, const QString word=""); ///< count how many time a certain command is defined, used for checking for duplicates
 	Q_INVOKABLE QDocumentLineHandle *findCommandDefinition(const QString &name); ///< get line of definition from command name (may return nullptr)
 	Q_INVOKABLE QDocumentLineHandle *findUsePackage(const QString &name); ///< get line of \usepackage from package name (may return nullptr)
 	Q_INVOKABLE void replaceItems(QMultiHash<QDocumentLineHandle *, ReferencePair> items, const QString &newName, QDocumentCursor *cursor = nullptr);
@@ -177,7 +178,7 @@ public:
 	QDocumentLine lineFromLineSnapshot(int lineNumber);
 	int lineToLineSnapshotLineNumber(const QDocumentLine &line);
 
-	bool remeberAutoReload; //remember whether doc is auto reloaded while hidden (and auto reload is always activated).
+	bool rememberAutoReload; //remember whether doc is auto reloaded while hidden (and auto reload is always activated).
 
 	bool mayHaveDiffMarkers;
 
@@ -199,7 +200,8 @@ public:
     bool saveCachingData(const QString &folder);
     bool restoreCachedData(const QString &folder, const QString fileName);
     bool isIncompleteInMemory();
-    void startSyntaxChecker();
+    bool startSyntaxChecker();
+    bool syntaxCheckerRunning();
 
     struct HandledData {
         QStringList removedUsepackages;
@@ -211,12 +213,15 @@ public:
         QStringList addedUserSnippets;
         QStringList lstFilesToLoad;
         QStringList removedIncludes;
+        QStringList removedLabels;
+        QStringList addedLabels;
         QList<LatexDocument *> addedIncludes;
         QStringList oldBibs;
         bool completerNeedsUpdate = false;
         bool bibItemsChanged = false;
         bool bibTeXFilesNeedsUpdate = false;
         bool updateSyntaxCheck = false;
+        bool updateStructure = false;
         int posLabel;
         int posTodo;
         int posBlock;
@@ -225,7 +230,7 @@ public:
 
     int lexLines(int &lineNr,int &count,bool recheck=false);
     void lexLinesSimple(const int lineNr,const int count);
-    void handleComments(QDocumentLineHandle *dlh, int &curLineNr, std::list<StructureEntry*>::iterator &docStructureIter);
+    void handleComments(QDocumentLineHandle *dlh, int &curLineNr, std::list<StructureEntry*>::iterator &docStructureIter,bool &updateStructure);
     void removeLineElements(QDocumentLineHandle *dlh, HandledData &changedCommands);
     void handleRescanDocuments(HandledData changedCommands);
     void interpretCommandArguments(QDocumentLineHandle *dlh, const int i, HandledData &data, bool recheckLabels, std::list<StructureEntry*>::iterator &docStructureIter);
@@ -254,8 +259,10 @@ private:
 	QSet<LatexDocument *> childDocs;
 
 	QMultiHash<QDocumentLineHandle *, ReferencePair> mLabelItem;
+    QMultiHash<QString,QDocumentLineHandle *> mLabelHash; // for faster lookup of refs, maps ref name to line
 	QMultiHash<QDocumentLineHandle *, ReferencePair> mBibItem;
 	QMultiHash<QDocumentLineHandle *, ReferencePair> mRefItem;
+    QMultiHash<QString,QDocumentLineHandle *> mRefHash; // for faster lookup of refs, maps ref name to line
 	QMultiHash<QDocumentLineHandle *, FileNamePair> mMentionedBibTeXFiles;
 	QMultiHash<QDocumentLineHandle *, UserCommandPair> mUserCommandList;
 	QMultiHash<QDocumentLineHandle *, QString> mUsepackageList;
@@ -333,9 +340,9 @@ signals:
  * organizes all open documents
  * handles master/slave or root/child relation between documents
  * documents can be hidden, i.e. they don't have a visible editor
- * hidden documents are used to keep syntax information present in the editor without the necessesity to make an extra storage architecture for closed elements
+ * hidden documents are used to keep syntax information present in the editor without the necessity to make an extra storage architecture for closed elements
  * documents which are closed/deleted are hidden if they are child documents of still used documents
- * Furthermore autimatically loaded documents are generally hidden
+ * Furthermore automatically loaded documents are generally hidden
  */
 class LatexDocuments: public QObject
 {
@@ -352,6 +359,7 @@ public:
 
 	void addDocument(LatexDocument *document, bool hidden = false);
 	void deleteDocument(LatexDocument *document, bool hidden = false, bool purge = false);
+    void deleteAllDocuments();
 	void move(int from, int to);
 	Q_INVOKABLE void setMasterDocument(LatexDocument *document); ///< explicitely set master document
 	Q_INVOKABLE LatexDocument *getCurrentDocument() const;
@@ -375,6 +383,8 @@ public:
 	Q_INVOKABLE LatexDocument *findDocumentFromName(const QString &fileName) const;
 
 	void reorder(const QList<LatexDocument *> &order);
+
+    void updateCachedDocuments();
 
 	void settingsRead();
     void setCachingFolder(const QString &folder);

@@ -69,6 +69,7 @@ public:
 		ERR_unrecognizedKey, ///< in key/value argument, an unknown key is used
 		ERR_unrecognizedKeyValues, ///< in key/value argument, an unknown value is used for a key
 		ERR_commandOutsideEnv, ///< command used outside of designated environment (similar math command outside math)
+        ERR_semicolonMissing, ///< missing semicolon in pgfplots
         ERR_spelling, ///< syntax error of text word (spell checker)
         ERR_highlight, ///< arbitraty format for highlighting (math,verbatim,picture)
 		ERR_MAX  // always last
@@ -134,7 +135,7 @@ signals:
 
 protected:
 	void run();
-    void checkLine(const QString &line, Ranges &newRanges, StackEnvironment &activeEnv, QDocumentLineHandle *dlh, TokenList &tl, TokenStack stack, int ticket, int commentStart=-1);
+    void checkLine(const QString &line, Ranges &newRanges, StackEnvironment &activeEnv, QDocumentLineHandle *dlh, TokenList &tl, TokenStack stack, int ticket, int commentStart,QVector<QParenthesis> &m_parens);
 
 private:
 	QQueue<SyntaxLine> mLines;

@@ -1,7 +1,8 @@
 # scripture package
-# Matthew Bertucci 2025/08/09 for v2.2
+# Matthew Bertucci 2026/08/23 for v2.5
 
 \added{words%text}
+\canonicalheading{heading%text}
 \ch{chapter number}
 \ch[letter]{chapter number}
 \ch*{chapter number}
@@ -57,10 +58,17 @@ aboveskip=##L
 added/font=%<font commands%>
 added/format=%<macro%>
 after=%<code%>
-befire=%<code%>
+before=%<code%>
 belowskip=##L
 book=%<name%>
+canonicalheading/aboveskip=##L
+canonicalheading/afterindent#true,false
+canonicalheading/align=#left,right,center
+canonicalheading/belowskip=##L
+canonicalheading/font=%<font commands%>
+canonicalheading/format=%<code%>
 chapter=%<integer%>
+chapter/aboveskip=##L
 chapter/align=#left,right
 chapter/colour=#%color
 chapter/color=#%color
@@ -68,11 +76,14 @@ chapter/drop#true,false
 chapter/font=%<font commands%>
 chapter/format=%<macro%>
 chapter/hide#true,false
+chapter/language=%<language name%>
+chapter/language/variant=%<language variant name%>
 chapter/nodrop#true,false
 chapter/para#true,false
 chapter/para/aboveskip=##L
 chapter/para/belowskip=##L
 chapter/para/indent#true,false
+chapter/presep=##L
 chapter/sep=##L
 chapter/show#true,false
 chapter/showverse#true,false
@@ -96,6 +107,7 @@ heading/show#true,false
 inline#true,false
 inline/begin=%<code%>
 inline/end=%<code%>
+inline/font=%<font%>
 inline/reference/format=%<macro%>
 inline/reference/sep=##L
 inline/version/delim=%<delim%>
@@ -104,6 +116,7 @@ indent#true,false
 language=%<language name%>
 language/variant=%<language variant name%>
 leftmargin=##L
+mark/verse/format=%<macro%>
 name/font=%<font commands%>
 name/format=%<macro%>
 noindent#true,false
@@ -119,6 +132,8 @@ reference/colour=#%color
 reference/color=#%color
 reference/font=%<font commands%>
 reference/format=%<macro%>
+reference/language=%<language name%>
+reference/language/variant=%<language variant name%>
 reference/newline
 reference/position=#start,end
 reference/sep=##L
@@ -142,13 +157,18 @@ verse/firstsep=##L
 verse/font=%<font commands%>
 verse/format=%<macro%>
 verse/hide#true,false
+verse/language=%<language name%>
+verse/language/variant=%<language variant name%>
 verse/para#true,false
 verse/para/indent=##L
+verse/presep=##L
 verse/sep=##L
 verse/show#true,false
 version=%<version%>
 version/delim=%<delim%>
 version/format=%<macro%>
+version/language=%<language name%>
+version/language/variant=%<language variant name%>
 version/position=#withref,end
 center/aboveskip=##L
 center/belowskip=##L
@@ -179,6 +199,7 @@ poetry/bigindent=##L
 poetry/indent=##L
 poetry/leftmargin=##L
 poetry/rightmargin=##L
+poetry/secondhalf#true,false
 poetry/verse/left#true,false
 poetry/verse/right#true,false
 poetry/verse/sep=##L
@@ -203,4 +224,5 @@ showverse#true,false
 #keyvals:\begin{poetry}
 bigindent=##L
 indent=##L
+secondhalf#true,false
 #endkeyvals

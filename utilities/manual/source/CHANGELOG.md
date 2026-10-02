@@ -1,18 +1,84 @@
 # CHANGELOG
+## TeXstudio 4.9.8
+
+- fix hang when external viewer is called from internal pdf viewer [#4625](https://github.com/texstudio-org/texstudio/issues/4625)
+- improve handling of subfolder in gitpanel [#4635](https://github.com/texstudio-org/texstudio/issues/4635)
+- fix freeze on thesaurus dialog [#4629](https://github.com/texstudio-org/texstudio/issues/4629)
+- fix crash on find label [#4613](https://github.com/texstudio-org/texstudio/issues/4613)
+- breaking change: all commands are internally monitored until they finish. New commands are blocked from execution which also blocks recompile if an external pdf viewer is used (which keeps running). Command syntax is extended to accept "&" at the end of a command, so that it runs that command detached (i.e. no blocking, no monitoring) [#4614](https://github.com/texstudio-org/texstudio/issues/4614)
+- make git panel smaller [#4591](https://github.com/texstudio-org/texstudio/issues/4591)
+- enable drag/drop from internal file explorer to text, calls image wizard/inserts "\include{fn}" [#4608](https://github.com/texstudio-org/texstudio/issues/4608)
+- change rootdir for fileExplorer after session restore
+- fix auto reload pdf after compile [#4601](https://github.com/texstudio-org/texstudio/issues/4601)
+- file explorer can open pdf [#4607](https://github.com/texstudio-org/texstudio/issues/4607)
+- improve pasting indented text [#1344](https://github.com/texstudio-org/texstudio/issues/1344)
+- mark missing semicolon in tikz commands [#4589](https://github.com/texstudio-org/texstudio/issues/4589)
+
+## TeXstudio 4.9.7
+
+- use fully asynchronous command execution for latex commands. This should remedy some rare stability issues.
+- add accessibility for text editor component (screen reader compatibility)
+- add bibliography overview in global TOC
+- fix crash when changing project structure (comment out/in includes) [#4579](https://github.com/texstudio-org/texstudio/issues/4579)
+- fix remove command [#4578](https://github.com/texstudio-org/texstudio/issues/4578)
+- have Find Usages results of labels ordered by line number [#4575](https://github.com/texstudio-org/texstudio/issues/4575)
+- allow expanding structures from all loaded files [#4565](https://github.com/texstudio-org/texstudio/issues/4565)
+- fix freeze/crash on removeColumn [#4590](https://github.com/texstudio-org/texstudio/issues/4590)
+- fix keyVal values completer trigger [#4595](https://github.com/texstudio-org/texstudio/issues/4595)
+
+## TeXstudio 4.9.6
+
+- fix update on structure pane [#4505](https://github.com/texstudio-org/texstudio/issues/4505)
+- fix math highlighting [#4508](https://github.com/texstudio-org/texstudio/issues/4508)
+- add panel for git
+- fix crashes [#4552](https://github.com/texstudio-org/texstudio/issues/4552),[#4545](https://github.com/texstudio-org/texstudio/issues/4545),[#4544](https://github.com/texstudio-org/texstudio/issues/4544)
+
+## TeXstudio 4.9.5
+
+- fix crash when setting explicit root doc [#4469](https://github.com/texstudio-org/texstudio/issues/4469)
+- improve handling collaboration with teamtype [#4454](https://github.com/texstudio-org/texstudio/issues/4454),[#4466](https://github.com/texstudio-org/texstudio/issues/4466)
+- workaround win11 style, invisible red background when text not found in searchpanel
+- keep folder structure of imported macros if more than one macro is imported [#4484](https://github.com/texstudio-org/texstudio/issues/4484)
+- highlight more tex symbol as keyword [#4465](https://github.com/texstudio-org/texstudio/issues/4465)
+- fix addresource bibfile when using citation-style-language [#4477](https://github.com/texstudio-org/texstudio/issues/4477)
+
+## TeXstudio 4.9.4
+
+- disable AI wizard by default
+- enable LLM to use tool functions to access the current document. This allows LLM to manipulate the document directly. This can be disabled.
+- fix losing cursor position when view width changes (soft wrap) [#3418](https://github.com/texstudio-org/texstudio/issues/3418)
+- fix file detection in TOC when creating new file from include/input
+- improve loading speed with large projects [#4410](https://github.com/texstudio-org/texstudio/pull/4410)
+- add find definitions on multiple defined labels
+- improve information when loading log is rejected because of size
+- add support for anthropic REST API [#4387](https://github.com/texstudio-org/texstudio/pull/4387)
+- fix expl3 highlighting [#4397](https://github.com/texstudio-org/texstudio/pull/4397)
+- fix TOC update (local & global were both triggered, at least on linux)
+- start syntax checker only when view is shown to reduce overall cpu load
+- fix color for ai chat in dark mode [#4425](https://github.com/texstudio-org/texstudio/pull/4425)
+- fix compiler optimization on windows build (was deactivated, performance should generally improve)
+- show progress dialog when restoring files takes longer
+- clean-up dialog allows arbitrary file endings [#4419](https://github.com/texstudio-org/texstudio/pull/4419)
+- completion of user constructs can be disabled (options/completer). This may speed up file restore for large projects
+- response after opening large log files can now be reverted by clicking the message [#4416](https://github.com/texstudio-org/texstudio/pull/4416)
+- speed-up globalTOC with large number of included files
+
 ## TeXstudio 4.9.3
 
 - preview updated to handle special document classes [#4322](https://github.com/texstudio-org/texstudio/pull/4322)
 - add functionality to remove entries from the recent files list [#4338](https://github.com/texstudio-org/texstudio/pull/4338)
 - equalize editor sizes with a double-click on the splitter [#4341](https://github.com/texstudio-org/texstudio/pull/4341)
 - switch review command support from easyReview to the changes package [#4177](https://github.com/texstudio-org/texstudio/issues/4177)
-- fix opening documentation of latex packages with miktex (help/Packages Help...)[#4359](https://github.com/texstudio-org/texstudio/issues/4359)
+- fix opening documentation of latex packages with miktex (Help/Packages Help...) [#4359](https://github.com/texstudio-org/texstudio/issues/4359)
 - fix searching in pdf [#4337](https://github.com/texstudio-org/texstudio/issues/4337)
 - fix inserting tables from libreoffice [#4328](https://github.com/texstudio-org/texstudio/issues/4328)
 - fix highlighting in some nested environments [#4331](https://github.com/texstudio-org/texstudio/issues/4331)
-- fix potential crash when using remodel table
-- add the option to turn macros on or off using checkboxes in the macro browser [#3971](https://github.com/
-texstudio-org/texstudio/issues/3971)
-- show ai chat as messenger like UI
+- fix potential crash when using "Remodel Table"
+- add the option to turn macros on or off using checkboxes in the macro browser [#3971](https://github.com/texstudio-org/texstudio/issues/3971)
+- show ai chat as messenger-like UI
+- close windowed pdf viewer on txs quit [#4368](https://github.com/texstudio-org/texstudio/issues/4368)
+- fix keyval val/key detection for completion [#4369](https://github.com/texstudio-org/texstudio/issues/4369)
+- improve glossary completion [#4370](https://github.com/texstudio-org/texstudio/issues/4370)
 
 ## TeXstudio 4.9.2
 
@@ -59,7 +125,7 @@ texstudio-org/texstudio/issues/3971)
 - fix invisible close button on tabs in OSX [#4000](https://github.com/texstudio-org/texstudio/issues/4000)
 - allow extra arguments for LanguaTool [#4147](https://github.com/texstudio-org/texstudio/pull/4147)
 - text completion also take other open documents as source [#4126](https://github.com/texstudio-org/texstudio/issues/4126)
-- fix crash when opening unopened file via global TOC [#4127](https://github.com/texstudio-org/texstudio/issues/4129)
+- fix crash when opening unopened file via global TOC [#4129](https://github.com/texstudio-org/texstudio/issues/4129)
 
 ## TeXstudio 4.8.8
 
@@ -90,7 +156,7 @@ texstudio-org/texstudio/issues/3971)
 - add Grid menu to windowed and embedded pdf-viewer's context menu [#3942](https://github.com/texstudio-org/texstudio/pull/3942)
 - fix pdf-viewer's scrollbar with Fit to Width/Window and changing Continuous mode [#3928](https://github.com/texstudio-org/texstudio/pull/3928)
 - fix pdf-viewer's Custom Grid dialog not preset with current Grid settings in Continuous mode [#3929](https://github.com/texstudio-org/texstudio/pull/3929)
-- fix pfd-viewer's page display in non continuous mode [#3952](https://github.com/texstudio-org/texstudio/pull/3952)
+- fix pdf-viewer's page display in non continuous mode [#3952](https://github.com/texstudio-org/texstudio/pull/3952)
 - fix pdf-viewer has a small issue when activating single page step [#3957](https://github.com/texstudio-org/texstudio/pull/3957)
 - add maximize button to Packages Help (Texdoc) dialog [#3911](https://github.com/texstudio-org/texstudio/pull/3911)
 - fix option 'all packages' no longer checked in Packages Help with no tex documents opened [#3917](https://github.com/texstudio-org/texstudio/pull/3917)
@@ -140,14 +206,14 @@ texstudio-org/texstudio/issues/3971)
 - allow hiding of sidepanel docks via view/show
 - reduce number on visible dock on OSX due to qt osx style weakness
 - fix raised dock after hiding/showing sidepanel [#3653](https://github.com/texstudio-org/texstudio/issues/3653)
-- fallback to simple syntax highligting when tooltip background differs from general background [#3644](https://github.com/texstudio-org/texstudio/issues/3644)
+- fallback to simple syntax highlighting when tooltip background differs from general background [#3644](https://github.com/texstudio-org/texstudio/issues/3644)
 - fix structure view context on sections [#3642](https://github.com/texstudio-org/texstudio/issues/3642)
 - fix black background on comboboxes with windows11 style (qt6.7.1)
 
 ## TeXstudio 4.8.0
 
 - AI chat assistant added
-- use moveable/**splitable** docks for sidepanel
+- use moveable/**splittable** docks for sidepanel
 - extended search can now also search in all files in one folder
 - add basic syntax highlighting for latex3 code
 - fix handling CJK characters in pdf on OSX [#3558](https://github.com/texstudio-org/texstudio/issues/3558)
@@ -220,7 +286,7 @@ texstudio-org/texstudio/issues/3971)
 - The link to the TeXstudio homepage is now at the top of the About dialog (Help menu) and the number of the latest stable version is also displayed ([#3146](https://github.com/texstudio-org/texstudio/pull/3146))
 - option Disable horizontal scrolling for "Fit to Text Width" now affects horizontal scrolling with mousepad and scroll wheel ([#1526](https://github.com/texstudio-org/texstudio/issues/1526))
 - fix editor moving last line of a selection when selection ends at start of a line ([#3131](https://github.com/texstudio-org/texstudio/issues/3131))
-- fix some icon issues on OSX ([#3100](https://github.com/texstudio-org/texstudio/issues/2921),[#3104](https://github.com/texstudio-org/texstudio/issues/3104))
+- fix some icon issues on OSX ([#3100](https://github.com/texstudio-org/texstudio/issues/3100),[#3104](https://github.com/texstudio-org/texstudio/issues/3104))
 - basic support for tblr colspec
 
 ## TeXstudio 4.5.2
@@ -575,7 +641,7 @@ texstudio-org/texstudio/issues/3971)
 - scripting: editor.cutBuffer
 - subframetitle in structure view
 - enable inputMethod (e.g. ^) in completer
-- change default for complete non-text chacters to off, as it tends to cause unexpected behaviour
+- change default for complete non-text characters to off, as it tends to cause unexpected behaviour
 - fix word separation with punctuation
 - fix: remove incorrect warning "Unknown magic comment" for "% !TeX TS-program = "
 - fix: avoid compile fail if magic comment program is spelled wrongly
@@ -600,16 +666,16 @@ texstudio-org/texstudio/issues/3971)
 - show frame titles in structure view
 - support table alignment in IEEEeqnarray, xtabular and mpxtabular
 - table alignment: fix aligning of empty cols
-- table alignment: place \\ if last columns is empty 
+- table alignment: place \\ if last column is empty 
 - warn if \begin{column} is used outside columns-env
 - workaround for not interpreting $ inside sweave \Sexpr{}
-- option to deactivate interperation of command definition in magic comments
+- option to deactivate interpretation of command definition in magic comments
 - remove pdf viewer subtypes from "Default Viewer" config. PDF viewer subtypes should be selected in "PDF Viewer".
 - increase the maximal resolution for pdf rendering (bug 2003)
 - toolbar for embedded viewer can not turned-off anymore
 - show shortcuts in tooltips (can be deactivated in the options)
 - pass non-breaking space to grammar check (fixes bug 2040)
-- \item completion no adds a space (feature request 994)
+- \item completion now adds a space (feature request 994)
 - fix highlighting of current section in structure (bug 2103)
 - fix delays when typing _abc
 - fix bug in log parser: wrong filename if empty brackets () occur in text
@@ -826,7 +892,7 @@ before changing to windowed mode (Bug #1876)
 ## TeXstudio 2.10.8
 
 - automatically expand search result if all matches are within one file
-- detection of magic comment % !TeX is more permissive concerning case sensistivity
+- detection of magic comment % !TeX is more permissive concerning case sensitivity
 - fix crash when using \subparagraph
 - fix symbolgrid widget on OSX
 - fix ?save-file trigger not working
@@ -1225,7 +1291,7 @@ before changing to windowed mode (Bug #1876)
 - structure tree view: context menu entries to recursively collapse/expand the structure
 - improved hard line wrap with joining lines
 - View -> Focus Viewer now also works for the windowed viewer
-- better detection of LagnuageTool
+- better detection of LanguageTool
 - similarity dictionary
 - "Align Table Columns" now works also for tabu/longtabu
 - updated poppler library, now displays PDF annotations like highlight and underline
@@ -1247,7 +1313,7 @@ before changing to windowed mode (Bug #1876)
 - option to silently reload files on external changes
 - make %todo as well as %TODO marker for "to-do" list
 - "Align Table Columns" now works on many more environments such as
-  matrix, align. align*, split, multline, multline*, gather, gather*, flalign, flalign*, alignat, alignat*
+  matrix, align, align*, split, multline, multline*, gather, gather*, flalign, flalign*, alignat, alignat*
 - template resources are now configured via template_resources.xml (allows to customize resource locations)
 - template json files are now UTF-8
 - basic Pweave highlighting
@@ -1373,7 +1439,7 @@ ref/commands overview
 
 ## TexMakerX 1.9.9a
 
-- some performance issues on mac have been addressed. It should feel faster for long sible lines on mac.
+- some performance issues on mac have been addressed. It should feel faster for long visible lines on mac.
 - more than one overlay can be shown at the same time e.g. for syntax highlighting and spell checking
 - command replacement in completed commands was added
 - a cut buffer was added. If selected text is replaced with a command via completion, the removed text is used as argument for the inserted command (if applicable)
@@ -1424,7 +1490,7 @@ ref/commands overview
 - added tabbed log panel
 - extended completer word list using kile cwl files
 - imported more math symbols (+730) from kile
-- imported changes of texmaker 1.8.1->1.9.2 (favourite symbols, new color scheme, a)
+- imported changes of texmaker 1.8.1->1.9.2 (favourite symbols, new color scheme)
 - fixed several bugs
 - see usermanual_en.html for a more detailed description
 
@@ -1435,7 +1501,7 @@ ref/commands overview
 - extended word completion system to use "kile"-word lists (*.cwl)
 - key Tab can be used to complete common word bases in the present suggestion list like it is done in bash shells
 - complete normal texttext by proposing earlier used text parts
-- "User Tags"\94 (user defined text blocks) can be inserted by using user defined abbreviations which replaced in the completion process
+- "User Tags" (user defined text blocks) can be inserted by using user defined abbreviations which replaced in the completion process
 - user defined latex commands are automatically scanned and can be used for command completion
 - new documents can be created by using templates
 - extended and improved symbol panel

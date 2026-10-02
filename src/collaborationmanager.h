@@ -40,7 +40,7 @@ signals:
     void changesReceived(QDocumentCursor cursor, const QString changes,const QString userName);
     void cursorMoved(QDocumentCursor cursor,const QString userId);
     void cursorRemoved(LatexDocument *doc,const QString userId);
-    void clientSuccessfullyStarted();
+    void clientSuccessfullyStarted(QString msg);
     void guestServerSuccessfullyStarted();
     void hostServerSuccessfullyStarted();
     void collabClientFinished(int exitCode,QString m_errorMessage);

@@ -1,6 +1,6 @@
 # babel.sty
 # available from ctan
-# tbraun 4.11.2008; Matthew Bertucci 2026/01/18 for v26.1
+# tbraun 4.11.2008; Matthew Bertucci 2026/05/05 for v26.7
 
 #keyvals:\usepackage/babel#c
 %<language%>
@@ -13,6 +13,7 @@ safe=#none,ref,bib
 math=#active,normal
 config=%<file%>
 main=%<language%>
+licr=#extended,unextended
 headfoot=%<language%>
 noconfigs
 showlanguages
@@ -683,7 +684,7 @@ select.encoding=#off
 \glossaryname#*
 #endif
 
-### breton.ldf v1.0f ###
+### breton.ldf v2.0.1 ###
 #ifOption:breton
 \captionsbreton#*
 \datebreton#*
@@ -700,18 +701,32 @@ select.encoding=#off
 \alsoname#*
 \proofname#*
 \glossaryname#*
-\at
 \boi
-\circonflexe
-\tild
-\degre
-\kentan
+\BRcolonspace
+\BRguillspace
+\BRSetColonSpace{width}{stretch}{shrink}
+\BRSetGuillSpace{width}{stretch}{shrink}
+\BRSetThinSpace{width}{stretch}{shrink}
+\BRthinspace
+\deiziad{year}{month}{day}
+\derez
 \eil
-\re
-\trede
-\pevare
-\vet
+\kentan
+\Ker
+\Ker[skip]
+\Ker[skip][scale]
+\kerbihan
+\kerbihan[skip]
+\kerbihan[skip][scale]
+\kilveskell
+\NoBRspacing
 \pempvet
+\pevare
+\re
+\tildenn
+\tiredkognek
+\trede
+\vet
 #endif
 
 ### bulgarian.ldf v1.2g ###
@@ -1294,7 +1309,7 @@ select.encoding=#off
 #repl:"> »
 #endif
 
-### french.ldf v4.0d (and associated acadian.ldf) ###
+### french.ldf v4.1a ###
 #ifOption:french
 \frenchsetup{options%keyvals}
 \frenchbsetup{options%keyvals}#S
@@ -1333,18 +1348,20 @@ FrenchSuperscripts#true,false
 LowercaseSuperscripts#true,false
 SuppressWarning#true,false
 TocPartFullName#true,false
+NosepItemize#true,false
+NosepEnumerate#true,false
 #endkeyvals
 \alsoname#*
 \at
-\bibname#*
 \AutoSpaceBeforeFDP#*
 \begin{descriptionFB}
 \begin{enumerateFB}
 \begin{itemizeFB}
 \begin{listFB}{symbol}
 \begin{listORI}{symbol}#*
-\boi
+\bibname#*
 \bname{text}
+\boi
 \bsc{text}
 \captionsfrench#*
 \ccname#*
@@ -1370,6 +1387,7 @@ TocPartFullName#true,false
 \FBeverylineguill#*
 \FBfigtabshape#*
 \FBfnindent#*
+\FBfnmark#*
 \FBfnmarkspace#*
 \FBFrenchFootnotesfalse#*
 \FBFrenchFootnotestrue#*
@@ -1399,9 +1417,9 @@ TocPartFullName#true,false
 \FBthickkern#*
 \FBthinspace
 \FBthousandsep#*
-\FBWarning{message%text}#*
-\FBtocpartsep#*
 \FBtocpartname{roman num}#*
+\FBtocpartsep#*
+\FBWarning{message%text}#*
 \fg
 \fgi#*
 \fgii#*
@@ -1432,7 +1450,6 @@ TocPartFullName#true,false
 \ieres
 \iers
 \ifFBAutoSpaceFootnotes#*
-\ifFBCompactItemize#*
 \ifFBCustomiseFigTabCaptions#*
 \ifFBfrench#*
 \ifFBFrenchFootnotes#*
@@ -1441,11 +1458,12 @@ TocPartFullName#true,false
 \ifFBINGuillSpace#*
 \ifFBListItemsAsPar#*
 \ifFBLowercaseSuperscripts#*
+\ifFBnewfootnotes#*
+\ifFBnewlists#*
+\ifFBNosepEnumerate#*
+\ifFBNosepItemize#*
 \ifFBOriginalTypewriter#*
 \ifFBPartNameFull#*
-\ifFBnewlists#*
-\ifFBnewfootnotes#*
-\ifFBTocPartNameFull#*
 \ifFBShowOptions#*
 \ifFBSmallCapsFigTabCaptions#*
 \ifFBStandardEnumerateEnv#*
@@ -1457,15 +1475,17 @@ TocPartFullName#true,false
 \ifFBSuppressWarning#*
 \ifFBThinColonSpace#*
 \ifFBThinSpaceInFrenchNumbers#*
-\ifLaTeXe#*
+\ifFBTocPartNameFull#*
 \ifFBUnicodeNoBreakSpaces#*
+\ifLaTeXe#*
+\insertfootnotemarkFB#*
+\itemindentFB#*
 \kernFFN#*
-\labelindentFB#*
 \labelwidthFB#*
-\leftmarginFB#*
+\leftmarginiFB#*
+\leftmarginiiFB#*
 \listfigurename#*
 \listindentFB#*
-\newfootnotemarkFB#*
 \No
 \no
 \NoAutoSpaceBeforeFDP#*
@@ -1489,228 +1509,14 @@ TocPartFullName#true,false
 \primo
 \proofname#*
 \quarto
-\rmfamilyFB#*
 \secundo
 \seename#*
-\sffamilyFB#*
+\setlistindentFB#*
 \StandardMathComma
 \tertio
 \tild
-\ttfamilyFB#*
 \up{text}
 \xspace
-\setlistindentFB#*
-#endif
-
-#ifOption:acadian
-\frenchsetup{options%keyvals}
-\frenchbsetup{options%keyvals}#S
-#keyvals:\frenchsetup,\frenchbsetup
-ShowOptions#true,false
-StandardLayout#true,false
-IndentFirst#true,false
-PartNameFull#true,false
-ListItemsAsPar#true,false
-StandardListSpacing#true,false
-StandardItemizeEnv#true,false
-StandardEnumerateEnv#true,false
-StandardItemLabels#true,false
-ItemLabels=
-ItemLabeli=
-ItemLabelii=
-ItemLabeliii=
-ItemLabeliv=
-StandardLists#true,false
-FrenchFootnotes#true,false
-AutoSpaceFootnotes#true,false
-AutoSpacePunctuation#true,false
-ThinColonSpace#true,false
-OriginalTypewriter#true,false
-UnicodeNoBreakSpaces#true,false
-og=
-fg=
-INGuillSpace#true,false
-EveryParGuill=#open,close,none
-EveryLineGuill=#open,close,none
-InnerGuillSingle#true,false
-ThinSpaceInFrenchNumbers#true,false
-SmallCapsFigTabCaptions#true,false
-CustomiseFigTabCaptions#true,false
-FrenchSuperscripts#true,false
-LowercaseSuperscripts#true,false
-SuppressWarning#true,false
-TocPartFullName#true,false
-#endkeyvals
-\acadiandate{day}{month}{year}
-\acadiantoday
-\alsoname#*
-\at
-\bibname#*
-\AutoSpaceBeforeFDP#*
-\begin{descriptionFB}
-\begin{enumerateFB}
-\begin{itemizeFB}
-\begin{listFB}{symbol}
-\begin{listORI}{symbol}#*
-\boi
-\bname{text}
-\bsc{text}
-\captionsfrench#*
-\captionsacadian#*
-\ccname#*
-\chaptername#*
-\circonflexe
-\dateacadian#*
-\datefrench#*
-\DecimalMathComma
-\degre#*
-\degres
-\descindentFB#*
-\dotFFN#*
-\enclname#*
-\end{descriptionFB}
-\end{enumerateFB}
-\end{itemizeFB}
-\end{listFB}
-\end{listORI}#*
-\extrasfrench#*
-\extrasacadian#*
-\FBcolonspace
-\FBdatebox#*
-\FBdatespace#*
-\FBeverylineguill#*
-\FBfigtabshape#*
-\FBfnindent#*
-\FBfnmarkspace#*
-\FBFrenchFootnotesfalse#*
-\FBFrenchFootnotestrue#*
-\FBFrenchSuperscriptstrue#*
-\FBgspchar#*
-\FBguillopen#*
-\FBguillspace
-\FBInnerGuillSinglefalse#*
-\FBInnerGuillSingletrue#*
-\FBListItemsAsParfalse#*
-\FBListItemsAsPartrue#*
-\FBLowercaseSuperscriptstrue#*
-\FBmedkern#*
-\FBPartNameFulltrue#*
-\FBsetspaces[language]{type}{width}{stretch}{shrink}#*
-\FBsetspaces{type}{width}{stretch}{shrink}#*
-\FBSmallCapsFigTabCaptionstrue#*
-\FBStandardEnumerateEnvtrue#*
-\FBStandardItemizeEnvtrue#*
-\FBStandardItemLabelstrue#*
-\FBStandardLayouttrue#*
-\FBStandardListSpacingtrue#*
-\FBStandardListstrue#*
-\FBsupR#*
-\FBsupS#*
-\FBthickkern#*
-\FBthinspace
-\FBthousandsep#*
-\FBWarning{message%text}#*
-\FBtocpartsep#*
-\FBtocpartname{roman num}#*
-\fg
-\fgi#*
-\fgii#*
-\fprimo)
-\frenchdate{day}{month}{year}#*
-\FrenchEnumerate{arg}#*
-\FrenchLabelItem#*
-\frenchpartfirst#*
-\frenchpartsecond#*
-\FrenchPopularEnumerate{arg}#*
-\frenchtoday
-\Frlabelitemi#*
-\Frlabelitemi#*
-\Frlabelitemii#*
-\Frlabelitemii#*
-\Frlabelitemiii#*
-\Frlabelitemiii#*
-\Frlabelitemiv#*
-\Frlabelitemiv#*
-\frquote{text}
-\fup{text}
-\glossaryname#*
-\headtoname#*
-\ieme
-\iemes
-\ier
-\iere
-\ieres
-\iers
-\ifFBAutoSpaceFootnotes#*
-\ifFBCompactItemize#*
-\ifFBCustomiseFigTabCaptions#*
-\ifFBfrench#*
-\ifFBFrenchFootnotes#*
-\ifFBFrenchSuperscripts#*
-\ifFBIndentFirst#*
-\ifFBINGuillSpace#*
-\ifFBListItemsAsPar#*
-\ifFBLowercaseSuperscripts#*
-\ifFBOriginalTypewriter#*
-\ifFBPartNameFull#*
-\ifFBnewlists#*
-\ifFBnewfootnotes#*
-\ifFBTocPartNameFull#*
-\ifFBShowOptions#*
-\ifFBSmallCapsFigTabCaptions#*
-\ifFBStandardEnumerateEnv#*
-\ifFBStandardItemizeEnv#*
-\ifFBStandardItemLabels#*
-\ifFBStandardLayout#*
-\ifFBStandardLists#*
-\ifFBStandardListSpacing#*
-\ifFBSuppressWarning#*
-\ifFBThinColonSpace#*
-\ifFBThinSpaceInFrenchNumbers#*
-\ifLaTeXe#*
-\ifFBUnicodeNoBreakSpaces#*
-\kernFFN#*
-\labelindentFB#*
-\labelwidthFB#*
-\leftmarginFB#*
-\listfigurename#*
-\listindentFB#*
-\newfootnotemarkFB#*
-\No
-\no
-\NoAutoSpaceBeforeFDP#*
-\NoAutoSpacing
-\NoEveryParQuote#*
-\noextrasfrench#*
-\noextrasacadian#*
-\nombre{arg}#*
-\nos
-\Nos
-\og
-\ogi#*
-\ogii#*
-\pagename#*
-\parindentFFN#*
-\partfirst#*
-\partfirst#*
-\partnameord#*
-\partsecond#*
-\partsecond#*
-\prefacename#*
-\primo
-\proofname#*
-\quarto
-\rmfamilyFB#*
-\secundo
-\seename#*
-\sffamilyFB#*
-\StandardMathComma
-\tertio
-\tild
-\ttfamilyFB#*
-\up{text}
-\xspace
-\setlistindentFB#*
 #endif
 
 ### friulan.ldf v1.3 ###
@@ -2900,6 +2706,26 @@ TocPartFullName#true,false
 \glossaryname#*
 #endif
 
+### kazakh.ldf v1.0 ###
+#ifOption:kazakh
+\captionskazakh#*
+\datekazakh#*
+\extraskazakh#*
+\noextraskazakh#*
+\prefacename#*
+\bibname#*
+\chaptername#*
+\tocname#*
+\authorname#*
+\enclname#*
+\ccname#*
+\headtoname#*
+\pagename#*
+\seename#*
+\alsoname#*
+\proofname#*
+#endif
+
 ### kurmanji.ldf v1.1 ###
 #ifOption:kurmanji
 \captionskurmanji#*
@@ -3197,45 +3023,33 @@ TocPartFullName#true,false
 \tbar{arg}#*
 #endif
 
-### magyar.ldf v1.5c (and alias hungarian) ###
+### magyar.ldf v1.6c (and alias hungarian) ###
 #ifOption:magyar
 \captionsmagyar#*
 \datemagyar#*
 \extrasmagyar#*
 \noextrasmagyar#*
-\ondatemagyar
-\prefacename#*
-\bibname#*
-\enclname#*
-\ccname#*
-\headtoname#*
-\proofname#*
-\glossaryname#*
-\chaptername#*
-\notesname#*
-\pagename#*
-\seename#*
-\alsoname#*
+\magyarOptions#*
+
 \acite*{keylist}#c
 \Acite*{keylist}#c
-\acite{keylist}#c
 \Acite{keylist}#c
+\acite{keylist}#c
+\alsoname#*
 \apageref*{label}#r
 \Apageref*{label}#r
-\apageref{label}#r
 \Apageref{label}#r
-\aref({label})#r
+\apageref{label}#r
 \Aref({label})#r
-\aref*{label}#r
+\aref({label})#r
 \Aref*{label}#r
+\aref*{label}#r
 \aref{label}#r
 \Aref{label}#r
-\atold%<⟨szám⟩%>+%<⟨toldalék⟩%>{}
 \Atold%<⟨szám⟩%>+%<⟨toldalék⟩%>{}
+\atold%<⟨szám⟩%>+%<⟨toldalék⟩%>{}
 \az*{szó}
 \Az*{szó}
-\az{szó}
-\Az{szó}
 \az+%<\refcmd{label}%>
 \Az+%<\refcmd{label}%>
 \azc{keylist}#*c
@@ -3244,12 +3058,47 @@ TocPartFullName#true,false
 \Azp{label}#*r
 \azr{label}#*r
 \Azr{label}#*r
-\captionlabeldelim#S
+\Az{szó}
+\az{szó}
+\bibname#*
+\ccname#*
+\chaptername#*
 \dMf#S
-\editorfootnote{lábjegyzet-szöveg%text}
+\editorfootnote{lábjegyzet szöveg%text}
 \emitdate[toldalék]{formátum}{dátum}
 \emitdate{formátum}{dátum}
+\enclname#*
 \factorial#m
+\glossaryname#*
+\hang{bekezdéskezdő jel}
+\headingfootnote[szám]{lábjegyzet szöveg%text}
+\headingfootnote{lábjegyzet szöveg%text}
+\headtoname#*
+\HuComma#*
+\hunnewlabel#*
+\Hunumeral{counter}
+\hunumeral{counter}
+\huordinal{counter}
+\Huordinal{counter}
+\magyarDumpHuMin#*
+\makeFootnotable{környezetnév}
+\MathBrkAll{szimbólum}#m
+\MathBrk{szimbólum}#m
+\MathReal{képlet tizedestörtekkel%formula}
+\mond %<⟨kimondott szöveg⟩%>
+\notesname#*
+\ondatemagyar
+\ontoday
+\pagename#*
+\prefacename#*
+\proofname#*
+\refstrucparen{label}#Sr
+\refstruc{label}#r
+\SafeToday
+\seename#*
+\textqq{szövegközti idézet%text}
+\told%<⟨szám⟩%>+%<⟨toldalék1⟩%>+%<⟨toldalék2⟩%>{}
+\told%<⟨szám⟩%>+%<⟨toldalék⟩%>{}
 \footnotestyle{előírás%keyvals}
 #keyvals:\footnotestyle
 reset=#none,section,chapter,page,page-resume,page-cont
@@ -3264,29 +3113,6 @@ huplain
 starplain
 editor
 #endkeyvals
-\hang{bekezdéskezdő jel}
-\headingfootnote[szám]{lábjegyzet-szöveg%text}
-\headingfootnote{lábjegyzet-szöveg%text}
-\HuComma#*
-\hunnewlabel#*
-\Hunumeral{counter}
-\hunumeral{counter}
-\huordinal{counter}
-\Huordinal{counter}
-\magyarDumpHuMin#*
-\makeFootnotable{környezet-név}
-\MathBrk{szimbólum}#m
-\MathBrkAll{szimbólum}#m
-\MathReal{képlet tizedestörtekkel%formula}
-\mond %<⟨kimondott szöveg⟩%>
-\ondatemagyar
-\ontoday
-\refstruc{label}#r
-\refstrucparen{label}#*r
-\SafeToday
-\textqq{szövegközti idézet%text}
-\told%<⟨szám⟩%>+%<⟨toldalék⟩%>{}
-\told%<⟨szám⟩%>+%<⟨toldalék1⟩%>+%<⟨toldalék2⟩%>{}
 #endif
 
 #ifOption:hungarian
@@ -3294,38 +3120,27 @@ editor
 \datehungarian#*
 \extrashungarian#*
 \noextrashungarian#*
-\prefacename#*
-\bibname#*
-\enclname#*
-\ccname#*
-\headtoname#*
-\proofname#*
-\glossaryname#*
-\chaptername#*
-\notesname#*
-\pagename#*
-\seename#*
-\alsoname#*
+\hungarianOptions#*
+
 \acite*{keylist}#c
 \Acite*{keylist}#c
-\acite{keylist}#c
 \Acite{keylist}#c
+\acite{keylist}#c
+\alsoname#*
 \apageref*{label}#r
 \Apageref*{label}#r
-\apageref{label}#r
 \Apageref{label}#r
-\aref({label})#r
+\apageref{label}#r
 \Aref({label})#r
-\aref*{label}#r
+\aref({label})#r
 \Aref*{label}#r
+\aref*{label}#r
 \aref{label}#r
 \Aref{label}#r
-\atold%<⟨szám⟩%>+%<⟨toldalék⟩%>{}
 \Atold%<⟨szám⟩%>+%<⟨toldalék⟩%>{}
+\atold%<⟨szám⟩%>+%<⟨toldalék⟩%>{}
 \az*{szó}
 \Az*{szó}
-\az{szó}
-\Az{szó}
 \az+%<\refcmd{label}%>
 \Az+%<\refcmd{label}%>
 \azc{keylist}#*c
@@ -3334,12 +3149,47 @@ editor
 \Azp{label}#*r
 \azr{label}#*r
 \Azr{label}#*r
-\captionlabeldelim#S
+\Az{szó}
+\az{szó}
+\bibname#*
+\ccname#*
+\chaptername#*
 \dMf#S
-\editorfootnote{lábjegyzet-szöveg%text}
+\editorfootnote{lábjegyzet szöveg%text}
 \emitdate[toldalék]{formátum}{dátum}
 \emitdate{formátum}{dátum}
+\enclname#*
 \factorial#m
+\glossaryname#*
+\hang{bekezdéskezdő jel}
+\headingfootnote[szám]{lábjegyzet szöveg%text}
+\headingfootnote{lábjegyzet szöveg%text}
+\headtoname#*
+\HuComma#*
+\hunnewlabel#*
+\Hunumeral{counter}
+\hunumeral{counter}
+\huordinal{counter}
+\Huordinal{counter}
+\magyarDumpHuMin#*
+\makeFootnotable{környezetnév}
+\MathBrkAll{szimbólum}#m
+\MathBrk{szimbólum}#m
+\MathReal{képlet tizedestörtekkel%formula}
+\mond %<⟨kimondott szöveg⟩%>
+\notesname#*
+\ondatemagyar
+\ontoday
+\pagename#*
+\prefacename#*
+\proofname#*
+\refstrucparen{label}#Sr
+\refstruc{label}#r
+\SafeToday
+\seename#*
+\textqq{szövegközti idézet%text}
+\told%<⟨szám⟩%>+%<⟨toldalék1⟩%>+%<⟨toldalék2⟩%>{}
+\told%<⟨szám⟩%>+%<⟨toldalék⟩%>{}
 \footnotestyle{előírás%keyvals}
 #keyvals:\footnotestyle
 reset=#none,section,chapter,page,page-resume,page-cont
@@ -3354,29 +3204,6 @@ huplain
 starplain
 editor
 #endkeyvals
-\hang{bekezdéskezdő jel}
-\headingfootnote[szám]{lábjegyzet-szöveg%text}
-\headingfootnote{lábjegyzet-szöveg%text}
-\HuComma#*
-\hunnewlabel#*
-\Hunumeral{counter}
-\hunumeral{counter}
-\huordinal{counter}
-\Huordinal{counter}
-\magyarDumpHuMin#*
-\makeFootnotable{környezet-név}
-\MathBrk{szimbólum}#m
-\MathBrkAll{szimbólum}#m
-\MathReal{képlet tizedestörtekkel%formula}
-\mond %<⟨kimondott szöveg⟩%>
-\ondatehungarian
-\ontoday
-\refstruc{label}#r
-\refstrucparen{label}#*r
-\SafeToday
-\textqq{szövegközti idézet%text}
-\told%<⟨szám⟩%>+%<⟨toldalék⟩%>{}
-\told%<⟨szám⟩%>+%<⟨toldalék1⟩%>+%<⟨toldalék2⟩%>{}
 #endif
 
 ### malay.ldf v1.0m (and proxies bahasam.ldf, melayu.ldf, and meyalu.ldf) ###
@@ -4918,7 +4745,7 @@ mexico-com
 \glossaryname#*
 #endif
 
-### ukraineb.ldf v1.4e ###
+### ukraineb.ldf v1.5 ###
 #ifOption:ukrainian
 \cyrdash
 \Ukrainian
@@ -5027,6 +4854,9 @@ mexico-com
 \lstlistlistingname#*
 \notesname#*
 \nomname#*
+\algorithmname#*
+\hypothesisname#*
+\theoremname#*
 \abbgyear#*
 \No
 #endif

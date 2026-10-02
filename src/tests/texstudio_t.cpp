@@ -173,3 +173,96 @@ void TexStudioTest::checkIncludesCached(){
     QEQUAL(synError,false);
     QEQUAL(refFound,refPresent);
 }
+
+void TexStudioTest::normalCompletion_data(){
+    QTest::addColumn<QString>("text");
+    QTest::addColumn<int>("line");
+    QTest::addColumn<int>("column");
+    QTest::addColumn<LatexCompleter::CompletionFlags>("flags");
+
+    QTest::newRow("command") << QStringLiteral("\\be") << 0 << 3 << LatexCompleter::CompletionFlags();
+    QTest::newRow("environment") << QStringLiteral("\\begin{doc") << 0 << 11 << LatexCompleter::CompletionFlags();
+    QTest::newRow("ref") << QStringLiteral("\\label{test}\\ref{t") << 0 << 18 << LatexCompleter::CompletionFlags(LatexCompleter::CF_FORCE_REF);
+    QTest::newRow("cite") << QStringLiteral("\\bibitem{test}\\cite{t") << 0 << int(QStringLiteral("\\bibitem{test}\\cite{t").size()) << LatexCompleter::CompletionFlags(LatexCompleter::CF_FORCE_CITE);
+    //QTest::newRow("package") << QStringLiteral("\\usepackage{a") << 0 << int(QStringLiteral("\\usepackage{a").size()) << LatexCompleter::CompletionFlags(LatexCompleter::CF_FORCE_PACKAGE);
+    //QTest::newRow("graphic") << QStringLiteral("\\usepackage{graphicx}\\includegraphics{f") << 0 << int(QStringLiteral("\\usepackage{graphicx}\\includegraphics{f").size()) << LatexCompleter::CompletionFlags(LatexCompleter::CF_FORCE_GRAPHIC);
+    QTest::newRow("keyval_key") << QStringLiteral("\\usepackage{fancyvrb}\\fvset{f") << 0 << int(QStringLiteral("\\usepackage{fancyvrb}\\fvset{f").size()) << LatexCompleter::CompletionFlags(LatexCompleter::CF_FORCE_KEYVAL);
+    QTest::newRow("keyval_valAfterEqual") << QStringLiteral("\\usepackage{fancyvrb}\\fvset{frame=") << 0 << int(QStringLiteral("\\usepackage{fancyvrb}\\fvset{frame=").size()) << LatexCompleter::CompletionFlags(LatexCompleter::CF_FORCE_KEYVAL);
+    QTest::newRow("keyval_val") << QStringLiteral("\\usepackage{fancyvrb}\\fvset{frame=s") << 0 << int(QStringLiteral("\\usepackage{fancyvrb}\\fvset{frame=s").size()) << LatexCompleter::CompletionFlags(LatexCompleter::CF_FORCE_KEYVAL);
+    QTest::newRow("keyval_keyAfterComma") << QStringLiteral("\\usepackage{fancyvrb}\\fvset{frame=s,") << 0 << int(QStringLiteral("\\usepackage{fancyvrb}\\fvset{frame=s,").size()) << LatexCompleter::CompletionFlags(LatexCompleter::CF_FORCE_KEYVAL);
+}
+
+void TexStudioTest::normalCompletion(){
+    QFETCH(QString, text);
+    QFETCH(int, line);
+    QFETCH(int, column);
+    QFETCH(LatexCompleter::CompletionFlags, flags);
+
+    Texstudio *txs = txsInstance;
+    QVERIFY2(txs, "The Texstudio instance must exist for completion tests");
+
+    LatexEditorView *edView = txs->currentEditorView();
+    if (!edView) {
+        QVERIFY2(QMetaObject::invokeMethod(txs, "fileNewInternal", Qt::DirectConnection), "A new document should be created for completion tests");
+        edView = txs->currentEditorView();
+    }
+    QVERIFY2(edView, "A LatexEditorView must be available for completion tests");
+    QVERIFY2(edView->editor, "The editor should be created before invoking completion");
+
+    edView->editor->setText(text, false);
+    edView->editor->setCursor(edView->editor->document()->cursor(line, column));
+    LatexEditorView::getCompleter()->close();
+    QCoreApplication::processEvents();
+
+    QVERIFY2(!LatexEditorView::getCompleter()->isVisible(), "The completer should start closed before invoking normal completion");
+    QVERIFY2(QMetaObject::invokeMethod(txs, "normalCompletion", Qt::DirectConnection), "normalCompletion should be invokable");
+    QCoreApplication::processEvents();
+    QVERIFY2(LatexEditorView::getCompleter()->isVisible(), "normalCompletion should open the completion popup");
+    QVERIFY2(LatexEditorView::getCompleter()->countWords() > 0, "normalCompletion should produce completion entries");
+    QVERIFY2(gatherCompletionFlags() == flags, "normalCompletion should set the correct completion flags");
+    LatexEditorView::getCompleter()->close();
+}
+/*!
+ * \brief recreate the completion flags from the current configuration
+ * Converts the current configuration into a set of completion flags that can be used to control the behavior of the completion engine.
+ * \return
+ */
+LatexCompleter::CompletionFlags TexStudioTest::gatherCompletionFlags()
+{
+    LatexCompleter *completer = LatexEditorView::getCompleter();
+    LatexCompleter::CompletionFlags flags;
+    if(completer){
+        if(completer->forcedCite)
+            flags |= LatexCompleter::CF_FORCE_CITE;
+        if(completer->forcedRef)
+            flags |= LatexCompleter::CF_FORCE_REF;
+        if(completer->forcedPackage)
+            flags |= LatexCompleter::CF_FORCE_PACKAGE;
+        if(completer->forcedGraphic)
+            flags |= LatexCompleter::CF_FORCE_GRAPHIC;
+        if(completer->forcedKeyval)
+            flags |= LatexCompleter::CF_FORCE_KEYVAL;
+        if(completer->forcedSpecialOption)
+            flags |= LatexCompleter::CF_FORCE_SPECIALOPTION;
+        if(completer->forcedLength)
+            flags |= LatexCompleter::CF_FORCE_LENGTH;
+    }
+    return flags;
+}
+
+/*!
+ * \brief check that dropped files are recognized as coming from the internal
+ * file explorer only when the drag source is that widget (or its viewport),
+ * see #4608 and #4644
+ */
+void TexStudioTest::dragDropTexFileSource()
+{
+    Texstudio *txs = txsInstance;
+    QVERIFY2(txs, "The Texstudio instance must exist for drag/drop tests");
+    QVERIFY2(txs->fileView, "The internal file explorer must exist for drag/drop tests");
+
+    QVERIFY2(txs->isInternalFileExplorerDragSource(txs->fileView), "drag from the file explorer widget itself should be recognized as internal");
+    QVERIFY2(txs->isInternalFileExplorerDragSource(txs->fileView->viewport()), "drag from the file explorer's viewport should be recognized as internal");
+    QVERIFY2(!txs->isInternalFileExplorerDragSource(nullptr), "a drop without a source (e.g. from an external application) must not be recognized as internal");
+    QVERIFY2(!txs->isInternalFileExplorerDragSource(txs), "a drag from an unrelated widget must not be recognized as internal");
+}

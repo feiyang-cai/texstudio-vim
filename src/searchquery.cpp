@@ -272,7 +272,7 @@ void SearchQuery::replaceAll()
 }
 
 
-LabelSearchQuery::LabelSearchQuery(QString label) :
+LabelSearchQuery::LabelSearchQuery(QString label, bool defintionOnly) :
 	SearchQuery(label, label, IsWord | IsCaseSensitive | SearchAgainAllowed | ReplaceAllowed)
 {
 	mModel = new LabelSearchResultModel(this);
@@ -281,6 +281,8 @@ LabelSearchQuery::LabelSearchQuery(QString label) :
 	mScope = ProjectScope;
 	mType = tr("Label Search");
 	mModel->setAllowPartialSelection(false);
+
+    mDefinitionOnly=defintionOnly;
 }
 
 void LabelSearchQuery::run(LatexDocument *doc)
@@ -288,17 +290,27 @@ void LabelSearchQuery::run(LatexDocument *doc)
 	mModel->removeAllSearches();
 	QString labelText = searchExpression();
 	QMultiHash<QDocumentLineHandle *, int> usages = doc->getLabels(labelText);
-	usages += doc->getRefs(labelText);
-	QHash<QDocument *, QList<QDocumentLineHandle *> > usagesByDocument;
+    if(!mDefinitionOnly){
+        usages += doc->getRefs(labelText);
+    }
+    QHash<QDocument *, QList<int> > usagesByDocument;
 	foreach (QDocumentLineHandle *dlh, usages.keys()) {
+        if(dlh==nullptr) continue;
 		QDocument *doc = dlh->document();
-		QList<QDocumentLineHandle *> dlhs = usagesByDocument[doc];
-		dlhs.append(dlh);
-		usagesByDocument.insert(doc, dlhs);
+        const int lineNr = doc->indexOf(dlh);
+        QList<int> lineNrs = usagesByDocument[doc];
+        auto it = std::lower_bound(lineNrs.begin(), lineNrs.end(), lineNr);
+        lineNrs.insert(it, lineNr);
+        usagesByDocument.insert(doc, lineNrs);
 	}
 
 	foreach (QDocument *doc, usagesByDocument.keys()) {
-		addDocSearchResult(doc, usagesByDocument.value(doc));
+        QList<QDocumentLineHandle *> usagesInDoc;
+        foreach(const int &lineNr, usagesByDocument.value(doc)){
+            QDocumentLineHandle *dlh=doc->line(lineNr).handle();
+            if(dlh) usagesInDoc.append(dlh);
+        }
+        addDocSearchResult(doc, usagesInDoc);
 	}
 
 	emit runCompleted();

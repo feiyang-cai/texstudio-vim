@@ -1,0 +1,82 @@
+# proofgraph package
+# Matthew Bertucci 2026/09/04 for v1.1.1
+
+#include:amsthm
+#include:etoolbox
+#include:xstring
+#include:kvoptions
+#include:pdftexcmds
+#include:shellesc
+
+#keyvals:\usepackage/proofgraph#c
+autorun#true,false
+cite#true,false
+citelabel=#key,tag
+direction=#usedby,uses
+engine=%<engine%>
+file=%<file name%>
+format=%<format%>
+hyperlinks#true,false
+rankdir=%<direction%>
+selfloops=#remove,keep
+statements#true,false
+#endkeyvals
+
+\proofgraph
+\proofgraph[options%keyvals]
+\proofgraphcitecommand{csname1,csname2,...}
+\proofgraphciteedge{result}{bibid}#C
+\proofgraphciteedge[note%text]{result}{bibid}#C
+\proofgraphedge{result}{label1,label2,...}
+\proofgraphexclude{label}
+\proofgraphignore{from}{to}
+\proofgraphignorecite{result}{bibid}#C
+\proofgraphignorecite[note%text]{result}{bibid}#C
+\proofgraphstylecite{attributes}
+\proofgraphstyle{style}{attributes}
+\proofgraphtrack{names}
+\proofgraphuntrack{names}
+\proofof{label%plain}
+\uses{label1,label2,...}
+\usescite{bibid}#C
+\usescite[note%text]{bibid}#C
+
+#keyvals:\proofgraph
+actualtext={%<text%>}
+alt={%<alt text%>}
+artifact#true,false
+bb=%<llx lly urx ury%>
+bbllx=
+bblly=
+bburx=
+bbury=
+natwidth=
+natheight=
+hiresbb#true,false
+pagebox=#mediabox,cropbox,bleedbox,trimbox,artbox
+viewport=%<llx lly urx ury%>
+trim=%<llx lly urx ury%>
+angle=%<degrees%>
+origin=
+width=##L
+height=##L
+totalheight=##L
+keepaspectratio#true,false
+scale=%<factor%>
+clip#true,false
+draft#true,false
+type=%<file type%>
+ext=%<file extension%>
+read=%<read-file extension%>
+command=
+quiet
+page=%<page number%>
+interpolate#true,false
+decodearray={%<color array%>}
+#endkeyvals
+
+# not documented
+\pgphnodemap{arg1}{arg2}#S
+\pgphnodemapcite{arg1}{arg2}#S
+
+

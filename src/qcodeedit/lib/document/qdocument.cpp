@@ -654,7 +654,7 @@ QStringList QDocument::textLines() const{
 /*!
 	\brief Set the content of the document
 */
-void QDocument::setText(const QString& s, bool allowUndo)
+void QDocument::setText(const QString& s, bool allowUndo,bool notVisible)
 {
 	if ( !m_impl )
 		return;
@@ -758,7 +758,12 @@ void QDocument::setText(const QString& s, bool allowUndo)
 
 	emit lineCountChanged(lineCount());
 
-	m_impl->emitContentsChange(0, m_impl->m_lines.count());
+    if(!notVisible){
+        // avoid update when loaded as hidden file
+        // would perform line wrap and similar
+        // update can be forced by calling highlight()
+        m_impl->emitContentsChange(0, m_impl->m_lines.count());
+    }
 }
 
 QTextCodec* guessEncoding(const QByteArray& data){
@@ -778,7 +783,7 @@ QTextCodec* guessEncoding(const QByteArray& data){
  * \param file
  * \param codec
  */
-void QDocument::load(const QString& file, QTextCodec* codec){
+void QDocument::load(const QString& file, QTextCodec* codec,bool notVisible){
 	QFile f(file);
 
 	// gotta handle line endings ourselves if we want to detect current line ending style...
@@ -793,7 +798,7 @@ void QDocument::load(const QString& file, QTextCodec* codec){
     if (codec == nullptr)
         codec=guessEncoding(d);
 
-    setText(codec->toUnicode(d), false);
+    setText(codec->toUnicode(d), false,notVisible);
 
 	setCodecDirect(codec);
 	setLastModified(QFileInfo(file).lastModified());
@@ -3477,16 +3482,24 @@ void QDocumentLineHandle::layout(int lineNr) const
 
 void QDocumentLineHandle::setParenthesis(QVector<QParenthesis> parens)
 {
-    lockForWrite();
+    QWriteLocker locker(&mLock);
+    setParenthesisNoLock(parens);
+}
+
+void QDocumentLineHandle::setParenthesisNoLock(QVector<QParenthesis> parens)
+{
     m_parens=parens;
-    unlock();
 }
 
 QVector<QParenthesis> QDocumentLineHandle::parenthesis()
 {
-    lockForRead();
+    QReadLocker locker(&mLock);
+    return parenthesisNoLock();
+}
+
+QVector<QParenthesis> QDocumentLineHandle::parenthesisNoLock()
+{
     QVector<QParenthesis>result=m_parens;
-    unlock();
     return result;
 }
 
@@ -7548,7 +7561,12 @@ void QDocumentPrivate::updateStaticCaches(const QPaintDevice *pd)
 		m_descent = fm.descent();
 		m_lineHeight = fm.height();
         m_leading = fm.leading() + (m_lineSpacingFactor-1.0)*m_lineHeight;
-		m_lineSpacing = m_leading+m_lineHeight;
+        m_lineSpacing = m_leading+m_lineHeight;
+#ifdef Q_OS_LINUX
+        if(m_leading<0.1){
+            m_lineSpacing += 1; // extend line spaing to 1 pixel, avoids cut underscores on wayland (issue #4495)
+        }
+#endif
 		//if ( !m_fixedPitch )
 		//	qDebug("unsafe computations...");
 

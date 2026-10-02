@@ -8,8 +8,6 @@
 #include <QJsonArray>
 #include "chatdelegate.h"
 
-extern bool darkMode;
-
 class AIChatAssistant : public QDialog
 {
     Q_OBJECT
@@ -17,7 +15,6 @@ public:
     explicit AIChatAssistant(QWidget *parent = nullptr);
     ~AIChatAssistant() override;
 
-    void setSelectedText(QString text);
     void setQueryText(const QString &text);
     void clearConversation();
     void executeQuery();
@@ -27,7 +24,7 @@ signals:
     void executeMacro(QString script);
 
 private slots:
-    void slotSend();
+    void slotSend(bool fromToolCall=false);
     void slotInsert();
     void slotCopyText();
     void slotOptions();
@@ -56,7 +53,6 @@ protected:
     QSplitter *hlBrowser;
 
     QString m_response;
-    QString m_selectedText;
     QString m_conversationFileName;
 
     QJsonArray ja_messages;
@@ -71,9 +67,42 @@ protected:
     QString makeJsonDoc() const;
     void updateConversationForChatview();
     void updateStreamedConversation(const QString &allData);
+    QJsonArray makeFunctionsJsonArray() const;
+    void handleToolCall(QJsonObject jo);
 
     void addMessage (const QString &text, Sender sender);
     void insertTextAtCursor(const QString &text);
+
+    QString tfGetFilename(const QString arg=QString()) const;
+    QString tfGetListFiles(const QString arg=QString()) const;
+    QString tfGetSelection(const QString arg=QString()) const;
+    QString tfRunMacro(const QString arg) const; //TODO ?
+    QString tfGetLog(const QString arg=QString()) const; // TODO ? fails only ?
+    QString tfGetText(const QString arg=QString()) const;
+    QString tfSetCursor(const QString arg) const;
+    QString tfSetSelection(const QString arg) const;
+    QString tfGetCursorPosition(const QString arg=QString()) const;
+    QString tfGetLineText(const QString arg) const;
+    QString tfGetLineLength(const QString arg) const;
+    QString tfGetNumberLines(const QString arg) const;
+    QString tfFindText(const QString arg,bool regExp=false) const;
+    QString tfReplaceSelectedText(const QString arg) const;
+
+    QMap<QString,int> retrieveToolArguments(const QString &parameter) const;
+    QMap<QString,QString> retrieveToolArgumentsString(const QString &parameter) const;
+
+    struct ToolFunction
+    {
+        QString name;
+        QString description;
+        QString parameter;
+        std::function<QString(const QString)> func;
+    };
+    QList<ToolFunction> m_toolFunctions;
+    /*!
+     * \brief register functions as tools for AI provider
+     */
+    void registerToolFunctions();
 };
 
 #endif // AICHATASSISTANT_H

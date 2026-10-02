@@ -583,11 +583,18 @@ bool latexDetermineContexts2(QDocumentLineHandle *dlh, TokenStack &stack, Comman
                     stack.push(tk);
                     ++tk.level;
                     lexed << tk;
+                    // stack lastEqual/lastComma
+                    ArgumentSeparator argSep;
+                    argSep.lastComma=lastComma;
+                    argSep.lastEqual=lastEqual;
+                    argumentStack.push(argSep);
+                    lastComma = -1;
+                    lastEqual = -1e6;
                 }
             }
             continue;
         }
-	    if (Token::tkClose().contains(tk.type)) {
+        if (Token::tkClose().contains(tk.type)) {
             // special treament for brackets as they don't have any syntactic meaning except with some commands
             if (tk.type == Token::closeBracket || tk.type == Token::greater ) {
                 if (stack.isEmpty())
@@ -616,7 +623,6 @@ bool latexDetermineContexts2(QDocumentLineHandle *dlh, TokenStack &stack, Comman
                     lastComma = -1;
                 }
                 if (tk1.subtype == Token::keyValArg) {
-                    lastComma = -1;
                     if (lastEqual > -1e6) {
                         if (!lexed.isEmpty() && lexed.last().type == Token::keyVal_key) {
                             // no value added, add empty key_val
@@ -631,6 +637,7 @@ bool latexDetermineContexts2(QDocumentLineHandle *dlh, TokenStack &stack, Comman
                         }
                         level = lastEqual;
                     }
+                    lastComma = -1;
                     lastEqual = -1e6;
                 }
                 // handle stacked lastComma/lastEqual
@@ -781,6 +788,11 @@ bool latexDetermineContexts2(QDocumentLineHandle *dlh, TokenStack &stack, Comman
                     level = lastEqual;
                 }
                 lastEqual = -1e6;
+                // add comma as token, to be removed if other key is present
+                // needed to separate keyVal from subsequent yet empty keys
+                tk.level = level;
+                tk.subtype = Token::keyVal_key;
+                lexed << tk;
                 continue;
             }
             if (tk.type == Token::symbol && line.mid(tk.start, 1) == "=") {
@@ -814,6 +826,11 @@ bool latexDetermineContexts2(QDocumentLineHandle *dlh, TokenStack &stack, Comman
                     }
                 }
                 keyName = line.mid(tk.start, tk.length);
+                // remove placeholder comma if present
+                if(lexed.length()>0 && lexed.last().subtype==Token::keyVal_key && lexed.last().type==Token::punctuation && line.mid(lexed.last().start, lexed.last().length)==","){
+                    // remove token from lexed and replace with current token
+                    lexed.removeLast();
+                }
                 lexed << tk;
                 lastComma = lexed.length() - 1;
             } else {
@@ -1277,7 +1294,7 @@ QString findRestArg(QDocumentLineHandle *dlh, Token::TokenType type, int hint, i
 			// closing found
 			return result.left(tk.start);
 		}
-		if (Token::tkClose().contains(tk.type)) {
+        if (Token::tkClose().contains(tk.type)) {
 			// wrong closing found/ syntax problem
 			//return value anyway
 			return result.left(tk.start + 1);
@@ -1308,7 +1325,7 @@ Token getTokenAtCol(QDocumentLineHandle *dlh, int pos, bool first)
 			if (first)
 				break;
 		}
-		if (!Token::tkBraces().contains(elem.type) && !Token::tkClose().contains(elem.type) && elem.start + elem.length >= pos) { // get abc|} -> abc
+        if (!Token::tkBraces().contains(elem.type) && !Token::tkClose().contains(elem.type) && elem.start + elem.length >= pos) { // get abc|} -> abc
 			tk = elem; // get deepest element at col
 			if (first)
 				break;

@@ -7,11 +7,14 @@ permissions:
   contents: read
 
 env:
-  OSX_QT_VERSION: 6.10.2
-  OSX_POPPLER_VERSION: 26.03.0
+  OSX_QT_VERSION: 6.11.1
+  OSX_POPPLER_VERSION: 26.08.0
   OSX_QUAZIP_VERSION: 1.5
 
 jobs:
+  verify:
+    uses: ./.github/workflows/ci.yml
+
   build-win10:
     name: win10 build (msys2)
     if: github.event_name == 'push'
@@ -20,18 +23,20 @@ jobs:
       run:
         shell: msys2 {0}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - uses: msys2/setup-msys2@v2
         with:
           msystem: UCRT64
           update: true
-          install: | 
+          install: |
             git make mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-toolchain mingw-w64-ucrt-x86_64-ninja
-            mingw-w64-ucrt-x86_64-qt6-base mingw-w64-ucrt-x86_64-qt6-declarative 
-            mingw-w64-ucrt-x86_64-qt6-tools 
+            mingw-w64-ucrt-x86_64-qt6-base mingw-w64-ucrt-x86_64-qt6-declarative
+            mingw-w64-ucrt-x86_64-qt6-tools
             mingw-w64-ucrt-x86_64-qt6-svg
-            mingw-w64-ucrt-x86_64-nsis mingw-w64-ucrt-x86_64-quazip-qt6 
-            mingw-w64-ucrt-x86_64-hunspell mingw-w64-ucrt-x86_64-qt6-translations 
+            mingw-w64-ucrt-x86_64-nsis mingw-w64-ucrt-x86_64-quazip-qt6
+            mingw-w64-ucrt-x86_64-hunspell mingw-w64-ucrt-x86_64-qt6-translations
             mingw-w64-ucrt-x86_64-python-mingw-ldd zip unzip
 
       - name: Install special poppler pkg
@@ -51,7 +56,7 @@ jobs:
           sed -i ../win.rc -Ee "s/0,[0,]+/$(tr <<<"$TXS_VERSION" . ,),0/"
           sed -i ../win.rc -e "s/git[\]0/$VERSION_NAME/"
           # qmake-qt6 texstudio.pro CONFIG-=debug MXE=1 BUILD_ADWAITA=1 STRIP=1
-          cmake .. -Wno-dev
+          cmake .. -Wno-dev -DTEXSTUDIO_ENABLE_CPP23_CRASH_HANDLER=ON
           # work-around strange git behaviour on msys2
           . ../git_revision.sh
           mkdir signed-artifacts
@@ -77,7 +82,7 @@ jobs:
           echo "VERSION_NAME=${VERSION_NAME}">> $GITHUB_OUTPUT
           echo "TXS_VERSION=${TXS_VERSION}">> $GITHUB_OUTPUT
           echo "GIT_VERSION=${GIT_VERSION}">> $GITHUB_OUTPUT
-      
+
       - name: Detect if codesign
         run: |
           # Nonexistent context property evaluates to an empty string.
@@ -90,7 +95,7 @@ jobs:
           fi
 
       - name: disable codesign for normal pushs
-        if: startsWith(github.ref, 'refs/tags/') == false
+        if: startsWith(github.ref, 'refs/tags/texstudio-vim-') == false
         run: |
           echo "IF_CODESIGN=false" >> "$GITHUB_ENV"
           echo "::notice file=.github/workflows/cd.yml,title=Codesign disabled::Normal push detected."
@@ -100,14 +105,14 @@ jobs:
         if: env.IF_CODESIGN == 'true'
         uses: signpath/github-action-submit-signing-request@v2
         with:
-          api-token: '${{ secrets.SIGNPATH_API_TOKEN }}'
-          organization-id: '9e74d567-be9b-4bd4-929d-9978860f6cbc'
-          project-slug: 'texstudio'
-          signing-policy-slug: 'release-signing'
-          github-artifact-id: '${{steps.upload-binary.outputs.artifact-id}}'
-          artifact-configuration-slug: 'zipped_exe'
+          api-token: "${{ secrets.SIGNPATH_API_TOKEN }}"
+          organization-id: "9e74d567-be9b-4bd4-929d-9978860f6cbc"
+          project-slug: "texstudio"
+          signing-policy-slug: "release-signing"
+          github-artifact-id: "${{steps.upload-binary.outputs.artifact-id}}"
+          artifact-configuration-slug: "zipped_exe"
           wait-for-completion: true
-          output-artifact-directory: './signed-artifacts'
+          output-artifact-directory: "./signed-artifacts"
           parameters: |
             Version: ${{ toJSON(steps.version.outputs.VERSION_NAME) }}
             Release_Tag: "${{ steps.version.outputs.GIT_VERSION }}"
@@ -127,36 +132,35 @@ jobs:
           echo "VERSION_NAME=${VERSION_NAME}">> $GITHUB_OUTPUT
           echo "TXS_VERSION=${TXS_VERSION}">> $GITHUB_OUTPUT
           echo "GIT_VERSION=${GIT_VERSION}">> $GITHUB_OUTPUT
-          
 
       - name: Upload zip to GitHub Artifacts
         if: github.event_name == 'push'
         uses: actions/upload-artifact@v7
         with:
-          name: texstudio-win-qt6-zip
-          path: ./build/package-zip/texstudio-win-qt6-${{ steps.package.outputs.VERSION_NAME }}.zip
-          
+          name: texstudio-vim-win-qt6-zip
+          path: ./build/package-zip/texstudio-vim-win-qt6-${{ steps.package.outputs.VERSION_NAME }}.zip
+
       - name: Upload to GitHub Artifacts
         id: upload-artifact
         if: github.event_name == 'push'
         uses: actions/upload-artifact@v7
         with:
-          name: texstudio-win-qt6-exe
-          path: texstudio-win-qt6-${{ steps.package.outputs.VERSION_NAME }}.exe
+          name: texstudio-vim-win-qt6-exe
+          path: texstudio-vim-win-qt6-${{ steps.package.outputs.VERSION_NAME }}.exe
 
       - name: Codesign
         id: sign
         if: env.IF_CODESIGN == 'true'
         uses: signpath/github-action-submit-signing-request@v2
         with:
-          api-token: '${{ secrets.SIGNPATH_API_TOKEN }}'
-          organization-id: '9e74d567-be9b-4bd4-929d-9978860f6cbc'
-          project-slug: 'texstudio'
-          signing-policy-slug: 'release-signing'
-          github-artifact-id: '${{steps.upload-artifact.outputs.artifact-id}}'
-          artifact-configuration-slug: 'zipped_exe'
+          api-token: "${{ secrets.SIGNPATH_API_TOKEN }}"
+          organization-id: "9e74d567-be9b-4bd4-929d-9978860f6cbc"
+          project-slug: "texstudio"
+          signing-policy-slug: "release-signing"
+          github-artifact-id: "${{steps.upload-artifact.outputs.artifact-id}}"
+          artifact-configuration-slug: "zipped_exe"
           wait-for-completion: true
-          output-artifact-directory: './signed-artifacts'
+          output-artifact-directory: "./signed-artifacts"
           parameters: |
             Version: ${{ toJSON(steps.package.outputs.VERSION_NAME) }}
             Release_Tag: "${{ steps.package.outputs.GIT_VERSION }}"
@@ -165,29 +169,29 @@ jobs:
         id: copy_signed_binary
         if: env.IF_CODESIGN == 'true'
         run: |
-          cp signed-artifacts/texstudio-win-qt6-${{ steps.package.outputs.VERSION_NAME }}.exe texstudio-${{ steps.package.outputs.GIT_VERSION }}-win-qt6-signed.exe
-    
+          cp signed-artifacts/texstudio-vim-win-qt6-${{ steps.package.outputs.VERSION_NAME }}.exe texstudio-vim-${{ steps.package.outputs.GIT_VERSION }}-win-qt6-signed.exe
 
       - name: Upload signed installer to GitHub Artifacts
         id: upload-artifact-signed
         if: env.IF_CODESIGN == 'true' && github.event_name == 'push'
         uses: actions/upload-artifact@v7
         with:
-          name: texstudio-win-qt6-signed-exe
-          path: signed-artifacts/texstudio-win-qt6-${{ steps.package.outputs.VERSION_NAME }}.exe
-      
+          name: texstudio-vim-win-qt6-signed-exe
+          path: signed-artifacts/texstudio-vim-win-qt6-${{ steps.package.outputs.VERSION_NAME }}.exe
+
       - name: Upload release file(s)
         uses: actions/upload-artifact@v7
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/texstudio-vim-')
         with:
+          if-no-files-found: error
           name: release-win
           path: |
             ${{ env.IF_CODESIGN == 'true'
-                && format('texstudio-{0}-win-qt6-signed.exe', steps.package.outputs.GIT_VERSION)
-                || '' }}
-            texstudio-${{ steps.package.outputs.GIT_VERSION }}-win-portable-qt6.zip
+                && format('texstudio-vim-{0}-win-qt6-signed.exe', steps.package.outputs.GIT_VERSION)
+                || format('texstudio-vim-{0}-win-qt6.exe', steps.package.outputs.GIT_VERSION) }}
+            texstudio-vim-${{ steps.package.outputs.GIT_VERSION }}-win-portable-qt6.zip
 
-###################################
+  ###################################
 
   build-win10-arm:
     name: win10 build (msys2,arm)
@@ -197,19 +201,21 @@ jobs:
       run:
         shell: msys2 {0}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
       - uses: msys2/setup-msys2@v2
         with:
           msystem: CLANGARM64
           update: true
-          install: | 
+          install: |
             git make mingw-w64-clang-aarch64-cmake mingw-w64-clang-aarch64-toolchain mingw-w64-clang-aarch64-ninja
-            mingw-w64-clang-aarch64-qt6-base mingw-w64-clang-aarch64-qt6-declarative 
-            mingw-w64-clang-aarch64-qt6-tools 
+            mingw-w64-clang-aarch64-qt6-base mingw-w64-clang-aarch64-qt6-declarative
+            mingw-w64-clang-aarch64-qt6-tools
             mingw-w64-clang-aarch64-qt6-svg
             mingw-w64-clang-x86_64-nsis
-            mingw-w64-clang-aarch64-quazip-qt6 
-            mingw-w64-clang-aarch64-hunspell mingw-w64-clang-aarch64-qt6-translations 
+            mingw-w64-clang-aarch64-quazip-qt6
+            mingw-w64-clang-aarch64-hunspell mingw-w64-clang-aarch64-qt6-translations
             mingw-w64-clang-aarch64-python-mingw-ldd zip unzip
 
       - name: Install special poppler pkg
@@ -229,7 +235,7 @@ jobs:
           sed -i ../win.rc -Ee "s/0,[0,]+/$(tr <<<"$TXS_VERSION" . ,),0/"
           sed -i ../win.rc -e "s/git[\]0/$VERSION_NAME/"
           # qmake-qt6 texstudio.pro CONFIG-=debug MXE=1 BUILD_ADWAITA=1 STRIP=1
-          cmake .. -Wno-dev -DTEXSTUDIO_ENABLE_CRASH_HANDLER=OFF
+          cmake .. -Wno-dev -DTEXSTUDIO_ENABLE_CRASH_HANDLER=OFF -DCMAKE_BUILD_TYPE=Release
           # work-around strange git behaviour on msys2
           . ../git_revision.sh
           mkdir signed-artifacts
@@ -255,7 +261,7 @@ jobs:
           echo "VERSION_NAME=${VERSION_NAME}">> $GITHUB_OUTPUT
           echo "TXS_VERSION=${TXS_VERSION}">> $GITHUB_OUTPUT
           echo "GIT_VERSION=${GIT_VERSION}">> $GITHUB_OUTPUT
-      
+
       - name: Detect if codesign
         run: |
           # Nonexistent context property evaluates to an empty string.
@@ -268,7 +274,7 @@ jobs:
           fi
 
       - name: disable codesign for normal pushs
-        if: startsWith(github.ref, 'refs/tags/') == false
+        if: startsWith(github.ref, 'refs/tags/texstudio-vim-') == false
         run: |
           echo "IF_CODESIGN=false" >> "$GITHUB_ENV"
           echo "::notice file=.github/workflows/cd.yml,title=Codesign disabled::Normal push detected."
@@ -278,14 +284,14 @@ jobs:
         if: env.IF_CODESIGN == 'true'
         uses: signpath/github-action-submit-signing-request@v2
         with:
-          api-token: '${{ secrets.SIGNPATH_API_TOKEN }}'
-          organization-id: '9e74d567-be9b-4bd4-929d-9978860f6cbc'
-          project-slug: 'texstudio'
-          signing-policy-slug: 'release-signing'
-          github-artifact-id: '${{steps.upload-binary.outputs.artifact-id}}'
-          artifact-configuration-slug: 'zipped_exe'
+          api-token: "${{ secrets.SIGNPATH_API_TOKEN }}"
+          organization-id: "9e74d567-be9b-4bd4-929d-9978860f6cbc"
+          project-slug: "texstudio"
+          signing-policy-slug: "release-signing"
+          github-artifact-id: "${{steps.upload-binary.outputs.artifact-id}}"
+          artifact-configuration-slug: "zipped_exe"
           wait-for-completion: true
-          output-artifact-directory: './signed-artifacts'
+          output-artifact-directory: "./signed-artifacts"
           parameters: |
             Version: ${{ toJSON(steps.version.outputs.VERSION_NAME) }}
             Release_Tag: "${{ steps.version.outputs.GIT_VERSION }}"
@@ -305,36 +311,35 @@ jobs:
           echo "VERSION_NAME=${VERSION_NAME}">> $GITHUB_OUTPUT
           echo "TXS_VERSION=${TXS_VERSION}">> $GITHUB_OUTPUT
           echo "GIT_VERSION=${GIT_VERSION}">> $GITHUB_OUTPUT
-          
 
       - name: Upload zip to GitHub Artifacts
         if: github.event_name == 'push'
         uses: actions/upload-artifact@v7
         with:
-          name: texstudio-win-arm-qt6-zip
-          path: ./build/package-zip/texstudio-win-qt6-${{ steps.package.outputs.VERSION_NAME }}.zip
-          
+          name: texstudio-vim-win-arm-qt6-zip
+          path: ./build/package-zip/texstudio-vim-win-qt6-${{ steps.package.outputs.VERSION_NAME }}.zip
+
       - name: Upload to GitHub Artifacts
         id: upload-artifact
         if: github.event_name == 'push'
         uses: actions/upload-artifact@v7
         with:
-          name: texstudio-win-arm-qt6-exe
-          path: texstudio-win-qt6-${{ steps.package.outputs.VERSION_NAME }}.exe
+          name: texstudio-vim-win-arm-qt6-exe
+          path: texstudio-vim-win-qt6-${{ steps.package.outputs.VERSION_NAME }}.exe
 
       - name: Codesign
         id: sign
         if: env.IF_CODESIGN == 'true'
         uses: signpath/github-action-submit-signing-request@v2
         with:
-          api-token: '${{ secrets.SIGNPATH_API_TOKEN }}'
-          organization-id: '9e74d567-be9b-4bd4-929d-9978860f6cbc'
-          project-slug: 'texstudio'
-          signing-policy-slug: 'release-signing'
-          github-artifact-id: '${{steps.upload-artifact.outputs.artifact-id}}'
-          artifact-configuration-slug: 'zipped_exe'
+          api-token: "${{ secrets.SIGNPATH_API_TOKEN }}"
+          organization-id: "9e74d567-be9b-4bd4-929d-9978860f6cbc"
+          project-slug: "texstudio"
+          signing-policy-slug: "release-signing"
+          github-artifact-id: "${{steps.upload-artifact.outputs.artifact-id}}"
+          artifact-configuration-slug: "zipped_exe"
           wait-for-completion: true
-          output-artifact-directory: './signed-artifacts'
+          output-artifact-directory: "./signed-artifacts"
           parameters: |
             Version: ${{ toJSON(steps.package.outputs.VERSION_NAME) }}
             Release_Tag: "${{ steps.package.outputs.GIT_VERSION }}"
@@ -343,91 +348,91 @@ jobs:
         id: copy_signed_binary
         if: env.IF_CODESIGN == 'true'
         run: |
-          cp signed-artifacts/texstudio-win-qt6-${{ steps.package.outputs.VERSION_NAME }}.exe texstudio-${{ steps.package.outputs.GIT_VERSION }}-win-arm-qt6-signed.exe
-    
+          cp signed-artifacts/texstudio-vim-win-qt6-${{ steps.package.outputs.VERSION_NAME }}.exe texstudio-vim-${{ steps.package.outputs.GIT_VERSION }}-win-arm-qt6-signed.exe
 
       - name: Upload signed installer to GitHub Artifacts
         id: upload-artifact-signed
         if: env.IF_CODESIGN == 'true' && github.event_name == 'push'
         uses: actions/upload-artifact@v7
         with:
-          name: texstudio-win-arm-qt6-signed-exe
-          path: signed-artifacts/texstudio-win-qt6-${{ steps.package.outputs.VERSION_NAME }}.exe
-      
+          name: texstudio-vim-win-arm-qt6-signed-exe
+          path: signed-artifacts/texstudio-vim-win-qt6-${{ steps.package.outputs.VERSION_NAME }}.exe
+
       - name: Upload release file(s)
         uses: actions/upload-artifact@v7
-        if: startsWith(github.ref, 'refs/tags/')
+        if: startsWith(github.ref, 'refs/tags/texstudio-vim-')
         with:
+          if-no-files-found: error
           name: release-win-arm
           path: |
             ${{ env.IF_CODESIGN == 'true'
-                && format('texstudio-{0}-win-arm-qt6-signed.exe', steps.package.outputs.GIT_VERSION)
-                || '' }}
-            texstudio-${{ steps.package.outputs.GIT_VERSION }}-win-arm-portable-qt6.zip
+                && format('texstudio-vim-{0}-win-arm-qt6-signed.exe', steps.package.outputs.GIT_VERSION)
+                || format('texstudio-vim-{0}-win-arm-qt6.exe', steps.package.outputs.GIT_VERSION) }}
+            texstudio-vim-${{ steps.package.outputs.GIT_VERSION }}-win-arm-portable-qt6.zip
 
-###################################
+  ###################################
 
   build-linux-release:
     name: linux appimage
     if: github.event_name == 'push'
     runs-on: ubuntu-24.04
     steps:
-    - name: Checkout
-      uses: actions/checkout@v6
-      with:
-        fetch-depth: 0
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
-    - name: Fetch tag annotations
-      run: git fetch --tags --force
+      - name: Fetch tag annotations
+        run: git fetch --tags --force
 
-    - name: Updates
-      run: sudo apt-get update
+      - name: Updates
+        run: sudo apt-get update
 
-    - name: Dependencies
-      run: sudo apt-get install qt6-base-dev qt6-base-dev-tools qt6-svg-dev qt6-declarative-dev qt6-tools-dev qt6-tools-dev-tools libpoppler-qt6-dev libpoppler-cpp-dev pkg-config zlib1g-dev libquazip1-qt6-dev libhunspell-dev
+      - name: Dependencies
+        run: sudo apt-get install qt6-base-dev qt6-base-dev-tools qt6-svg-dev qt6-declarative-dev qt6-tools-dev qt6-tools-dev-tools libpoppler-qt6-dev libpoppler-cpp-dev pkg-config zlib1g-dev libquazip1-qt6-dev libhunspell-dev
 
-    - name: Configure
-      run: |
-        mkdir build
-        cd build
-        cmake -DCMAKE_INSTALL_PREFIX=appdir/usr .. -Wno-dev
+      - name: Configure
+        run: |
+          mkdir build
+          cd build
+          cmake -DCMAKE_INSTALL_PREFIX=appdir/usr .. -Wno-dev
 
-    - name: Build
-      run: |
-        cd build
-        cmake --build . --target install -- -j 4
-      
-    - name: Package
-      id: package
-      run: |
-        cd build
-        POPPLERDATA_VERSION="0.4.8"
-        POPPLERDATA_SUBDIR="poppler-data-${POPPLERDATA_VERSION}"
-        POPPLERDATA_FILE="poppler-data-${POPPLERDATA_VERSION}.tar.gz"
-        POPPLERDATA_URL="https://poppler.freedesktop.org/${POPPLERDATA_FILE}"
-        POPPLERDATA_SHA256="1096a18161f263cccdc6d8a2eb5548c41ff8fcf9a3609243f1b6296abdf72872"
-        . ../.github/scripts/package_linux.sh
-        echo "VERSION_NAME=${VERSION_NAME}" >> $GITHUB_OUTPUT
-        echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
-        echo "TXS_VERSION=${TXS_VERSION}" >> $GITHUB_OUTPUT
-        echo "GIT_VERSION=${GIT_VERSION}" >> $GITHUB_OUTPUT
-        
-    - name: Upload to Github Artifacts
-      if: github.event_name == 'push'
-      uses: actions/upload-artifact@v7
-      with:
-        name: texstudio-linux
-        path: texstudio-linux-${{ steps.package.outputs.VERSION_NAME }}-x86_64.AppImage
+      - name: Build
+        run: |
+          cd build
+          cmake --build . --target install -- -j 4
 
-    - name: Upload release file(s)
-      uses: actions/upload-artifact@v7
-      if: startsWith(github.ref, 'refs/tags/')
-      with:
-        name: release-linux
-        path: texstudio-${{ steps.package.outputs.GIT_VERSION }}-x86_64.AppImage
+      - name: Package
+        id: package
+        run: |
+          cd build
+          POPPLERDATA_VERSION="0.4.8"
+          POPPLERDATA_SUBDIR="poppler-data-${POPPLERDATA_VERSION}"
+          POPPLERDATA_FILE="poppler-data-${POPPLERDATA_VERSION}.tar.gz"
+          POPPLERDATA_URL="https://poppler.freedesktop.org/${POPPLERDATA_FILE}"
+          POPPLERDATA_SHA256="1096a18161f263cccdc6d8a2eb5548c41ff8fcf9a3609243f1b6296abdf72872"
+          . ../.github/scripts/package_linux.sh
+          echo "VERSION_NAME=${VERSION_NAME}" >> $GITHUB_OUTPUT
+          echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
+          echo "TXS_VERSION=${TXS_VERSION}" >> $GITHUB_OUTPUT
+          echo "GIT_VERSION=${GIT_VERSION}" >> $GITHUB_OUTPUT
 
+      - name: Upload to Github Artifacts
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v7
+        with:
+          name: texstudio-linux
+          path: texstudio-vim-linux-${{ steps.package.outputs.VERSION_NAME }}-x86_64.AppImage
 
-############################
+      - name: Upload release file(s)
+        uses: actions/upload-artifact@v7
+        if: startsWith(github.ref, 'refs/tags/texstudio-vim-')
+        with:
+          if-no-files-found: error
+          name: release-linux
+          path: texstudio-vim-${{ steps.package.outputs.GIT_VERSION }}-x86_64.AppImage
+
+  ############################
 
   macosx:
     name: Mac OS X
@@ -435,99 +440,100 @@ jobs:
     runs-on: macos-15-intel
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v6
-      with:
-        fetch-depth: 0
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
-    - name: Fetch tag annotations
-      run: git fetch --tags --force
+      - name: Fetch tag annotations
+        run: git fetch --tags --force
 
-    - name: Install Dependencies
-      run: |
-        wget https://github.com/sunderme/homebrew-qt6-modules/releases/download/${{ env.OSX_QT_VERSION }}/QtBase-${{ env.OSX_QT_VERSION }}-Darwin.tar.xz
-        sudo tar xvf ./QtBase-${{ env.OSX_QT_VERSION }}-Darwin.tar.xz -C /usr/local
-        rm QtBase-${{ env.OSX_QT_VERSION }}-Darwin.tar.xz
-        wget https://github.com/sunderme/homebrew-qt6-modules/releases/download/${{ env.OSX_QT_VERSION }}/QtSvg-${{ env.OSX_QT_VERSION }}-Darwin.tar.xz
-        sudo tar xvf ./QtSvg-${{ env.OSX_QT_VERSION }}-Darwin.tar.xz -C /usr/local/QtBase-${{ env.OSX_QT_VERSION }}-Darwin --strip-components=1
-        rm QtSvg-${{ env.OSX_QT_VERSION }}-Darwin.tar.xz
-        wget https://github.com/sunderme/homebrew-qt6-modules/releases/download/${{ env.OSX_QT_VERSION }}/Qt5Compat-${{ env.OSX_QT_VERSION }}-Darwin.tar.xz
-        sudo tar xvf ./Qt5Compat-${{ env.OSX_QT_VERSION }}-Darwin.tar.xz -C /usr/local/QtBase-${{ env.OSX_QT_VERSION }}-Darwin --strip-components=1
-        rm Qt5Compat-${{ env.OSX_QT_VERSION }}-Darwin.tar.xz
-        wget https://github.com/sunderme/homebrew-qt6-modules/releases/download/${{ env.OSX_QT_VERSION }}/QtTools-${{ env.OSX_QT_VERSION }}-Darwin.tar.xz
-        sudo tar xvf ./QtTools-${{ env.OSX_QT_VERSION }}-Darwin.tar.xz -C /usr/local/QtBase-${{ env.OSX_QT_VERSION }}-Darwin --strip-components=1
-        rm QtTools-${{ env.OSX_QT_VERSION }}-Darwin.tar.xz
-        wget https://github.com/sunderme/homebrew-qt6-modules/releases/download/${{ env.OSX_QT_VERSION }}/QtDeclarative-${{ env.OSX_QT_VERSION }}-Darwin.tar.xz
-        sudo tar xvf ./QtDeclarative-${{ env.OSX_QT_VERSION }}-Darwin.tar.xz -C /usr/local/QtBase-${{ env.OSX_QT_VERSION }}-Darwin --strip-components=1
-        rm QtDeclarative-${{ env.OSX_QT_VERSION }}-Darwin.tar.xz
-        wget https://github.com/sunderme/homebrew-qt6-modules/releases/download/${{ env.OSX_QT_VERSION }}/poppler-${{ env.OSX_POPPLER_VERSION }}-Darwin.tar.xz
-        sudo tar xvf ./poppler-${{ env.OSX_POPPLER_VERSION}}-Darwin.tar.xz -C /usr/local --strip-components=1
-        rm poppler-${{ env.OSX_POPPLER_VERSION }}-Darwin.tar.xz
-        wget https://github.com/sunderme/homebrew-qt6-modules/releases/download/${{ env.OSX_QT_VERSION }}/QuaZip-${{ env.OSX_QUAZIP_VERSION }}-Darwin.tar.xz
-        sudo tar xvf ./QuaZip-${{ env.OSX_QUAZIP_VERSION }}-Darwin.tar.xz -C /usr/local --strip-components=1
-        rm QuaZip-${{ env.OSX_QUAZIP_VERSION }}-Darwin.tar.xz
-        brew install --quiet cairo fontconfig freetype gettext jpeg libpng libtiff little-cms2 openjpeg
-        brew install --quiet ninja pkg-config
+      - name: Install Dependencies
+        run: |
+          wget https://github.com/sunderme/homebrew-qt6-modules/releases/download/${{ env.OSX_QT_VERSION }}/QtBase-${{ env.OSX_QT_VERSION }}-Darwin.tar.xz
+          sudo tar xvf ./QtBase-${{ env.OSX_QT_VERSION }}-Darwin.tar.xz -C /usr/local
+          rm QtBase-${{ env.OSX_QT_VERSION }}-Darwin.tar.xz
+          wget https://github.com/sunderme/homebrew-qt6-modules/releases/download/${{ env.OSX_QT_VERSION }}/QtSvg-${{ env.OSX_QT_VERSION }}-Darwin.tar.xz
+          sudo tar xvf ./QtSvg-${{ env.OSX_QT_VERSION }}-Darwin.tar.xz -C /usr/local/QtBase-${{ env.OSX_QT_VERSION }}-Darwin --strip-components=1
+          rm QtSvg-${{ env.OSX_QT_VERSION }}-Darwin.tar.xz
+          wget https://github.com/sunderme/homebrew-qt6-modules/releases/download/${{ env.OSX_QT_VERSION }}/Qt5Compat-${{ env.OSX_QT_VERSION }}-Darwin.tar.xz
+          sudo tar xvf ./Qt5Compat-${{ env.OSX_QT_VERSION }}-Darwin.tar.xz -C /usr/local/QtBase-${{ env.OSX_QT_VERSION }}-Darwin --strip-components=1
+          rm Qt5Compat-${{ env.OSX_QT_VERSION }}-Darwin.tar.xz
+          wget https://github.com/sunderme/homebrew-qt6-modules/releases/download/${{ env.OSX_QT_VERSION }}/QtTools-${{ env.OSX_QT_VERSION }}-Darwin.tar.xz
+          sudo tar xvf ./QtTools-${{ env.OSX_QT_VERSION }}-Darwin.tar.xz -C /usr/local/QtBase-${{ env.OSX_QT_VERSION }}-Darwin --strip-components=1
+          rm QtTools-${{ env.OSX_QT_VERSION }}-Darwin.tar.xz
+          wget https://github.com/sunderme/homebrew-qt6-modules/releases/download/${{ env.OSX_QT_VERSION }}/QtDeclarative-${{ env.OSX_QT_VERSION }}-Darwin.tar.xz
+          sudo tar xvf ./QtDeclarative-${{ env.OSX_QT_VERSION }}-Darwin.tar.xz -C /usr/local/QtBase-${{ env.OSX_QT_VERSION }}-Darwin --strip-components=1
+          rm QtDeclarative-${{ env.OSX_QT_VERSION }}-Darwin.tar.xz
+          wget https://github.com/sunderme/homebrew-qt6-modules/releases/download/${{ env.OSX_QT_VERSION }}/poppler-${{ env.OSX_POPPLER_VERSION }}-Darwin.tar.xz
+          sudo tar xvf ./poppler-${{ env.OSX_POPPLER_VERSION}}-Darwin.tar.xz -C /usr/local --strip-components=1
+          rm poppler-${{ env.OSX_POPPLER_VERSION }}-Darwin.tar.xz
+          wget https://github.com/sunderme/homebrew-qt6-modules/releases/download/${{ env.OSX_QT_VERSION }}/QuaZip-${{ env.OSX_QUAZIP_VERSION }}-Darwin.tar.xz
+          sudo tar xvf ./QuaZip-${{ env.OSX_QUAZIP_VERSION }}-Darwin.tar.xz -C /usr/local --strip-components=1
+          rm QuaZip-${{ env.OSX_QUAZIP_VERSION }}-Darwin.tar.xz
+          brew install --quiet cairo fontconfig freetype gettext jpeg libpng libtiff little-cms2 openjpeg
+          brew install --quiet ninja pkg-config
 
-    - name: Configure
-      run: |
-        mkdir build
-        cd build
-        /usr/local/QtBase-${{ env.OSX_QT_VERSION }}-Darwin/bin/qt-cmake .. -G Ninja
+      - name: Configure
+        run: |
+          mkdir build
+          cd build
+          /usr/local/QtBase-${{ env.OSX_QT_VERSION }}-Darwin/bin/qt-cmake .. -G Ninja
 
-    - name: Build
-      run: |
-        cd build
-        cmake --build . --parallel
+      - name: Build
+        run: |
+          cd build
+          cmake --build . --parallel
 
-    - name: Workarounds
-      run: |
-        cd build
-        mkdir -p texstudio.app/Contents/Frameworks
-        touch texstudio.app/Contents/Resources/empty.lproj
+      - name: Workarounds
+        run: |
+          cd build
+          mkdir -p texstudio.app/Contents/Frameworks
+          touch texstudio.app/Contents/Resources/empty.lproj
 
-    - name: poppler data
-      run: |
-        cd build
-        wget https://poppler.freedesktop.org/poppler-data-0.4.12.tar.gz
-        tar xvf poppler-data-0.4.12.tar.gz
-        mkdir -p texstudio.app/Contents/share/poppler
-        cp -r poppler-data-0.4.12/cidToUnicode texstudio.app/Contents/share/poppler
-        cp -r poppler-data-0.4.12/cMap texstudio.app/Contents/share/poppler
-        cp -r poppler-data-0.4.12/nameToUnicode texstudio.app/Contents/share/poppler
-        cp -r poppler-data-0.4.12/unicodeMap texstudio.app/Contents/share/poppler
+      - name: poppler data
+        run: |
+          cd build
+          wget https://poppler.freedesktop.org/poppler-data-0.4.12.tar.gz
+          tar xvf poppler-data-0.4.12.tar.gz
+          mkdir -p texstudio.app/Contents/share/poppler
+          cp -r poppler-data-0.4.12/cidToUnicode texstudio.app/Contents/share/poppler
+          cp -r poppler-data-0.4.12/cMap texstudio.app/Contents/share/poppler
+          cp -r poppler-data-0.4.12/nameToUnicode texstudio.app/Contents/share/poppler
+          cp -r poppler-data-0.4.12/unicodeMap texstudio.app/Contents/share/poppler
 
-    - name: Package
-      id: package
-      run: |
-        cd build
-        /usr/local/QtBase-${{ env.OSX_QT_VERSION }}-Darwin/bin/macdeployqt texstudio.app
-        codesign --force --deep --sign - texstudio.app
-        . ../.github/scripts/get-version.sh
-        cp -r texstudio.app ../texstudio-${GIT_VERSION}-osx.app
-        mkdir ../app
-        mv texstudio.app ../app/texstudio-osx-${VERSION_NAME}.app
-        cd ..
-        # zip -r texstudio-osx-m1-${VERSION_NAME}.zip texstudio-osx-${VERSION_NAME}.app
-        zip -r texstudio-${GIT_VERSION}-osx.zip texstudio-${GIT_VERSION}-osx.app
-        echo "VERSION_NAME=${VERSION_NAME}" >> $GITHUB_OUTPUT
-        echo "TXS_VERSION=${TXS_VERSION}" >> $GITHUB_OUTPUT
-        echo "GIT_VERSION=${GIT_VERSION}" >> $GITHUB_OUTPUT
-        
-    - name: Upload to Github artifacts
-      if: github.event_name == 'push'
-      uses: actions/upload-artifact@v7
-      with:
-        name: texstudio-osx
-        path: app
-        # path: texstudio-osx-m1-${{ steps.package.outputs.VERSION_NAME }}.zip
-    
-    - name: Upload release file(s)
-      uses: actions/upload-artifact@v7
-      if: startsWith(github.ref, 'refs/tags/')
-      with:
-        name: release-osx
-        path: texstudio-${{ steps.package.outputs.GIT_VERSION }}-osx.zip
+      - name: Package
+        id: package
+        run: |
+          cd build
+          /usr/local/QtBase-${{ env.OSX_QT_VERSION }}-Darwin/bin/macdeployqt texstudio.app
+          codesign --force --deep --sign - texstudio.app
+          . ../.github/scripts/get-version.sh
+          cp -rP texstudio.app ../texstudio-vim-${GIT_VERSION}-osx.app
+          mkdir ../app
+          mv texstudio.app ../app/texstudio-vim-osx-${VERSION_NAME}.app
+          cd ../app
+          zip -ry texstudio-vim-osx-${VERSION_NAME}.zip texstudio-vim-osx-${VERSION_NAME}.app
+          cd ..
+          zip -ry texstudio-vim-${GIT_VERSION}-osx.zip texstudio-vim-${GIT_VERSION}-osx.app
+          echo "VERSION_NAME=${VERSION_NAME}" >> $GITHUB_OUTPUT
+          echo "TXS_VERSION=${TXS_VERSION}" >> $GITHUB_OUTPUT
+          echo "GIT_VERSION=${GIT_VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Upload to Github artifacts
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v7
+        with:
+          name: texstudio-osx
+          path: app/texstudio-vim-osx-${{ steps.package.outputs.VERSION_NAME }}.zip
+
+      - name: Upload release file(s)
+        uses: actions/upload-artifact@v7
+        if: startsWith(github.ref, 'refs/tags/texstudio-vim-')
+        with:
+          if-no-files-found: error
+          name: release-osx
+          path: texstudio-vim-${{ steps.package.outputs.GIT_VERSION }}-osx.zip
 
   macosxM1:
     name: Mac OS X (M1)
@@ -535,131 +541,135 @@ jobs:
     runs-on: macos-14
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v6
-      with:
-        fetch-depth: 0
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
-    - name: Fetch tag annotations
-      run: git fetch --tags --force
+      - name: Fetch tag annotations
+        run: git fetch --tags --force
 
-    - name: Install Dependencies
-      run: |
-        wget https://github.com/sunderme/homebrew-qt6-modules/releases/download/${{ env.OSX_QT_VERSION }}/QtBase-${{ env.OSX_QT_VERSION }}-Darwin-M1.tar.xz
-        sudo tar xvf ./QtBase-${{ env.OSX_QT_VERSION }}-Darwin-M1.tar.xz -C /usr/local
-        rm QtBase-${{ env.OSX_QT_VERSION }}-Darwin-M1.tar.xz
-        wget https://github.com/sunderme/homebrew-qt6-modules/releases/download/${{ env.OSX_QT_VERSION }}/QtSvg-${{ env.OSX_QT_VERSION }}-Darwin-M1.tar.xz
-        sudo tar xvf ./QtSvg-${{ env.OSX_QT_VERSION }}-Darwin-M1.tar.xz -C /usr/local/QtBase-${{ env.OSX_QT_VERSION }}-Darwin --strip-components=1
-        rm QtSvg-${{ env.OSX_QT_VERSION }}-Darwin-M1.tar.xz
-        wget https://github.com/sunderme/homebrew-qt6-modules/releases/download/${{ env.OSX_QT_VERSION }}/Qt5Compat-${{ env.OSX_QT_VERSION }}-Darwin-M1.tar.xz
-        sudo tar xvf ./Qt5Compat-${{ env.OSX_QT_VERSION }}-Darwin-M1.tar.xz -C /usr/local/QtBase-${{ env.OSX_QT_VERSION }}-Darwin --strip-components=1
-        rm Qt5Compat-${{ env.OSX_QT_VERSION }}-Darwin-M1.tar.xz
-        wget https://github.com/sunderme/homebrew-qt6-modules/releases/download/${{ env.OSX_QT_VERSION }}/QtTools-${{ env.OSX_QT_VERSION }}-Darwin-M1.tar.xz
-        sudo tar xvf ./QtTools-${{ env.OSX_QT_VERSION }}-Darwin-M1.tar.xz -C /usr/local/QtBase-${{ env.OSX_QT_VERSION }}-Darwin --strip-components=1
-        rm QtTools-${{ env.OSX_QT_VERSION }}-Darwin-M1.tar.xz
-        wget https://github.com/sunderme/homebrew-qt6-modules/releases/download/${{ env.OSX_QT_VERSION }}/QtDeclarative-${{ env.OSX_QT_VERSION }}-Darwin-M1.tar.xz
-        sudo tar xvf ./QtDeclarative-${{ env.OSX_QT_VERSION }}-Darwin-M1.tar.xz -C /usr/local/QtBase-${{ env.OSX_QT_VERSION }}-Darwin --strip-components=1
-        rm QtDeclarative-${{ env.OSX_QT_VERSION }}-Darwin-M1.tar.xz
-        wget https://github.com/sunderme/homebrew-qt6-modules/releases/download/${{ env.OSX_QT_VERSION }}/poppler-${{ env.OSX_POPPLER_VERSION }}-Darwin-M1.tar.xz
-        sudo tar xvf ./poppler-${{ env.OSX_POPPLER_VERSION}}-Darwin-M1.tar.xz -C /usr/local --strip-components=1
-        rm poppler-${{ env.OSX_POPPLER_VERSION }}-Darwin-M1.tar.xz
-        wget https://github.com/sunderme/homebrew-qt6-modules/releases/download/${{ env.OSX_QT_VERSION }}/QuaZip-${{ env.OSX_QUAZIP_VERSION }}-Darwin-M1.tar.xz
-        sudo tar xvf ./QuaZip-${{ env.OSX_QUAZIP_VERSION }}-Darwin-M1.tar.xz -C /usr/local --strip-components=1
-        rm QuaZip-${{ env.OSX_QUAZIP_VERSION }}-Darwin-M1.tar.xz
-        brew install --quiet cairo fontconfig freetype gettext jpeg libpng libtiff little-cms2 openjpeg
-        brew install --quiet ninja pkg-config
+      - name: Install Dependencies
+        run: |
+          wget https://github.com/sunderme/homebrew-qt6-modules/releases/download/${{ env.OSX_QT_VERSION }}/QtBase-${{ env.OSX_QT_VERSION }}-Darwin-M1.tar.xz
+          sudo tar xvf ./QtBase-${{ env.OSX_QT_VERSION }}-Darwin-M1.tar.xz -C /usr/local
+          rm QtBase-${{ env.OSX_QT_VERSION }}-Darwin-M1.tar.xz
+          wget https://github.com/sunderme/homebrew-qt6-modules/releases/download/${{ env.OSX_QT_VERSION }}/QtSvg-${{ env.OSX_QT_VERSION }}-Darwin-M1.tar.xz
+          sudo tar xvf ./QtSvg-${{ env.OSX_QT_VERSION }}-Darwin-M1.tar.xz -C /usr/local/QtBase-${{ env.OSX_QT_VERSION }}-Darwin --strip-components=1
+          rm QtSvg-${{ env.OSX_QT_VERSION }}-Darwin-M1.tar.xz
+          wget https://github.com/sunderme/homebrew-qt6-modules/releases/download/${{ env.OSX_QT_VERSION }}/Qt5Compat-${{ env.OSX_QT_VERSION }}-Darwin-M1.tar.xz
+          sudo tar xvf ./Qt5Compat-${{ env.OSX_QT_VERSION }}-Darwin-M1.tar.xz -C /usr/local/QtBase-${{ env.OSX_QT_VERSION }}-Darwin --strip-components=1
+          rm Qt5Compat-${{ env.OSX_QT_VERSION }}-Darwin-M1.tar.xz
+          wget https://github.com/sunderme/homebrew-qt6-modules/releases/download/${{ env.OSX_QT_VERSION }}/QtTools-${{ env.OSX_QT_VERSION }}-Darwin-M1.tar.xz
+          sudo tar xvf ./QtTools-${{ env.OSX_QT_VERSION }}-Darwin-M1.tar.xz -C /usr/local/QtBase-${{ env.OSX_QT_VERSION }}-Darwin --strip-components=1
+          rm QtTools-${{ env.OSX_QT_VERSION }}-Darwin-M1.tar.xz
+          wget https://github.com/sunderme/homebrew-qt6-modules/releases/download/${{ env.OSX_QT_VERSION }}/QtDeclarative-${{ env.OSX_QT_VERSION }}-Darwin-M1.tar.xz
+          sudo tar xvf ./QtDeclarative-${{ env.OSX_QT_VERSION }}-Darwin-M1.tar.xz -C /usr/local/QtBase-${{ env.OSX_QT_VERSION }}-Darwin --strip-components=1
+          rm QtDeclarative-${{ env.OSX_QT_VERSION }}-Darwin-M1.tar.xz
+          wget https://github.com/sunderme/homebrew-qt6-modules/releases/download/${{ env.OSX_QT_VERSION }}/poppler-${{ env.OSX_POPPLER_VERSION }}-Darwin-M1.tar.xz
+          sudo tar xvf ./poppler-${{ env.OSX_POPPLER_VERSION}}-Darwin-M1.tar.xz -C /usr/local --strip-components=1
+          rm poppler-${{ env.OSX_POPPLER_VERSION }}-Darwin-M1.tar.xz
+          wget https://github.com/sunderme/homebrew-qt6-modules/releases/download/${{ env.OSX_QT_VERSION }}/QuaZip-${{ env.OSX_QUAZIP_VERSION }}-Darwin-M1.tar.xz
+          sudo tar xvf ./QuaZip-${{ env.OSX_QUAZIP_VERSION }}-Darwin-M1.tar.xz -C /usr/local --strip-components=1
+          rm QuaZip-${{ env.OSX_QUAZIP_VERSION }}-Darwin-M1.tar.xz
+          brew install --quiet cairo fontconfig freetype gettext jpeg libpng libtiff little-cms2 openjpeg
+          brew install --quiet ninja pkg-config
 
-    - name: Configure
-      run: |
-        mkdir build
-        cd build
-        /usr/local/QtBase-${{ env.OSX_QT_VERSION }}-Darwin/bin/qt-cmake .. -G Ninja
+      - name: Configure
+        run: |
+          mkdir build
+          cd build
+          /usr/local/QtBase-${{ env.OSX_QT_VERSION }}-Darwin/bin/qt-cmake .. -G Ninja
 
-    - name: Build
-      run: |
-        cd build
-        cmake --build . --parallel
+      - name: Build
+        run: |
+          cd build
+          cmake --build . --parallel
 
-    - name: Workarounds
-      run: |
-        cd build
-        mkdir -p texstudio.app/Contents/Frameworks
-        touch texstudio.app/Contents/Resources/empty.lproj
+      - name: Workarounds
+        run: |
+          cd build
+          mkdir -p texstudio.app/Contents/Frameworks
+          touch texstudio.app/Contents/Resources/empty.lproj
 
-    - name: poppler data
-      run: |
-        cd build
-        wget https://poppler.freedesktop.org/poppler-data-0.4.12.tar.gz
-        tar xvf poppler-data-0.4.12.tar.gz
-        mkdir -p texstudio.app/Contents/share/poppler
-        cp -r poppler-data-0.4.12/cidToUnicode texstudio.app/Contents/share/poppler
-        cp -r poppler-data-0.4.12/cMap texstudio.app/Contents/share/poppler
-        cp -r poppler-data-0.4.12/nameToUnicode texstudio.app/Contents/share/poppler
-        cp -r poppler-data-0.4.12/unicodeMap texstudio.app/Contents/share/poppler
+      - name: poppler data
+        run: |
+          cd build
+          wget https://poppler.freedesktop.org/poppler-data-0.4.12.tar.gz
+          tar xvf poppler-data-0.4.12.tar.gz
+          mkdir -p texstudio.app/Contents/share/poppler
+          cp -r poppler-data-0.4.12/cidToUnicode texstudio.app/Contents/share/poppler
+          cp -r poppler-data-0.4.12/cMap texstudio.app/Contents/share/poppler
+          cp -r poppler-data-0.4.12/nameToUnicode texstudio.app/Contents/share/poppler
+          cp -r poppler-data-0.4.12/unicodeMap texstudio.app/Contents/share/poppler
 
-    - name: Package
-      id: package
-      run: |
-        cd build
-        # /usr/local/QtBase-${{ env.OSX_QT_VERSION }}-Darwin/bin/macdeployqt texstudio.app -dmg
-        /usr/local/QtBase-${{ env.OSX_QT_VERSION }}-Darwin/bin/macdeployqt texstudio.app
-        codesign --force --deep --sign - texstudio.app
-        . ../.github/scripts/get-version.sh
-        cp -r texstudio.app ../texstudio-${GIT_VERSION}-osx-m1.app
-        mkdir ../app
-        mv texstudio.app ../app/texstudio-osx-m1-${VERSION_NAME}.app
-        cd ..
-        # zip -r texstudio-osx-m1-${VERSION_NAME}.zip texstudio-osx-m1-${VERSION_NAME}.app
-        zip -r texstudio-${GIT_VERSION}-osx-m1.zip texstudio-${GIT_VERSION}-osx-m1.app
-        echo "VERSION_NAME=${VERSION_NAME}" >> $GITHUB_OUTPUT
-        echo "TXS_VERSION=${TXS_VERSION}" >> $GITHUB_OUTPUT
-        echo "GIT_VERSION=${GIT_VERSION}" >> $GITHUB_OUTPUT
-        
-    - name: Upload to Github artifacts
-      if: github.event_name == 'push'
-      uses: actions/upload-artifact@v7
-      with:
-        name: texstudio-osx-m1
-        path: app
-        # path: texstudio-osx-m1-${{ steps.package.outputs.VERSION_NAME }}.zip
+      - name: Package
+        id: package
+        run: |
+          cd build
+          # /usr/local/QtBase-${{ env.OSX_QT_VERSION }}-Darwin/bin/macdeployqt texstudio.app -dmg
+          /usr/local/QtBase-${{ env.OSX_QT_VERSION }}-Darwin/bin/macdeployqt texstudio.app
+          codesign --force --deep --sign - texstudio.app
+          . ../.github/scripts/get-version.sh
+          cp -rP texstudio.app ../texstudio-vim-${GIT_VERSION}-osx-m1.app
+          mkdir ../app
+          mv texstudio.app ../app/texstudio-vim-osx-m1-${VERSION_NAME}.app
+          cd ../app
+          zip -ry texstudio-vim-osx-m1-${VERSION_NAME}.zip texstudio-vim-osx-m1-${VERSION_NAME}.app
+          cd ..
+          # zip -r texstudio-vim-osx-m1-${VERSION_NAME}.zip texstudio-vim-osx-m1-${VERSION_NAME}.app
+          zip -ry texstudio-vim-${GIT_VERSION}-osx-m1.zip texstudio-vim-${GIT_VERSION}-osx-m1.app
+          echo "VERSION_NAME=${VERSION_NAME}" >> $GITHUB_OUTPUT
+          echo "TXS_VERSION=${TXS_VERSION}" >> $GITHUB_OUTPUT
+          echo "GIT_VERSION=${GIT_VERSION}" >> $GITHUB_OUTPUT
 
-    - name: Upload release file(s)
-      uses: actions/upload-artifact@v7
-      if: startsWith(github.ref, 'refs/tags/')
-      with:
-        name: release-osx-m1
-        path: texstudio-${{ steps.package.outputs.GIT_VERSION }}-osx-m1.zip
+      - name: Upload to Github artifacts
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v7
+        with:
+          name: texstudio-vim-osx-m1
+          path: app/texstudio-vim-osx-m1-${{ steps.package.outputs.VERSION_NAME }}.zip
+
+      - name: Upload release file(s)
+        uses: actions/upload-artifact@v7
+        if: startsWith(github.ref, 'refs/tags/texstudio-vim-')
+        with:
+          if-no-files-found: error
+          name: release-osx-m1
+          path: texstudio-vim-${{ steps.package.outputs.GIT_VERSION }}-osx-m1.zip
 
   release:
     permissions:
-      actions: write   # for GeekyEggo/delete-artifact to delete artifacts
-      contents: write  # for softprops/action-gh-release to create GitHub release
+      actions: write # for GeekyEggo/delete-artifact to delete artifacts
+      contents: write # for softprops/action-gh-release to create GitHub release
     name: Release
-    needs: [build-win10, build-win10-arm, build-linux-release, macosx, macosxM1] # build-linux-win,macosx-qt5 is disabled
+    needs: [verify, build-win10, build-win10-arm, build-linux-release, macosx, macosxM1] # build-linux-win,macosx-qt5 is disabled
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    if: startsWith(github.ref, 'refs/tags/texstudio-vim-')
     steps:
-    - name: Download temp artifacts
-      uses: actions/download-artifact@v8
-      with:
-        pattern: release-*
-        merge-multiple: true
+      - name: Download temp artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: release-*
+          merge-multiple: true
 
-    - name: Calculate hashes
-      run: |
-        echo --SHA1SUM-- > hashes.txt
-        sha1sum * | grep -v hashes.txt >> hashes.txt
-        echo >> hashes.txt
-        echo --SHA256SUM-- >> hashes.txt
-        sha256sum * | grep -v hashes.txt >> hashes.txt
+      - name: Calculate hashes
+        run: |
+          echo --SHA1SUM-- > hashes.txt
+          sha1sum * | grep -v hashes.txt >> hashes.txt
+          echo >> hashes.txt
+          echo --SHA256SUM-- >> hashes.txt
+          sha256sum * | grep -v hashes.txt >> hashes.txt
 
-    - name: Batch release
-      uses: softprops/action-gh-release@v2
-      with:
-        prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
-        files: ./*
+      - name: Batch release
+        uses: softprops/action-gh-release@v3
+        with:
+          name: ${{ github.ref_name }}
+          fail_on_unmatched_files: true
+          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
+          files: ./*
 
-    - name: Delete temp artifacts
-      uses: GeekyEggo/delete-artifact@v5
-      with:
-        name: release-*
+      - name: Delete temp artifacts
+        uses: GeekyEggo/delete-artifact@v6
+        with:
+          name: release-*

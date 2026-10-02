@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10.0)
 
-project(TeXstudio VERSION 4.9.3 LANGUAGES C CXX)
+project(TeXstudio VERSION 4.9.8 LANGUAGES C CXX)
 SET(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
 set(CMAKE_DEBUG_POSTFIX "d")
 set(CMAKE_AUTOMOC ON)
@@ -57,7 +57,11 @@ if(WIN32 AND NOT MSVC)
         #add_compile_options(-Wa,-mbig-obj)
 endif()
 
-find_package(QT NAMES Qt6 Qt5 COMPONENTS Widgets LinguistTools REQUIRED)
+if(QT_VERSION_MAJOR)
+    find_package(QT NAMES Qt${QT_VERSION_MAJOR} COMPONENTS Widgets LinguistTools REQUIRED)
+else()
+    find_package(QT NAMES Qt6 Qt5 COMPONENTS Widgets LinguistTools REQUIRED)
+endif()
 find_package(Qt${QT_VERSION_MAJOR} COMPONENTS Core Network Xml Concurrent Widgets UiTools REQUIRED)
 find_package(Qt${QT_VERSION_MAJOR} COMPONENTS PrintSupport Svg Qml REQUIRED)
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
@@ -73,7 +77,7 @@ add_subdirectory(src)
 add_subdirectory(src/qtsingleapplication)
 
 # main
-set(RESOURCE_FILES 
+set(RESOURCE_FILES
 	texstudio.qrc
 	symbols.qrc
 	completion.qrc
@@ -208,18 +212,27 @@ else()
 			option(QUAZIP_IS_STATIC "QuaZIP is a static library" OFF)
 		endif()
 	else()
-                message(STATUS "Using internal QuaZIP and internal zlib")
-                if(WIN32)
-                    set(ZLIB_BUILD_EXAMPLES OFF)
-                    set(SKIP_INSTALL_LIBRARIES ON)
-                    add_subdirectory(src/zlib-1.3.1)
-                    set(ZLIB_INCLUDE_DIR ${CMAKE_CURRENT_BINARY_DIR}/src/zlib-1.3.1)
-                    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-                        set(ZLIB_LIBRARY ${CMAKE_CURRENT_BINARY_DIR}/src/zlib-1.3.1/libzlibd.dll)
-                    else()
-                        set(ZLIB_LIBRARY ${CMAKE_CURRENT_BINARY_DIR}/src/zlib-1.3.1/libzlib.dll)
-                    endif()
-                endif()
+        message(STATUS "Using internal QuaZIP and internal zlib")
+        if(WIN32)
+            set(ZLIB_BUILD_EXAMPLES OFF)
+            set(SKIP_INSTALL_LIBRARIES ON)
+            # Link zlib statically like the other bundled dependencies, so that
+            # no zlib DLL has to be deployed next to the executable.
+            set(ZLIB_BUILD_SHARED OFF)
+            add_subdirectory(src/zlib-1.3.2)
+            set(ZLIB_INCLUDE_DIR ${CMAKE_CURRENT_BINARY_DIR}/src/zlib-1.3.2)
+            # Let CMake resolve the library: the vendored zlib target sets
+            # OUTPUT_NAME z and CMAKE_DEBUG_POSTFIX d, so the file name cannot
+            # be spelled out here without going out of sync.
+            set(ZLIB_LIBRARY zlibstatic)
+            # QuaZIP calls find_package(ZLIB) and links ZLIB::ZLIB. Without the
+            # shared library that alias is not defined by zlib itself, and
+            # FindZLIB would create an imported target pointing at a file that
+            # does not exist.
+            if(NOT TARGET ZLIB::ZLIB)
+                add_library(ZLIB::ZLIB ALIAS zlibstatic)
+            endif()
+        endif()
 		set(BUILD_SHARED_LIBS OFF)
   		set(QUAZIP_INSTALL OFF)
                 set(QUAZIP_USE_QT_ZLIB OFF)

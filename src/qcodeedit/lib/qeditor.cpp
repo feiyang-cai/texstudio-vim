@@ -14,6 +14,7 @@
 ****************************************************************************/
 
 #include "qeditor.h"
+#include "qeditoraccessible.h"
 #include <QtMath>
 
 /*!
@@ -44,6 +45,7 @@
 #include "smallUsefulFunctions.h"
 #include "latexparser/latexparser.h"
 #include <QDrag>
+#include <QAccessible>
 
 #include "libqmarkedscrollbar/src/markedscrollbar.h"
 
@@ -54,6 +56,9 @@
 #ifdef Q_OS_MAC
 #include <QSysInfo>
 #endif
+
+#include <QGestureEvent>
+#include <QPinchGesture>
 
 #include <QPrinter>
 #include <QPrintDialog>
@@ -324,7 +329,7 @@ QEditor::QEditor(QWidget *p)
     m_doc(nullptr), m_definition(nullptr),
 	m_doubleClickSelectionType(QDocumentCursor::WordOrCommandUnderCursor), m_tripleClickSelectionType(QDocumentCursor::LineUnderCursor),
 	m_curPlaceHolder(-1), m_placeHolderSynchronizing(false), m_state(defaultFlags()),
-    mDisplayModifyTime(true), m_cursorStyle(QDocument::AutoCursorStyle), m_inputModeLabel(), m_blockKey(false), m_disableAccentHack(false), m_LineWidth(0), m_wrapAfterNumChars(0), m_scrollAnimation(nullptr)
+    mDisplayModifyTime(true), m_cursorStyle(QDocument::AutoCursorStyle), m_inputModeLabel(), m_blockKey(false), m_disableAccentHack(false), m_LineWidth(0), m_wrapAfterNumChars(0), m_scrollAnimation(nullptr), m_pinchStartFontSizeModifier(0)
 {
 	m_editors << this;
 
@@ -344,7 +349,7 @@ QEditor::QEditor(bool actions, QWidget *p,QDocument *doc)
     m_doc(nullptr), m_definition(nullptr),
 	m_doubleClickSelectionType(QDocumentCursor::WordOrCommandUnderCursor), m_tripleClickSelectionType(QDocumentCursor::ParenthesesOuter),
 	m_curPlaceHolder(-1), m_placeHolderSynchronizing(false), m_state(defaultFlags()),
-    mDisplayModifyTime(true), m_cursorStyle(QDocument::AutoCursorStyle), m_inputModeLabel(), m_blockKey(false), m_disableAccentHack(false), m_LineWidth(0), m_wrapAfterNumChars(0), m_scrollAnimation(nullptr)
+    mDisplayModifyTime(true), m_cursorStyle(QDocument::AutoCursorStyle), m_inputModeLabel(), m_blockKey(false), m_disableAccentHack(false), m_LineWidth(0), m_wrapAfterNumChars(0), m_scrollAnimation(nullptr), m_pinchStartFontSizeModifier(0)
 {
 	m_editors << this;
 
@@ -365,7 +370,7 @@ QEditor::QEditor(const QString& s, QWidget *p)
     pMenu(nullptr), m_lineEndingsMenu(nullptr), m_lineEndingsActions(nullptr),
     m_bindingsMenu(nullptr), aDefaultBinding(nullptr), m_bindingsActions(nullptr),
     m_doc(nullptr), m_definition(nullptr), m_curPlaceHolder(-1), m_placeHolderSynchronizing(false), m_state(defaultFlags()),
-        mDisplayModifyTime(true), m_cursorStyle(QDocument::AutoCursorStyle), m_inputModeLabel(), m_blockKey(false), m_disableAccentHack(false), m_LineWidth(0), m_wrapAfterNumChars(0), m_scrollAnimation(nullptr)
+        mDisplayModifyTime(true), m_cursorStyle(QDocument::AutoCursorStyle), m_inputModeLabel(), m_blockKey(false), m_disableAccentHack(false), m_LineWidth(0), m_wrapAfterNumChars(0), m_scrollAnimation(nullptr), m_pinchStartFontSizeModifier(0)
 {
 	m_editors << this;
 
@@ -387,7 +392,7 @@ QEditor::QEditor(const QString& s, bool actions, QWidget *p)
     pMenu(nullptr), m_lineEndingsMenu(nullptr), m_lineEndingsActions(nullptr),
     m_bindingsMenu(nullptr), aDefaultBinding(nullptr), m_bindingsActions(nullptr),
     m_doc(nullptr), m_definition(nullptr), m_curPlaceHolder(-1), m_placeHolderSynchronizing(false), m_state(defaultFlags()),
-    mDisplayModifyTime(true), m_cursorStyle(QDocument::AutoCursorStyle), m_inputModeLabel(), m_useQSaveFile(true), m_blockKey(false), m_disableAccentHack(false), m_LineWidth(0), m_wrapAfterNumChars(0), m_scrollAnimation(nullptr)
+    mDisplayModifyTime(true), m_cursorStyle(QDocument::AutoCursorStyle), m_inputModeLabel(), m_useQSaveFile(true), m_blockKey(false), m_disableAccentHack(false), m_LineWidth(0), m_wrapAfterNumChars(0), m_scrollAnimation(nullptr), m_pinchStartFontSizeModifier(0)
 {
 	m_editors << this;
 
@@ -436,6 +441,7 @@ void QEditor::init(bool actions,QDocument *doc)
 	viewport()->setAttribute(Qt::WA_KeyCompression, true);
 	viewport()->setAttribute(Qt::WA_InputMethodEnabled, true);
 	viewport()->setAttribute(Qt::WA_AcceptTouchEvents, true);
+	viewport()->grabGesture(Qt::PinchGesture);
 
 
     MarkedScrollBar *scrlBar=new MarkedScrollBar();
@@ -754,6 +760,10 @@ void QEditor::init(bool actions,QDocument *doc)
 	setWindowTitle("[*]"); //remove warning of setWindowModified
 
 	setCursor(QDocumentCursor());
+
+	// Register the accessibility factory so screen readers (NVDA, JAWS, etc.)
+	// can interact with the editor via platform accessibility APIs.
+	QAccessible::installFactory(&QEditorAccessible::factory);
 }
 
 /*!
@@ -877,6 +887,24 @@ QString QEditor::text() const
 QString QEditor::text(int line) const
 {
 	return m_doc ? m_doc->line(line).text() : QString();
+}
+
+/*!
+	\brief Compute the absolute character offset for the given (line, column) position.
+
+	The document is treated as a plain string where each line is separated by a
+	single '\\n' character.  This is used by the accessibility interface so that
+	AT tools receive consistent offsets regardless of platform line-ending style.
+*/
+int QEditor::documentOffsetFromPosition(int line, int column) const
+{
+	if (!m_doc)
+		return 0;
+	int offset = 0;
+	const int lineCount = m_doc->lineCount();
+	for (int i = 0; i < line && i < lineCount; ++i)
+		offset += m_doc->line(i).length() + 1; // +1 for '\n'
+	return offset + qMax(0, column);
 }
 
 /*!
@@ -1572,11 +1600,11 @@ void QEditor::removeAction(QAction *a, const QString& menu, const QString& toolb
 	If the file cannot be loaded, previous content is cleared.
 */
 
-void QEditor::load(const QString& file, QTextCodec* codec)
+void QEditor::load(const QString& file, QTextCodec* codec,bool skipHighlight)
 {
 	clearPlaceHolders();
 
-	m_doc->load(file,codec);
+    m_doc->load(file,codec,skipHighlight);
 
 	setCursor(QDocumentCursor(m_doc));
 
@@ -2471,6 +2499,12 @@ void QEditor::emitCursorPositionChanged()
 	if ( m_doc->impl()->hasMarks() )
 		QLineMarksInfoCenter::instance()->cursorMoved(this);
 
+	// Notify AT (Assistive Technology) tools about the cursor movement so
+	// screen readers (NVDA, JAWS, Narrator) announce the new position.
+	if (QAccessible::isActive()) {
+		const int cursorOffset = documentOffsetFromPosition(m_cursor.lineNumber(), m_cursor.columnNumber());
+		QAccessible::updateAccessibility(new QAccessibleTextCursorEvent(this, cursorOffset));
+	}
 }
 
 /*!
@@ -3158,6 +3192,64 @@ bool QEditor::event(QEvent *e)
     }*/
 
 	return r;
+}
+
+/*!
+	\internal
+	\brief Handle viewport events, including pinch gesture for zoom
+*/
+bool QEditor::viewportEvent(QEvent *e)
+{
+	if (e->type() == QEvent::Gesture) {
+		// QGestureEvent is a QEvent subclass, not a QObject, so static_cast is
+		// correct here after the type() check above confirms the event kind.
+		return gestureEvent(static_cast<QGestureEvent *>(e));
+	}
+	return QAbstractScrollArea::viewportEvent(e);
+}
+
+/*!
+	\internal
+	\brief Dispatch gesture events to specific handlers
+*/
+bool QEditor::gestureEvent(QGestureEvent *e)
+{
+	bool handled = false;
+	// e->gesture() returns a QGesture* (which is a QObject*); the type is
+	// already verified by the Qt::PinchGesture argument, so static_cast is safe.
+	QGesture *g = e->gesture(Qt::PinchGesture);
+	if (g) {
+		pinchEvent(static_cast<QPinchGesture *>(g));
+		e->accept(g);
+		handled = true;
+	}
+	return handled;
+}
+
+/*!
+	\internal
+	\brief Handle pinch gesture to zoom the editor font size
+*/
+void QEditor::pinchEvent(QPinchGesture *gesture)
+{
+	if (!m_doc)
+		return;
+
+	if (gesture->state() == Qt::GestureStarted)
+		m_pinchStartFontSizeModifier = m_doc->fontSizeModifier();
+
+	// totalScaleFactor is the cumulative pinch scale since the gesture started (1.0 = no change).
+	// log2(totalScaleFactor) converts the multiplicative scale to a linear measure of doublings,
+	// and multiplying by s_zoomStepsPerDoubling maps that to discrete zoom steps.
+	// For example, a 2× pinch out gives log2(2.0) * 3 = 3 zoom steps in.
+	const qreal totalScaleFactor = gesture->totalScaleFactor();
+	if (totalScaleFactor <= 0)
+		return;
+	const int zoomDelta = qRound(std::log2(totalScaleFactor) * s_zoomStepsPerDoubling);
+	const int targetModifier = m_pinchStartFontSizeModifier + zoomDelta;
+	const int delta = targetModifier - m_doc->fontSizeModifier();
+	if (delta != 0)
+		zoom(delta);
 }
 
 /*!
@@ -4319,6 +4411,7 @@ void QEditor::wheelEvent(QWheelEvent *e)
 void QEditor::resizeEvent(QResizeEvent *)
 {
 	const QSize viewportSize = viewport()->size();
+    bool cursorIsVisible = isCursorVisible(); // check cursor visibility before changing scrollbars, as it may change after
 
 	if ( flag(HardLineWrap)||flag(LineWidthConstraint) ){
 	    horizontalScrollBar()->setMaximum(qMax(0, m_LineWidth - viewportSize.width()));
@@ -4335,11 +4428,11 @@ void QEditor::resizeEvent(QResizeEvent *)
 
 	setVerticalScrollBarMaximum();
 
-	emit visibleLinesChanged();
-	//qDebug("page step : %i", viewportSize.height() / ls);
+    if ( cursorIsVisible && flag(LineWrap) ){
+        ensureCursorVisible(KeepDistanceFromViewTop);
+    }
 
-	//if ( isCursorVisible() && flag(LineWrap) )
-	//	ensureCursorVisible();
+    emit visibleLinesChanged();
 }
 
 /*!
@@ -5206,6 +5299,43 @@ void QEditor::preInsertUnindent(QDocumentCursor& c, const QString& s, int additi
 	if ( off > 0 )
 		c.movePosition(off, QDocumentCursor::NextCharacter);
 }
+/*!
+ * \brief remove tabs if selection cursor starts at end of tabs but before first non-space character
+ * \return selected text without common tabs
+ */
+QString QEditor::getSelectionWithoutIndentation() const
+{
+    QString text = m_cursor.selectedText();
+    // check if start is after tabs and every line has the same number of tabs at the beginning, then remove them
+    if (text.contains('\n')) {
+        QStringList lines = text.split('\n');
+        QString indent;
+        // check how many tabs are before the starting cursor
+        int ln,col;
+        m_cursor.beginBoundary(ln,col);
+        if(col>0){
+            QString line = m_doc->line(ln).text();
+            int numberOfTabs=0;
+            for(numberOfTabs=0; numberOfTabs<col && line.at(numberOfTabs).isSpace(); ++numberOfTabs);
+            indent=line.left(numberOfTabs);
+        }
+        if (indent.size()>0) {
+            bool allLinesHaveTabs = true;
+            for (int i = 1; i < lines.size(); ++i) {
+                if(lines[i].startsWith(indent)){
+                    lines[i].remove(0, indent.size());
+                }else{
+                    allLinesHaveTabs = false;
+                    break;
+                }
+            }
+            if (allLinesHaveTabs) {
+                text = lines.join('\n');
+            }
+        }
+    }
+    return text;
+}
 
 /*!
 	\brief Insert some text at a given cursor position
@@ -5982,8 +6112,9 @@ QMimeData* QEditor::createMimeDataFromSelection() const
 	}
 
 	if ( m_mirrors.isEmpty() )
-	{
-		d->setText(m_cursor.selectedText());
+    {
+        const QString text=getSelectionWithoutIndentation();
+        d->setText(text);
 	} else {
 		// Multiple cursors. Use QMap to have the texts are ordered by line number.
 		// Ordering by m_mirrors, would be selection order, which may be unexpected.
@@ -6444,6 +6575,10 @@ void QEditor::updateContent (int i, int n)
 	}
 			
 	repaintContent(i, n>1 ? -1 : n);
+
+	// Notify AT tools that the document content has changed.
+	if (QAccessible::isActive())
+		QAccessible::updateAccessibility(new QAccessibleValueChangeEvent(this, QVariant()));
 }
 
 /*!

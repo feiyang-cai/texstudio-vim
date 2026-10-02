@@ -1,7 +1,7 @@
 /* ***** BEGIN LICENSE BLOCK *****
  * Version: MPL 1.1/GPL 2.0/LGPL 2.1
  *
- * Copyright (C) 2002-2017 Németh László
+ * Copyright (C) 2002-2022 Németh László
  *
  * The contents of this file are subject to the Mozilla Public License Version
  * 1.1 (the "License"); you may not use this file except in compliance with
@@ -35,10 +35,15 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
-#ifndef Header_W_Char
-#define Header_W_Char
+#ifndef W_CHAR_HXX_
+#define W_CHAR_HXX_
 
 #include <string>
+
+#if __cplusplus >= 202002L || (defined(_MSVC_LANG) && _MSVC_LANG >= 202002L)
+#include <bit>
+#endif
+#include <cstring>
 
 #ifndef GCC
 struct w_char {
@@ -48,18 +53,33 @@ struct __attribute__((packed)) w_char {
   unsigned char l;
   unsigned char h;
 
+  operator unsigned short() const
+  {
+#if defined(_WIN32) || (defined(__BYTE_ORDER__) && (__BYTE_ORDER__==__ORDER_LITTLE_ENDIAN__))  || defined(__LITTLE_ENDIAN__)
+    //use little-endian optimized version
+#if (__cplusplus >= 202002L || (defined(_MSVC_LANG) && _MSVC_LANG >= 202002L)) && defined __cpp_lib_bit_cast && __cpp_lib_bit_cast >= 201806L
+    return std::bit_cast<unsigned short>(*this);
+#else
+    unsigned short u;
+    memcpy(&u, this, sizeof(unsigned short));
+    return u;
+#endif
+
+#else
+    return ((unsigned short)h << 8) | (unsigned short)l;
+#endif
+  }
+
   friend bool operator<(const w_char a, const w_char b) {
-    unsigned short a_idx = (a.h << 8) + a.l;
-    unsigned short b_idx = (b.h << 8) + b.l;
-    return a_idx < b_idx;
+    return (unsigned short)a < (unsigned short)b;
   }
 
   friend bool operator==(const w_char a, const w_char b) {
-    return (((a).l == (b).l) && ((a).h == (b).h));
+    return (unsigned short)a == (unsigned short)b;
   }
 
   friend bool operator!=(const w_char a, const w_char b) {
-    return !(a == b);;
+    return !(a == b);
   }
 };
 

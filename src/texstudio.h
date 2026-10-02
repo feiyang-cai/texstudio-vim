@@ -50,6 +50,7 @@
 #include "diffoperations.h"
 #include "svn.h"
 #include "git.h"
+#include "gitwidget.h"
 #include "help.h"
 
 #include <QProgressDialog>
@@ -81,7 +82,7 @@ public:
     Texstudio(QWidget *parent = nullptr, Qt::WindowFlags flags = Qt::WindowFlags(), QSplashScreen *splash = nullptr);
 	~Texstudio();
 
-	Q_INVOKABLE QString getCurrentFileName(); ///< returns the absolute file name of the current file or "" if none is opene
+	Q_INVOKABLE QString getCurrentFileName(); ///< returns the absolute file name of the current file or "" if none is opened
 	Q_INVOKABLE QString getAbsoluteFilePath(const QString &relName, const QString &extension = ""); ///< treats the path relative to the compiled .tex file
 	Q_INVOKABLE QString getRelativeFileName(const QString &file, QString basepath, bool keepSuffix = false); ///< provide function for scripts
     Q_INVOKABLE bool fileExists(const QString &file); ///< provide function for scripts
@@ -91,6 +92,7 @@ public:
     Q_INVOKABLE void runInternalCommand(const QString &cmd, const QString &master, const QString &options);
 
     friend class TexStudioTest;
+    friend class AIChatAssistant;
 
 public slots:
 	LatexEditorView *load(const QString &f , bool asProject = false, bool recheck = true, bool dontAsk = false);
@@ -128,7 +130,7 @@ private slots:
     void leftPanelChanged(QWidget* widget);
 private:
     bool executeTests(const QStringList &args); ///< execute self-tests. Only works for debug-builds.
-	void generateAddtionalTranslations();
+	void generateAdditionalTranslations();
 	void setupMenus();
 	void setupDockWidgets();
 	void createStatusBar();
@@ -167,6 +169,8 @@ private:
 	SymbolWidget *symbolWidget;
     QTreeView *fileView; ///< file explorer in docks
     QFileSystemModel *fileExplorerModel = nullptr;
+    GitWidget *gitWidget = nullptr; ///< git source control dock panel
+    QDockWidget *gitDockWidget = nullptr; ///< dock widget for gitWidget
 	QString hiddenLeftPanelWidgets;
     QString docksToBeRaised; ///< when restoring docks from hidden sidepanel, these docks should be raised. Dock names are separated by "|"
     QMap<QString, QString> m_dockIcons;
@@ -174,7 +178,9 @@ private:
 
     //StructureTreeView *structureTreeView;
     QTreeWidget *structureTreeWidget;
+    QDockWidget *structureDockWidget;
     QTreeWidget *topTOCTreeWidget;
+    QDockWidget *topTOCDockWidget;
 	LatexParser latexParser;
 
     QVector<QIcon> iconSection;
@@ -229,6 +235,7 @@ private:
 
 	Q_INVOKABLE LatexEditorView *currentEditorView() const;
 	Q_INVOKABLE QEditor *currentEditor() const;
+	Q_INVOKABLE bool isInternalFileExplorerDragSource(QObject *source) const;
 	void configureNewEditorView(LatexEditorView *edit);
 	void configureNewEditorViewEnd(LatexEditorView *edit, bool asMaster = false, bool hidden = false);
 	LatexEditorView *getEditorViewFromFileName(const QString &fileName, bool checkTemporaryNames = false);
@@ -241,8 +248,8 @@ private:
 
 	void updateUserToolMenu();
 	void linkToEditorSlot(QAction *act, const char *slot, const QList<QVariant> &args);
-
-    bool parseStruct(LatexDocument *doc, QVector<QTreeWidgetItem *> &rootVector, QSet<LatexDocument*> *visited=nullptr, QList<QTreeWidgetItem *> *todoList=nullptr, int currentColor=0);
+    
+    bool parseStruct(LatexDocument *doc, QVector<QTreeWidgetItem *> &rootVector, QSet<LatexDocument*> *visited=nullptr, QList<QTreeWidgetItem *> *todoList=nullptr, QList<QTreeWidgetItem *> *biblioList=nullptr, int currentColor=0);
     void parseStructLocally(LatexDocument* document, QVector<QTreeWidgetItem *> &rootVector, QList<QTreeWidgetItem *> *todoList=nullptr, QList<QTreeWidgetItem *> *labelList=nullptr, QList<QTreeWidgetItem *> *magicList=nullptr, QList<QTreeWidgetItem *> *biblioList=nullptr, QList<QTreeWidgetItem *> *blockList=nullptr);
 #ifndef QT_NO_DEBUG
     void checkForShortcutDuplicate();
@@ -276,7 +283,7 @@ private slots:
     void collapseSubitems();
     StructureEntry *labelForStructureEntry(const StructureEntry *entry);
 
-    void updateStructureLocally(bool updateAll=false);
+    void updateStructureLocally(bool updateAll=false, LatexDocument *specificDoc=nullptr);
     void customMenuStructure(const QPoint &pos);
     void createLabelFromAction();
 
@@ -326,10 +333,9 @@ protected slots:
 	void fileLoadSession();
 	void loadSession(const QString &fileName);
 	void fileSaveSession();
-private slots:
+private:
 	void restoreSession(const Session &s, bool showProgress = true, bool warnMissing = true);
 	Session getCurrentSession();
-protected slots:
 	void MarkCurrentFileAsRecent();
 private slots:
 	void fileCheckin(QString filename = "");
@@ -344,6 +350,8 @@ private slots:
 	void svnPatch(QEditor *ed, QString diff);
 	void showOldRevisions();
 	void changeToRevision(QString rev, QString old_rev = "");
+    void showDiff(QString rev, QString old_rev = "");
+    QString getDiff(QString rev, QString old_rev = "");
     void svnDialogClosed(int);
 	void fileDiff();
 	void fileDiff3();
@@ -355,8 +363,9 @@ private slots:
 	void fileDiffMerge();
 	void declareConflictResolved();
 protected slots:
-    LatexEditorView * openExternalFile(QString name, const QString &defaultExt = "tex", LatexDocument *doc = nullptr,bool relativeToCurrentDoc=false); // signaled by latexViewer to open specific file
+    LatexEditorView * openExternalFile(QString name, const QString &defaultExt = "tex", LatexDocument *doc = nullptr,bool relativeToCurrentDoc=false,int lineNr=-1); // signaled by latexViewer to open specific file
     void openExternalFileFromAction();
+    void openExternalFileAtLine(QString name,int lineNr);
 
 	void editUndo(); ///< undo changes in text editor
 	void editRedo(); ///< redo changes in text editor
@@ -393,13 +402,13 @@ protected slots:
 	void editInsertRefToNextLabel(const QString &refCmd = "\\ref", bool backward = false);
 	void editInsertRefToPrevLabel(const QString &refCmd = "\\ref");
 	void runSearch(SearchQuery *query);
-	void findLabelUsages(LatexDocument *doc, const QString &labelText);
+    void findLabelUsages(LatexDocument *doc, const QString &labelText,bool definitionOnly=false);
     void findSpecialUsages(LatexDocument* doc,const QString &text,int type);
     void findLabelUsagesFromAction();
 	SearchResultWidget *searchResultWidget();
 
-	void findWordRepetions();
-	void findNextWordRepetion();
+	void findWordRepetitions();
+	void findNextWordRepetition();
 
 	void LTErrorMessage(QString message);
 
@@ -421,6 +430,7 @@ protected slots:
 	void updateMasterDocumentCaption();
 	void updateUndoRedoStatus();
 	void currentEditorChanged();
+    void visibleEditorsChanged();
 	void editorTabMoved(int from, int to);
 	void editorAboutToChangeByTabClick(LatexEditorView *edFrom, LatexEditorView *edTo);
 
@@ -446,7 +456,9 @@ protected slots:
     void insertFromTagList(QListWidgetItem *item);
 	void insertBib();
     void openFromExplorer(const QModelIndex &index);
+    void openFromGit(const QString &fn,const QString rev);
     void insertFromExplorer(bool visible);
+    void refreshGitWidget(const QString &filename,const int checkin = 0);
 	void closeEnvironment();
 
 	void insertBibEntryFromAction();
@@ -482,7 +494,7 @@ protected slots:
     void quickTabular(const QMimeData *d=nullptr); ///< start quick tabular wizard
 	void quickArray(); ///< start quick array wizard
 	void quickTabbing(); ///< start quick tabbing wizard
-	void quickLetter(); ///< start quick leter wizard
+	void quickLetter(); ///< start quick letter wizard
 	void quickDocument(); ///< start quick document wizard
 	void quickBeamer(); ///< start quick beamer wizard
 	void quickGraphics(const QString &graphicsFile = QString()); ///< start quick graphics wizard
@@ -492,6 +504,7 @@ protected slots:
 	bool checkProgramPermission(const QString &program, const QString &cmdId, LatexDocument *master);
 	void runInternalPdfViewer(const QFileInfo &master, const QString &options);
 	void runBibliographyIfNecessary(const QFileInfo &cmd);
+    bool checkRunBibliographyIfNecessary(const QFileInfo &cmd);
 	QDateTime GetBblLastModified(void);
 
 	void showExtendedSearch();
@@ -505,6 +518,7 @@ public slots:
 	void connectSubCommand(ProcessX *p, bool showStdoutLocallyDefault);
 private slots:
     void runInternalCommand(const QString &cmd, const QFileInfo &master, const QString &options);
+    void runInternalCommandAsync(const QString &cmd, const QFileInfo &mainfile, const QString &options);
 	void commandLineRequested(const QString &cmdId, QString *result, bool *);
 	void beginRunningCommand(const QString &commandMain, bool latex, bool pdf, bool async);
 	void beginRunningSubCommand(ProcessX *p, const QString &commandMain, const QString &subCommand, const RunCommandFlags &flags);
@@ -512,7 +526,7 @@ private slots:
 	void endRunningCommand(const QString &commandMain, bool latex, bool pdf, bool async);
 
 
-    bool runCommand(const QString &commandline, QString *buffer = nullptr, QTextCodec *codecForBuffer = nullptr, bool saveAll=true);
+    bool runCommand(const QString &commandline, QString *buffer = nullptr, QTextCodec *codecForBuffer = nullptr, bool saveAll=true, bool blocking=false);
     bool runCommandNoSpecialChars(QString commandline, QString *buffer = nullptr, QTextCodec *codecForBuffer = nullptr);
 	void setStatusMessageProcess(const QString &message);
     bool runCommandAsync(const QString &commandline, const char *returnCMD);
@@ -542,7 +556,7 @@ protected slots:
     void collabClientFinished(int exitCode, QString m_errorMessage);
     void guestServerSuccessfullyStarted();
     void hostServerSuccessfullyStarted();
-    void updateCollabStatus();
+    void updateCollabStatus(const QString errorMessage="");
     void copyCollabLinkToClipboard();
 
 	bool loadLog();
@@ -748,6 +762,7 @@ protected:
     CollaborationManager *collabManager = nullptr;
 
     QString mOverloadProgram=QString();
+    bool mDisableTOCupdates=false;
 
 public:
     Q_PROPERTY(QString clipboard READ clipboardText WRITE setClipboardText)
@@ -757,6 +772,8 @@ public:
 	Q_INVOKABLE void simulateKeyPress(const QString &shortcut);
 
 	static void recoverFromCrash();
+
+    QDockWidget* addDock(const QString &name, const QString &iconName, const QString &title, QWidget *wgt);
 
 public slots:
 	void threadCrashed();
@@ -770,7 +787,6 @@ public slots:
 
 	void openBugsAndFeatures();
     void maniplateDockingTabBars();
-    void addDock(const QString &name, const QString &iconName, const QString &title, QWidget *wgt);
     void toggleDocks(bool visible);
     void resetDocks();
     void toggleDockVisibility();
@@ -778,16 +794,15 @@ public slots:
     bool checkDockSpread();
 
 signals:
-	void infoNewFile(); ///< signal that a new file has been generated. Used for scritps as trigger.
-	void infoNewFromTemplate(); ///< signal that a new file from template has been generated. Used for scritps as trigger.
-	void infoLoadFile(const QString &filename); ///< signal that a file has been loaded. Used for scritps as trigger.
-	void infoFileSaved(const QString &filename,const int checkin = 0); ///< signal that a file has been saved. Used for scritps as trigger.
-	void infoFileClosed(); ///< signal that a file has been closed. Used for scritps as trigger.
-	void infoAfterTypeset(); ///< signal that a file has been compiled. Used for scritps as trigger.
+	void infoNewFile(); ///< signal that a new file has been generated. Used for scripts as trigger.
+	void infoNewFromTemplate(); ///< signal that a new file from template has been generated. Used for scripts as trigger.
+	void infoLoadFile(const QString &filename); ///< signal that a file has been loaded. Used for scripts as trigger.
+	void infoFileSaved(const QString &filename,const int checkin = 0); ///< signal that a file has been saved. Used for scripts as trigger.
+	void infoFileClosed(); ///< signal that a file has been closed. Used for scripts as trigger.
+	void infoAfterTypeset(); ///< signal that a file has been compiled. Used for scripts as trigger.
 	void imgPreview(const QString &fn);
 };
 
 //Q_DECLARE_METATYPE(Texstudio *)
 
 #endif
-

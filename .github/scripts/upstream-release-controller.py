@@ -419,6 +419,29 @@ def create_release_candidate(pr, baseline):
     print(f'Dispatched full verification for {tag} at {release_sha}')
 
 
+def merge_reviewed_commits(pr):
+    base, head = pr['base']['sha'], pr['head']['sha']
+    if not all(re.fullmatch(r'[0-9a-f]{40}', sha) for sha in (base, head)):
+        raise RuntimeError('Invalid reviewed commit SHA')
+    subprocess.run(['git', 'fetch', 'origin', base, head], check=True, capture_output=True)
+    tree = subprocess.check_output(
+        ['git', 'merge-tree', '--write-tree', base, head], text=True).strip()
+    if not re.fullmatch(r'[0-9a-f]{40}', tree):
+        raise RuntimeError('Could not construct a conflict-free reviewed merge tree')
+    merge_sha = subprocess.check_output([
+        'git', '-c', 'user.name=github-actions[bot]',
+        '-c', 'user.email=41898282+github-actions[bot]@users.noreply.github.com',
+        'commit-tree', tree, '-p', base, '-p', head,
+        '-m', f'Merge independently reviewed upstream sync PR #{pr["number"]}',
+    ], text=True).strip()
+    # A non-forced push is an atomic fast-forward check. A concurrent commit
+    # outside the reviewed ancestry makes the push fail, rather than changing
+    # the merge's first parent. Repository protections are respected as well.
+    subprocess.run(['git', 'push', 'origin', f'{merge_sha}:refs/heads/{pr["base"]["ref"]}'],
+                   check=True, capture_output=True)
+    return merge_sha
+
+
 def promote_candidate(run, dry_run=False, allow_publication=False):
     sha, branch = run['head_sha'], run['head_branch']
     if run['head_repository']['full_name'].lower() != repository.lower():
@@ -448,13 +471,7 @@ def promote_candidate(run, dry_run=False, allow_publication=False):
     if not allow_publication:
         print('Publication disabled: verified sync PR is not merged')
         return
-    merged = api('PUT', f'/repos/{repository}/pulls/{fresh["number"]}/merge', {
-        'sha': sha,
-        'merge_method': 'merge',
-    })
-    if not merged.get('merged'):
-        raise RuntimeError('GitHub did not merge the verified sync PR')
-    merge_sha = merged['sha']
+    merge_sha = merge_reviewed_commits(fresh)
     if branch_sha(baseline['branch']) != merge_sha:
         raise RuntimeError('Default branch advanced unexpectedly during the merge')
     create_release_candidate(fresh, baseline)

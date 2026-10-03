@@ -94,6 +94,10 @@ default-branch workflow. Approval must follow that snapshot and match both
 the head and base. If the base advances, the next daily/manual run requests a
 new review after any in-flight review finishes. Tagging checks the actual merge's
 first parent against the reviewed base, rather than the current branch tip.
+Promotion builds a two-parent merge from the reviewed SHAs and uses a non-forced
+Git push. Unrelated concurrent default-branch commits make that update fail;
+the controller never retries by merging onto a different base. Branch protections
+still apply and can block this update; the controller does not bypass them.
 The review instructions focus on behavioral upstream/Vim interactions, including
 changes that Git merges without conflicts and gaps not covered by current tests.
 

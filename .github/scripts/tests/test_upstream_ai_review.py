@@ -1,6 +1,9 @@
 import importlib.util
 import json
 import os
+import subprocess
+import tempfile
+from contextlib import chdir
 from pathlib import Path
 import unittest
 from unittest.mock import patch
@@ -128,6 +131,55 @@ class UpstreamAIReviewTests(unittest.TestCase):
             with patch.object(controller, 'api') as api:
                 requester.request_review(self.pr)
                 self.assertEqual(api.call_count, 2)
+
+    def test_reviewed_merge_push_is_atomic_against_concurrent_base_advance(self):
+        actual_run = subprocess.run
+        for concurrent in (False, True):
+            with self.subTest(concurrent=concurrent), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                remote, work = root / 'remote.git', root / 'work'
+                actual_run(['git', 'init', '--bare', '-q', str(remote)], check=True, capture_output=True)
+                actual_run(['git', 'init', '-q', '-b', 'master', str(work)], check=True)
+                def git(*args):
+                    return actual_run(['git', '-C', str(work), *args], check=True,
+                                      capture_output=True, text=True).stdout.strip()
+                git('config', 'user.name', 'Test')
+                git('config', 'user.email', 'test@example.com')
+                git('remote', 'add', 'origin', str(remote))
+                (work / 'document').write_text('base\n')
+                git('add', 'document')
+                git('commit', '-qm', 'base')
+                base = git('rev-parse', 'HEAD')
+                git('push', '-q', 'origin', 'master')
+                git('checkout', '-qb', 'copilot/sync')
+                (work / 'document').write_text('reviewed upstream change\n')
+                git('commit', '-qam', 'reviewed change')
+                head = git('rev-parse', 'HEAD')
+                git('push', '-q', 'origin', 'copilot/sync')
+                git('checkout', '-q', 'master')
+                pr = dict(self.pr, base={'sha': base, 'ref': 'master'}, head={'sha': head})
+                advanced = []
+                def run_with_race(command, **kwargs):
+                    if concurrent and command[:3] == ['git', 'push', 'origin']:
+                        git('commit', '--allow-empty', '-qm', 'concurrent default-branch change')
+                        advanced.append(git('rev-parse', 'HEAD'))
+                        git('push', '-q', 'origin', 'master')
+                    return actual_run(command, **kwargs)
+                with chdir(work), patch.object(controller.subprocess, 'run', side_effect=run_with_race):
+                    if concurrent:
+                        with self.assertRaises(subprocess.CalledProcessError):
+                            controller.merge_reviewed_commits(pr)
+                    else:
+                        merge = controller.merge_reviewed_commits(pr)
+                remote_tip = actual_run(['git', '--git-dir', str(remote), 'rev-parse', 'master'],
+                                        check=True, capture_output=True, text=True).stdout.strip()
+                if concurrent:
+                    self.assertEqual(remote_tip, advanced[0])
+                else:
+                    self.assertEqual(remote_tip, merge)
+                    self.assertEqual(git('rev-list', '--parents', '-n', '1', merge).split(),
+                                     [merge, base, head])
+                    self.assertEqual(git('show', f'{merge}:document'), 'reviewed upstream change')
 
     def test_thread_pagination_and_graphql_bot_login(self):
         def page(nodes, more=False):

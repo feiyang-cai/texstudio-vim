@@ -321,6 +321,19 @@ class UpstreamAIReviewTests(unittest.TestCase):
                         {'head_sha': 'a' * 40, 'head_branch': 'copilot/sync',
                          'head_repository': {'full_name': controller.repository}}, *expected)
 
+    def test_daily_recheck_continues_after_candidate_failure_and_reports_it(self):
+        second = dict(self.pr, number=43, head=dict(self.pr['head'], sha='f' * 40))
+        policy = {'dry_run': False, 'publication_enabled': True}
+        with patch.dict(os.environ, {'CONTROLLER_ACTION': 'pending',
+                                    'UPSTREAM_RELEASE_PUBLICATION_ENABLED': 'true'}), \
+                patch.object(controller.Path, 'read_text', return_value=json.dumps(policy)), \
+                patch.object(controller, 'list_all', return_value=[self.pr, second]), \
+                patch.object(controller, 'promote_candidate', side_effect=[RuntimeError('bad candidate'), None]) as promote:
+            with self.assertRaisesRegex(RuntimeError, r'PRs: \[42\]'):
+                controller.main()
+            self.assertEqual(promote.call_count, 2)
+            self.assertEqual(promote.call_args.args[0]['head_sha'], 'f' * 40)
+
     def test_dry_run_never_requests_review_or_needs_a_secret(self):
         with patch.object(controller, 'token', ''), patch.object(controller, 'api') as api:
             requester.main()

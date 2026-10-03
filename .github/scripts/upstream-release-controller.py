@@ -722,14 +722,21 @@ def main():
         if not policy['dry_run'] and not publication_enabled(policy):
             print('Publication disabled: pending syncs are not merged')
             return
+        failures = []
         for pr in list_all(f'/repos/{repository}/pulls?state=open'):
             if (not pr.get('draft') and marker_from(pr.get('body'))
                     and (pr['head'].get('repo') or {}).get('full_name') == repository
                     and pr['user']['login'] in ('Copilot', 'copilot-swe-agent[bot]')):
-                promote_candidate({'head_sha': pr['head']['sha'],
-                                   'head_branch': pr['head']['ref'],
-                                   'head_repository': {'full_name': repository}},
-                                  policy['dry_run'], publication_enabled(policy))
+                try:
+                    promote_candidate({'head_sha': pr['head']['sha'],
+                                       'head_branch': pr['head']['ref'],
+                                       'head_repository': {'full_name': repository}},
+                                      policy['dry_run'], publication_enabled(policy))
+                except Exception as error:
+                    failures.append(pr['number'])
+                    print(f'PR #{pr["number"]} could not be promoted: {type(error).__name__}: {error}')
+        if failures:
+            raise RuntimeError(f'Sync reevaluation failed for PRs: {failures}')
         return
     run = json.loads(os.environ['WORKFLOW_RUN'])
     if run['head_repository']['full_name'].lower() != repository.lower():

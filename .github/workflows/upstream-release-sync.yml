@@ -1,0 +1,94 @@
+name: Upstream release sync
+
+on:
+  schedule:
+    - cron: '17 13 * * *'
+  workflow_dispatch:
+  workflow_run:
+    workflows: [CD, Vim desktop tests]
+    types: [completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: upstream-release-controller
+  cancel-in-progress: false
+
+jobs:
+  detect:
+    if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+      - name: Detect published upstream releases and assign sync issues
+        env:
+          COPILOT_SYNC_TOKEN: ${{ secrets.COPILOT_SYNC_TOKEN }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: python3 .github/scripts/detect-upstream-releases.py
+
+  merge:
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.full_name == github.repository && startsWith(github.event.workflow_run.head_branch, 'copilot/')
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+      - name: Verify and merge the fully tested sync pull request
+        env:
+          CONTROLLER_ACTION: merge
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          UPSTREAM_RELEASE_PUBLICATION_ENABLED: ${{ vars.UPSTREAM_RELEASE_PUBLICATION_ENABLED || 'false' }}
+          WORKFLOW_RUN: ${{ toJSON(github.event.workflow_run) }}
+        run: python3 .github/scripts/upstream-release-controller.py
+
+  tag:
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.full_name == github.repository && startsWith(github.event.workflow_run.head_branch, 'release-sync/')
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+      - name: Tag the post-merge-verified sync and dispatch CD
+        env:
+          CONTROLLER_ACTION: tag
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          UPSTREAM_RELEASE_PUBLICATION_ENABLED: ${{ vars.UPSTREAM_RELEASE_PUBLICATION_ENABLED || 'false' }}
+          WORKFLOW_RUN: ${{ toJSON(github.event.workflow_run) }}
+        run: python3 .github/scripts/upstream-release-controller.py
+
+  publish:
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.name == 'CD' && startsWith(github.event.workflow_run.head_branch, 'texstudio-vim-') && github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+      - name: Record stable or prerelease progress after publication
+        env:
+          CONTROLLER_ACTION: publish
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          UPSTREAM_RELEASE_PUBLICATION_ENABLED: ${{ vars.UPSTREAM_RELEASE_PUBLICATION_ENABLED || 'false' }}
+          WORKFLOW_RUN: ${{ toJSON(github.event.workflow_run) }}
+        run: python3 .github/scripts/upstream-release-controller.py

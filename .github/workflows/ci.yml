@@ -15,6 +15,9 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v7
       
+    - name: Upstream release controller tests
+      run: python3 -m unittest discover -s .github/scripts/tests -p 'test_*.py'
+
     - name: Updates
       run: sudo apt-get update
 

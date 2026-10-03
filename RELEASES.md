@@ -36,6 +36,51 @@ modes, editing, visual blocks, marks, substitution, Ex commands, insert-mode
 completion, and fork version parsing. Check both logs as well as exit status. Review the merged diff against the upstream tag so it contains
 only intentional fork differences.
 
+## Daily upstream synchronization
+
+The `Upstream release sync` workflow checks stable and prerelease releases daily
+and can be run manually from the default branch. It starts each candidate from
+the matching stream's latest published fork commit, never from the moving
+`master` tip, and requires the candidate to contain only one merge of that base
+and the pinned upstream commit. It verifies that the published base and candidate
+both retain the approved `VIM_REVISION`. Sync PRs cannot change workflow,
+action, script, test, package
+identity, or publication controls.
+
+After merge, the trusted controller stages the tested application tree with the
+current base-branch `.github` tree, then reruns CD and Vim-platform checks on that
+exact release candidate. This ensures the tag's CD release job enforces the
+publication switch even though release source commits are based on earlier
+published tags.
+
+Dry-run procedure: run **Actions → Upstream release sync → Run workflow** on the
+default branch. `.github/upstream-release-policy.json` defaults to
+`"dry_run": true` and `"publication_enabled": false`; the run reports releases
+and planned issue/controller actions without creating issues, merging PRs,
+tagging, or publishing. To permit sync issue creation and assignment, an owner
+must change `dry_run` to `false` in a reviewed default-branch change. Automatic
+merge and release tagging additionally require an owner-reviewed change setting
+`publication_enabled` to `true` and the repository Actions variable
+`UPSTREAM_RELEASE_PUBLICATION_ENABLED=true`. The Actions variable is also checked
+by the current CD release job. Either switch being disabled keeps automatic
+release mutations off. Create release tags only through the trusted controller;
+older immutable CD workflow revisions predate this guard.
+
+Configure
+`COPILOT_SYNC_TOKEN` as a user-to-server token that can create issues and assign
+Copilot; it is exposed only to the trusted detector step. Each issue pins the
+upstream release tag and resolved commit SHA. The trusted controller reuses
+pending issues/PRs and requires the `CD` and `Vim desktop tests` workflows to
+pass on the exact sync head before merging. It then dispatches both workflows
+on the merge commit, creates an immutable fork tag only after those checks pass,
+and dispatches `CD` on that tag. Publication waits for all platform builds and
+all nine packaged GUI checks. Stable and prerelease progress is recorded
+separately only after the matching fork release is published.
+
+GitHub-required approval of Copilot workflow runs is not bypassed. Syncs preserve
+the approved Vim baseline and `VIM_REVISION`; changing either requires an
+owner-approved change.
+
 ## Release naming and publishing
 
 Create each fork tag on its own tested merge commit, never on the unmodified
@@ -43,9 +88,12 @@ upstream commit. Use `texstudio-vim-<upstream-version>-r<fork-revision>` for tag
 files. The numeric version inside the application follows upstream; the Git
 revision shown in About and `--version` includes the full fork release name.
 
-`r0` is the current Vim baseline. Increment the number in `VIM_REVISION` for
-released fork changes on the same upstream base (including Vim and packaging
-fixes). Reset it to `0` when adopting a new upstream version. Keep the upstream
+`r1` is the approved Vim baseline, recorded with its commit and branch in
+`.github/approved-vim-baseline.json`. Preserve `VIM_REVISION` when adopting a
+new upstream version; an upstream update alone does not authorize a revision
+change. Automatic sync releases use the approved Vim baseline and must not
+include unapproved Vim development from `master`. Advance the approved baseline
+only through owner-approved changes. Keep the upstream
 beta/alpha/rc designation, for example `texstudio-vim-4.9.9beta2-r1`. The fork
 revision is separate from upstream's beta number and Git commits since the tag.
 

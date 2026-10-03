@@ -62,6 +62,8 @@ FORK_RELEASE_TAG = re.compile(r'texstudio-vim-(' + RELEASE_VERSION.pattern + r')
 repository = os.environ.get('GITHUB_REPOSITORY', 'feiyang-cai/texstudio-vim')
 owner, repo = repository.split('/', 1)
 token = os.environ.get('GH_TOKEN', '')
+AI_REVIEWER = 'copilot-pull-request-reviewer[bot]'
+AI_REVIEWER_LOGINS = {AI_REVIEWER, AI_REVIEWER.removesuffix('[bot]')}
 
 
 def api(method, path, payload=None, token_value=None):
@@ -85,6 +87,56 @@ def branch_sha(branch):
 def marker_from(body):
     match = MARKER.search(body or '')
     return tuple(match.groups()) if match else None
+
+
+def latest_ai_review(pr):
+    reviews = list(list_all(f'/repos/{repository}/pulls/{pr["number"]}/reviews'))
+    matching = [review for review in reviews
+                if review.get('user', {}).get('login') in AI_REVIEWER_LOGINS
+                and review.get('user', {}).get('type') == 'Bot'
+                and review.get('commit_id') == pr['head']['sha']]
+    return max(matching, key=lambda review: review['id']) if matching else None
+
+
+def unresolved_ai_threads(number):
+    query = '''query($owner:String!, $repo:String!, $number:Int!, $cursor:String) {
+      repository(owner:$owner, name:$repo) {
+        pullRequest(number:$number) {
+          reviewThreads(first:100, after:$cursor) {
+            nodes { isResolved comments(first:1) { nodes { author { login } } } }
+            pageInfo { hasNextPage endCursor }
+          }
+        }
+      }
+    }'''
+    cursor = None
+    while True:
+        response = api('POST', '/graphql', {
+            'query': query,
+            'variables': {'owner': owner, 'repo': repo, 'number': number, 'cursor': cursor},
+        })
+        if response.get('errors'):
+            raise RuntimeError('Could not verify AI review threads')
+        threads = response['data']['repository']['pullRequest']['reviewThreads']
+        for thread in threads['nodes']:
+            comments = thread['comments']['nodes']
+            if (not thread['isResolved'] and comments
+                    and (comments[0].get('author') or {}).get('login') in AI_REVIEWER_LOGINS):
+                return True
+        if not threads['pageInfo']['hasNextPage']:
+            return False
+        cursor = threads['pageInfo']['endCursor']
+
+
+def ai_review_passes(pr):
+    review = latest_ai_review(pr)
+    if not review or review['state'] != 'APPROVED':
+        print(f'PR #{pr["number"]} needs independent Copilot approval of {pr["head"]["sha"]}')
+        return False
+    if unresolved_ai_threads(pr['number']):
+        print(f'PR #{pr["number"]} still has unresolved Copilot review findings')
+        return False
+    return True
 
 
 def publication_enabled(policy):
@@ -357,6 +409,8 @@ def promote_candidate(run, dry_run=False, allow_publication=False):
         print(f'No open Copilot sync pull request found for {sha}')
         return
     fresh, _, _ = verify_sync_pr(pr, baseline)
+    if not ai_review_passes(fresh):
+        return
     if branch_sha(baseline['branch']) != fresh['base']['sha']:
         raise RuntimeError('Default branch changed after checks completed')
     if dry_run:
@@ -471,6 +525,8 @@ def promote_release_candidate(run, baseline, dry_run=False):
     if not candidate_checks:
         raise RuntimeError('Exact source candidate checks are missing or failed')
     validate_sync_metadata(pr, baseline)
+    if not ai_review_passes(pr):
+        return
     changed = subprocess.check_output(
         ['git', 'diff', '--name-only', f'{candidate_sha}..{sha}'], text=True).splitlines()
     if not trusted_overlay_only(changed):
@@ -564,10 +620,24 @@ def publish_progress(run, baseline):
 
 
 def main():
+    action = os.environ['CONTROLLER_ACTION']
+    if action == 'pending':
+        policy = json.loads(Path('.github/upstream-release-policy.json').read_text())
+        if not policy['dry_run'] and not publication_enabled(policy):
+            print('Publication disabled: pending syncs are not merged')
+            return
+        for pr in list_all(f'/repos/{repository}/pulls?state=open'):
+            if (not pr.get('draft') and marker_from(pr.get('body'))
+                    and (pr['head'].get('repo') or {}).get('full_name') == repository
+                    and pr['user']['login'] in ('Copilot', 'copilot-swe-agent[bot]')):
+                promote_candidate({'head_sha': pr['head']['sha'],
+                                   'head_branch': pr['head']['ref'],
+                                   'head_repository': {'full_name': repository}},
+                                  policy['dry_run'], publication_enabled(policy))
+        return
     run = json.loads(os.environ['WORKFLOW_RUN'])
     if run['head_repository']['full_name'].lower() != repository.lower():
         return
-    action = os.environ['CONTROLLER_ACTION']
     baseline = json.loads(Path('.github/approved-vim-baseline.json').read_text())
     if action == 'merge':
         if run['conclusion'] == 'success':

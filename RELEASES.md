@@ -81,6 +81,36 @@ GitHub-required approval of Copilot workflow runs is not bypassed. Syncs preserv
 the approved Vim baseline and `VIM_REVISION`; changing either requires an
 owner-approved change.
 
+### Independent AI review
+
+Upstream syncs additionally require an independent **Copilot code review**,
+separate from the Copilot coding agent that prepares the merge. The controller
+requires the review bot's latest review of the exact PR head to be `APPROVED`,
+and every Copilot review thread must be resolved. Missing, comment-only,
+changes-requested, dismissed, and stale reviews block merging and release
+tagging. A new commit needs a new review. GitHub API failures also block promotion.
+The review instructions focus on behavioral upstream/Vim interactions, including
+changes that Git merges without conflicts and gaps not covered by current tests.
+
+The trusted `Upstream AI review` workflow requests reviews when eligible sync PRs
+are ready or updated, without checking out candidate code. Daily/manual sync
+runs retry missing review requests and recheck reviewed PRs, so a review that
+finishes after CI can be picked up on the next daily check or manual run.
+Dry-run mode sends no review requests. Publication switches remain independent
+and disabled by default; AI approval alone cannot publish a release.
+
+Configure **Settings → Copilot → Code review → Auto-approval → Allow Copilot to
+approve pull requests** in this repository. Copilot otherwise normally submits
+comment-only reviews, which deliberately do not satisfy this gate. If the
+approval feature is unavailable for the account, automatic promotion remains
+blocked; a comment saying the code looks good is never treated as approval.
+Copilot review uses the existing `COPILOT_SYNC_TOKEN` user credential and
+subscription. Review findings need fixes and a new review; tests still remain
+required. AI review reduces risk but does not guarantee correctness.
+If Copilot already submitted a comment-only review before auto-approval was
+enabled, manually request another review on that PR. The workflow avoids
+repeated requests for a commit that Copilot has already reviewed.
+
 ## Release naming and publishing
 
 Create each fork tag on its own tested merge commit, never on the unmodified

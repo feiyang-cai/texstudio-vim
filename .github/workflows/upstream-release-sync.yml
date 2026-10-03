@@ -16,6 +16,26 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  reevaluate:
+    if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+      - name: Recheck completed AI reviews and tested syncs
+        env:
+          CONTROLLER_ACTION: pending
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          UPSTREAM_RELEASE_PUBLICATION_ENABLED: ${{ vars.UPSTREAM_RELEASE_PUBLICATION_ENABLED || 'false' }}
+        run: python3 .github/scripts/upstream-release-controller.py
+
   detect:
     if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     runs-on: ubuntu-24.04
@@ -32,6 +52,11 @@ jobs:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: python3 .github/scripts/detect-upstream-releases.py
+      - name: Request missing independent AI reviews
+        env:
+          GH_TOKEN: ${{ secrets.COPILOT_SYNC_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: python3 .github/scripts/request-upstream-ai-review.py
 
   merge:
     if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.full_name == github.repository && startsWith(github.event.workflow_run.head_branch, 'copilot/')
@@ -60,6 +85,7 @@ jobs:
     permissions:
       actions: write
       contents: write
+      pull-requests: read
     steps:
       - uses: actions/checkout@v7
         with:

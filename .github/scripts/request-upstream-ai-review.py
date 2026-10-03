@@ -9,6 +9,9 @@ from pathlib import Path
 spec = spec_from_file_location('controller', Path(__file__).with_name('upstream-release-controller.py'))
 controller = module_from_spec(spec)
 spec.loader.exec_module(controller)
+# GitHub can represent an in-flight code-review request using the Copilot alias.
+# This alias must not broaden the identities allowed to approve promotion.
+PENDING_REVIEWER_LOGINS = controller.AI_REVIEWER_LOGINS | {'Copilot'}
 
 
 def request_review(pr):
@@ -20,7 +23,7 @@ def request_review(pr):
     if controller.latest_ai_review(pr):
         print(f'PR #{pr["number"]} already has an AI review for this commit')
         return
-    if any(user['login'] in controller.AI_REVIEWER_LOGINS for user in pr.get('requested_reviewers', [])):
+    if any(user['login'] in PENDING_REVIEWER_LOGINS for user in pr.get('requested_reviewers', [])):
         print(f'PR #{pr["number"]} is awaiting its independent AI review')
         return
     controller.api('POST', f'/repos/{controller.repository}/pulls/{pr["number"]}/requested_reviewers',

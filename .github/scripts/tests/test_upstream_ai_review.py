@@ -34,6 +34,7 @@ class UpstreamAIReviewTests(unittest.TestCase):
     def test_only_explicit_current_independent_bot_approval_passes(self):
         cases = [[], [self.review('COMMENTED')], [self.review('CHANGES_REQUESTED')],
                  [self.review('DISMISSED')], [self.review(commit_id='b' * 40)],
+                 [self.review(user={'login': 'Copilot', 'type': 'Bot'})],
                  [self.review(user={'login': 'copilot-swe-agent[bot]', 'type': 'Bot'})],
                  [self.review(user={'login': 'feiyang-cai', 'type': 'User'})]]
         for reviews in cases:
@@ -90,10 +91,13 @@ class UpstreamAIReviewTests(unittest.TestCase):
             requester.request_review(self.pr)
             self.assertEqual(api.call_args.args[0], 'POST')
             self.assertEqual(api.call_args.args[2], {'reviewers': [controller.AI_REVIEWER]})
-        self.pr['requested_reviewers'] = [{'login': controller.AI_REVIEWER}]
-        with patch.object(controller, 'list_all', return_value=[]), patch.object(controller, 'api') as api:
-            requester.request_review(self.pr)
-            api.assert_not_called()
+        for login in (controller.AI_REVIEWER, controller.AI_REVIEWER.removesuffix('[bot]'), 'Copilot'):
+            self.pr['requested_reviewers'] = [{'login': login}]
+            with self.subTest(login=login), \
+                    patch.object(controller, 'list_all', return_value=[]), \
+                    patch.object(controller, 'api') as api:
+                requester.request_review(self.pr)
+                api.assert_not_called()
 
     def test_missing_or_stale_ai_approval_prevents_release_tagging(self):
         run = {'head_sha': 'e' * 40, 'head_branch': 'release-sync/stable/5.0.0'}

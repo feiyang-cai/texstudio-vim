@@ -1,5 +1,5 @@
 {
-  "dry_run": true,
+  "dry_run": false,
   "publication_enabled": false,
   "human_validation_reviewers": ["feiyang-cai"]
 }

@@ -100,7 +100,7 @@ def activate(pid):
             return result[0]
     return None
 
-def ensure_windows_input_focus():
+def ensure_windows_input_focus(recover=True):
     if sys.platform == 'darwin':
         return
     api = ctypes.windll.user32
@@ -115,27 +115,44 @@ def ensure_windows_input_focus():
     title = ctypes.create_unicode_buffer(api.GetWindowTextLengthW(foreground) + 1)
     api.GetWindowTextW(foreground, title, len(title))
     gui.screenshot().save(output / 'interrupted-desktop.png')
-    # A delayed first-login WSL installer can steal focus after startup passed.
-    # Close only its known setup window on this disposable hosted CI machine.
-    if 'wsl.exe' not in title.value.lower():
-        raise RuntimeError(f'Unexpected desktop focus loss: pid={owner.value}, title={title.value!r}')
-    print('Closing delayed hosted-runner WSL setup:', title.value, flush=True)
-    api.PostMessageW.argtypes = [ctypes.c_void_p, ctypes.c_uint, ctypes.c_size_t, ctypes.c_ssize_t]
-    api.PostMessageW(foreground, 0x0010, 0, 0) # WM_CLOSE
-    time.sleep(.5)
+    details = {'expected_pid': process.pid, 'foreground_pid': owner.value,
+               'foreground_title': title.value, 'recover': recover}
+    with (output / 'focus-interruptions.jsonl').open('a', encoding='utf-8') as log:
+        log.write(json.dumps(details) + '\n')
+    if not recover:
+        # A key may have gone to the other window. Never replay an editing
+        # command or accept its result after an interruption during input.
+        raise RuntimeError(f'Desktop focus changed during input: {details!r}')
+    # Hosted runners can launch a terminal after initial desktop preparation.
+    # Bring the test app forward before input, without closing unrelated windows.
+    # Close only the positively identified WSL first-login prompt.
+    if 'wsl.exe' in title.value.lower():
+        print('Closing delayed hosted-runner WSL setup:', title.value, flush=True)
+        api.PostMessageW.argtypes = [ctypes.c_void_p, ctypes.c_uint, ctypes.c_size_t, ctypes.c_ssize_t]
+        api.PostMessageW(foreground, 0x0010, 0, 0) # WM_CLOSE
+        time.sleep(.5)
+    else:
+        print('Restoring test app focus before input:', json.dumps(details), flush=True)
     geometry = activate(process.pid)
     if not geometry:
-        raise RuntimeError('Application window missing after closing runner setup')
+        raise RuntimeError('Application window missing while restoring desktop focus')
     x, y, width, height = geometry
-    input_driver.click(x + width * 2 // 3, y + height // 4)
+    # Click the native caption, not the editor: editor clicks change the Vim
+    # cursor and can corrupt a pending motion or Visual selection.
+    input_driver.click(x + width // 2, y + 12)
     time.sleep(.2)
     api.GetWindowThreadProcessId(api.GetForegroundWindow(), ctypes.byref(owner))
     if owner.value != process.pid:
         raise RuntimeError('Application did not regain desktop focus')
 
 def type_keys(text):
-    ensure_windows_input_focus()
-    input_driver.write(text, interval=.09)
+    if sys.platform == 'darwin':
+        input_driver.write(text, interval=.09)
+        return
+    for char in text:
+        ensure_windows_input_focus()
+        input_driver.write(char, interval=.09)
+        ensure_windows_input_focus(recover=False)
 
 def save_and_check(label, expected):
     type_keys(':w')

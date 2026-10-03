@@ -335,8 +335,16 @@ class UpstreamAIReviewTests(unittest.TestCase):
             self.assertEqual(promote.call_args.args[0]['head_sha'], 'f' * 40)
 
     def test_dry_run_never_requests_review_or_needs_a_secret(self):
-        with patch.object(controller, 'token', ''), patch.object(controller, 'api') as api:
+        with patch.object(controller.Path, 'read_text', return_value=json.dumps({'dry_run': True})), \
+                patch.object(controller, 'token', ''), patch.object(controller, 'api') as api:
             requester.main()
+            api.assert_not_called()
+
+    def test_active_review_requests_require_user_token_before_any_api_call(self):
+        with patch.object(controller.Path, 'read_text', return_value=json.dumps({'dry_run': False})), \
+                patch.object(controller, 'token', ''), patch.object(controller, 'api') as api:
+            with self.assertRaisesRegex(SystemExit, 'COPILOT_SYNC_TOKEN is required'):
+                requester.main()
             api.assert_not_called()
 
     def test_foreign_human_and_draft_prs_do_not_start_ai_sessions(self):

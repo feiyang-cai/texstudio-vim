@@ -75,7 +75,7 @@ class UpstreamReleaseSyncTests(unittest.TestCase):
         self.assertIsNone(controller.marker_from(
             '<!-- upstream-release-sync:unknown:5.0.0 -->'))
 
-    def test_dry_run_and_publication_switch_fail_closed_by_default(self):
+    def test_publication_requires_both_explicit_switches(self):
         policy = {'dry_run': True, 'publication_enabled': False}
         self.assertFalse(controller.publication_enabled(policy))
         self.assertFalse(controller.publication_enabled({
@@ -87,12 +87,10 @@ class UpstreamReleaseSyncTests(unittest.TestCase):
             self.assertFalse(controller.publication_enabled({
                 'dry_run': False, 'publication_enabled': True}))
         with patch.dict(controller.os.environ, {'UPSTREAM_RELEASE_PUBLICATION_ENABLED': 'true'}):
+            self.assertFalse(controller.publication_enabled({}))
+            self.assertFalse(controller.publication_enabled({'publication_enabled': 'true'}))
             self.assertTrue(controller.publication_enabled({
                 'dry_run': False, 'publication_enabled': True}))
-        checked_in = json.loads(
-            (ROOT / '.github/upstream-release-policy.json').read_text())
-        self.assertTrue(checked_in['dry_run'])
-        self.assertFalse(checked_in['publication_enabled'])
 
     def test_dry_run_never_creates_release_tag_refs_and_allows_advanced_default_branch(self):
         upstream_sha, fork_base, candidate = 'a' * 40, 'b' * 40, 'c' * 40

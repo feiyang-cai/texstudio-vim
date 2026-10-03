@@ -1,4 +1,6 @@
 import importlib.util
+import json
+import os
 from pathlib import Path
 import unittest
 from unittest.mock import patch
@@ -92,6 +94,48 @@ class UpstreamAIReviewTests(unittest.TestCase):
         with patch.object(controller, 'list_all', return_value=[]), patch.object(controller, 'api') as api:
             requester.request_review(self.pr)
             api.assert_not_called()
+
+    def test_missing_or_stale_ai_approval_prevents_release_tagging(self):
+        run = {'head_sha': 'e' * 40, 'head_branch': 'release-sync/stable/5.0.0'}
+        pr = dict(self.pr, merged=True, merge_commit_sha='f' * 40)
+        for reviews in ([], [self.review(commit_id='b' * 40)]):
+            with self.subTest(reviews=reviews), \
+                    patch.object(controller, 'workflows_pass', return_value=True), \
+                    patch.object(controller.subprocess, 'run'), \
+                    patch.object(controller.subprocess, 'check_output', return_value=run['head_sha']), \
+                    patch.object(controller, 'api', return_value={'parents': [{'sha': 'a' * 40}]}), \
+                    patch.object(controller, 'sync_pr_for_commit', return_value=pr), \
+                    patch.object(controller, 'resolve_upstream_tag', return_value='c' * 40), \
+                    patch.object(controller, 'validate_sync_metadata'), \
+                    patch.object(controller, 'list_all', return_value=reviews), \
+                    patch.object(controller, 'create_release_tag') as tag:
+                controller.promote_release_candidate(run, {'branch': 'master'})
+                tag.assert_not_called()
+
+    def test_daily_recheck_preserves_publication_and_candidate_filters(self):
+        for dry_run, policy_enabled, variable_enabled, expected in (
+                (False, False, 'true', None),
+                (False, True, 'false', None),
+                (True, False, 'false', (True, False)),
+                (False, True, 'true', (False, True))):
+            policy = {'dry_run': dry_run, 'publication_enabled': policy_enabled}
+            prs = [self.pr, dict(self.pr, draft=True), dict(self.pr, body=''),
+                   dict(self.pr, user={'login': 'human'}),
+                   dict(self.pr, head={'repo': {'full_name': 'other/repo'}})]
+            with self.subTest(policy=policy, variable=variable_enabled), \
+                    patch.dict(os.environ, {'CONTROLLER_ACTION': 'pending',
+                                            'UPSTREAM_RELEASE_PUBLICATION_ENABLED': variable_enabled}), \
+                    patch.object(controller.Path, 'read_text', return_value=json.dumps(policy)), \
+                    patch.object(controller, 'list_all', return_value=prs) as listing, \
+                    patch.object(controller, 'promote_candidate') as promote:
+                controller.main()
+                if expected is None:
+                    listing.assert_not_called()
+                    promote.assert_not_called()
+                else:
+                    promote.assert_called_once_with(
+                        {'head_sha': 'a' * 40, 'head_branch': 'copilot/sync',
+                         'head_repository': {'full_name': controller.repository}}, *expected)
 
     def test_dry_run_never_requests_review_or_needs_a_secret(self):
         with patch.object(controller, 'token', ''), patch.object(controller, 'api') as api:

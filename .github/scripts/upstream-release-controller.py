@@ -20,6 +20,7 @@ PROTECTED_PATHS = {
     '.github/upstream-release-state.json',
     '.github/upstream-release-policy.json',
     '.github/release-request.json',
+    '.github/copilot-instructions.md',
     'RELEASES.md',
     '.github/workflows/ci.yml',
     '.github/workflows/cd.yml',

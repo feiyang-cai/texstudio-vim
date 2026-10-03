@@ -165,7 +165,54 @@ def ai_review_passes(pr, base_sha=None):
     if unresolved_ai_threads(pr['number']):
         print(f'PR #{pr["number"]} still has unresolved Copilot review findings')
         return False
+    if upstream_changes_need_human(pr) and not human_validation_passes(pr, snapshot):
+        print(f'PR #{pr["number"]} needs human validation of its proposed upstream changes')
+        return False
     return True
+
+
+def upstream_changes_need_human(pr):
+    body = pr.get('body') or ''
+    if (body.count('<!-- upstream-behavior:preserved -->') != 1
+            or '<!-- upstream-behavior:human-validation-required -->' in body
+            or any(label['name'] == 'upstream-human-validation-required'
+                   for label in pr.get('labels', []))):
+        return True
+    marker = marker_from(body)
+    if not marker:
+        return True
+    _, _, upstream_sha, fork_base = marker
+    # Compare with Git's unmodified merge of the pinned inputs. Any conflict
+    # resolution or extra edits conservatively require a human, even if the
+    # agent describes them as compatibility changes.
+    merged = subprocess.run(['git', 'merge-tree', '--write-tree', fork_base, upstream_sha],
+                            capture_output=True, text=True, check=False)
+    if merged.returncode == 1:
+        return True
+    if merged.returncode != 0:
+        raise RuntimeError('Could not verify the unmodified upstream merge')
+    tree = merged.stdout.strip()
+    if not re.fullmatch(r'[0-9a-f]{40}', tree):
+        raise RuntimeError('Invalid automatic merge tree')
+    candidate_tree = subprocess.check_output(
+        ['git', 'rev-parse', f'{pr["head"]["sha"]}^{{tree}}'], text=True).strip()
+    return tree != candidate_tree
+
+
+def human_validation_passes(pr, snapshot):
+    policy = json.loads(Path('.github/upstream-release-policy.json').read_text())
+    allowed = set(policy.get('human_validation_reviewers', []))
+    latest = {}
+    for review in list_all(f'/repos/{repository}/pulls/{pr["number"]}/reviews'):
+        user = review.get('user') or {}
+        login = user.get('login')
+        if login in allowed and user.get('type') == 'User':
+            if login not in latest or review['id'] > latest[login]['id']:
+                latest[login] = review
+    return any(review['state'] == 'APPROVED'
+               and review.get('commit_id') == pr['head']['sha']
+               and review['submitted_at'] > snapshot['created_at']
+               for review in latest.values())
 
 
 def publication_enabled(policy):

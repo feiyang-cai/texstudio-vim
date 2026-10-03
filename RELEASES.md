@@ -120,6 +120,23 @@ If Copilot already submitted a comment-only review before auto-approval was
 enabled, manually request another review on that PR. The workflow avoids
 repeated requests for a commit that Copilot has already reviewed.
 
+### Human validation of upstream changes
+
+Syncs must preserve upstream behavior and contain only Vim compatibility changes.
+The agent must escalate proposed upstream changes or uncertain behavior for human
+validation. Each PR declares `<!-- upstream-behavior:preserved -->` or
+`<!-- upstream-behavior:human-validation-required -->`; a missing declaration
+also blocks unattended promotion. The `upstream-human-validation-required` label
+can additionally flag concerns found during review.
+The controller compares the candidate tree with Git's automatic merge of the
+pinned fork and upstream commits. Conflicts or additional edits require a human
+even when described as Vim compatibility fixes. Before merging or tagging, the
+latest review from a configured `human_validation_reviewers` account must approve
+the exact head and follow the current base snapshot. Only `feiyang-cai` is
+configured initially. New commits or base changes require fresh validation;
+AI approval and passing tests remain necessary. This conservative check does not
+prove semantic equivalence; the independent reviewer must escalate uncertainties.
+
 ## Release naming and publishing
 
 Create each fork tag on its own tested merge commit, never on the unmodified

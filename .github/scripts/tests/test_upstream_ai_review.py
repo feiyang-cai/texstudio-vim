@@ -19,6 +19,10 @@ controller = requester.controller
 
 class UpstreamAIReviewTests(unittest.TestCase):
     def setUp(self):
+        self.classify_upstream_changes = controller.upstream_changes_need_human
+        classification_patch = patch.object(controller, 'upstream_changes_need_human', return_value=False)
+        classification_patch.start()
+        self.addCleanup(classification_patch.stop)
         self.snapshot = {'description': 'b' * 40, 'created_at': '2026-10-01T00:00:00Z'}
         self.snapshot_patch = patch.object(controller, 'review_base_snapshot', return_value=self.snapshot)
         self.snapshot_patch.start()
@@ -64,6 +68,40 @@ class UpstreamAIReviewTests(unittest.TestCase):
         with patch.object(controller, 'list_all', return_value=[self.review()]), \
                 patch.object(controller, 'unresolved_ai_threads', return_value=True):
             self.assertFalse(controller.ai_review_passes(self.pr))
+
+    def test_upstream_change_blocks_ai_approval_without_human_validation(self):
+        with patch.object(controller, 'list_all', return_value=[self.review()]), \
+                patch.object(controller, 'unresolved_ai_threads', return_value=False), \
+                patch.object(controller, 'upstream_changes_need_human', return_value=True):
+            self.assertFalse(controller.ai_review_passes(self.pr))
+            approved = self.review(id=2, user={'login': 'feiyang-cai', 'type': 'User'})
+            with patch.object(controller, 'list_all', return_value=[self.review(), approved]):
+                self.assertTrue(controller.ai_review_passes(self.pr))
+
+    def test_human_validation_rejects_wrong_identity_stale_or_dismissed_reviews(self):
+        owner = self.review(user={'login': 'feiyang-cai', 'type': 'User'})
+        for reviews in ([], [self.review()], [dict(owner, commit_id='f' * 40)],
+                        [dict(owner, submitted_at=self.snapshot['created_at'])],
+                        [dict(owner, user={'login': 'someone-else', 'type': 'User'})],
+                        [dict(owner, user={'login': 'feiyang-cai', 'type': 'Bot'})],
+                        [owner, dict(owner, id=2, state='DISMISSED')],
+                        [owner, dict(owner, id=2, state='CHANGES_REQUESTED')]):
+            with self.subTest(reviews=reviews), patch.object(controller, 'list_all', return_value=reviews):
+                self.assertFalse(controller.human_validation_passes(self.pr, self.snapshot))
+        with patch.object(controller, 'list_all', return_value=[owner]):
+            self.assertTrue(controller.human_validation_passes(self.pr, self.snapshot))
+
+    def test_missing_or_escalated_behavior_declaration_requires_human(self):
+        preserved = self.pr['body'] + '\n<!-- upstream-behavior:preserved -->'
+        for pr in (self.pr, dict(self.pr, body=preserved + '\n<!-- upstream-behavior:human-validation-required -->'),
+                   dict(self.pr, body=preserved, labels=[{'name': 'upstream-human-validation-required'}]),
+                   dict(self.pr, body=preserved + '\n<!-- upstream-behavior:preserved -->')):
+            self.assertTrue(self.classify_upstream_changes(pr))
+        with patch.object(controller.subprocess, 'run', return_value=subprocess.CompletedProcess([], 1)):
+            self.assertTrue(self.classify_upstream_changes(dict(self.pr, body=preserved)))
+        with patch.object(controller.subprocess, 'run', return_value=subprocess.CompletedProcess([], 128)):
+            with self.assertRaises(RuntimeError):
+                self.classify_upstream_changes(dict(self.pr, body=preserved))
 
     def test_base_change_or_review_before_snapshot_blocks_approval(self):
         for snapshot in (None, {'description': 'c' * 40, 'created_at': '2026-10-01T00:00:00Z'},
@@ -180,6 +218,20 @@ class UpstreamAIReviewTests(unittest.TestCase):
                     self.assertEqual(git('rev-list', '--parents', '-n', '1', merge).split(),
                                      [merge, base, head])
                     self.assertEqual(git('show', f'{merge}:document'), 'reviewed upstream change')
+                    candidate = dict(pr, head={'sha': merge}, body=(
+                        f'<!-- upstream-release-sync:stable:5.0.0:{head}:{base} -->\n'
+                        '<!-- upstream-behavior:preserved -->'))
+                    with chdir(work):
+                        self.assertFalse(self.classify_upstream_changes(candidate))
+                    # An agent can claim preservation while modifying the merged
+                    # tree. The controller still detects those extra edits.
+                    (work / 'document').write_text('extra upstream edit\n')
+                    git('add', 'document')
+                    edited_tree = git('write-tree')
+                    edited = git('commit-tree', edited_tree, '-p', base, '-p', head, '-m', 'proposal')
+                    candidate['head']['sha'] = edited
+                    with chdir(work):
+                        self.assertTrue(self.classify_upstream_changes(candidate))
 
     def test_thread_pagination_and_graphql_bot_login(self):
         def page(nodes, more=False):

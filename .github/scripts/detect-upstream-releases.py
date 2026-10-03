@@ -110,6 +110,19 @@ replace editor files wholesale, change release-control files or `VIM_REVISION`,
 disable tests, force-push, or move existing release tags. Report any unresolved
 conflict or failed test in the pull request.
 
+Preserve upstream behavior. Make only changes needed for Vim compatibility;
+do not independently fix, refactor, or redesign upstream functionality. If a
+change to upstream behavior or shared upstream code is needed, stop for human
+validation: describe the proposed change, why it is necessary, and its impact
+in the PR. A proposal may be prepared for review but must not be promoted before
+the configured human reviewer approves the exact commit. Every manual conflict
+resolution or edit beyond Git's automatic merge also requires human validation.
+Include exactly one behavior declaration in the PR description:
+`<!-- upstream-behavior:preserved -->` for an unchanged automatic merge, or
+`<!-- upstream-behavior:human-validation-required -->` for proposed changes or
+uncertain upstream behavior. Never remove an escalation to avoid human review.
+Copilot approval and green tests cannot substitute for human validation.
+
 Open a pull request against `{baseline['branch']}`. Its description must include
 this exact marker so the trusted release controller can bind all checks and the
 eventual fork tag to this release. Do not include unrelated Vim development.

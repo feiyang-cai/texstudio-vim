@@ -102,7 +102,32 @@ class UpstreamAIReviewTests(unittest.TestCase):
                 patch.object(controller, 'api') as api:
             requester.request_review(self.pr)
             self.assertEqual(len(api.call_args_list), 2)
-            self.assertEqual(api.call_args.args[2]['description'], 'f' * 40)
+            self.assertEqual(api.call_args_list[0].args[2]['description'], 'f' * 40)
+
+    def test_review_before_or_equal_to_snapshot_is_retried_in_safe_order(self):
+        for submitted in ('2026-09-30T00:00:00Z', self.snapshot['created_at']):
+            with self.subTest(submitted=submitted), \
+                    patch.object(controller, 'list_all', return_value=[self.review(submitted_at=submitted)]), \
+                    patch.dict(os.environ, {'GITHUB_RUN_ID': '123', 'REVIEW_STATE_TOKEN': 'test-token'}), \
+                    patch.object(controller, 'api') as api:
+                requester.request_review(self.pr)
+                self.assertEqual(len(api.call_args_list), 2)
+                self.assertIn('/statuses/', api.call_args_list[0].args[1])
+                self.assertIn('/requested_reviewers', api.call_args_list[1].args[1])
+
+    def test_snapshot_failure_does_not_request_review_and_request_failure_can_retry(self):
+        with patch.object(controller, 'list_all', return_value=[]), \
+                patch.dict(os.environ, {'GITHUB_RUN_ID': '123', 'REVIEW_STATE_TOKEN': 'test-token'}):
+            with patch.object(controller, 'api', side_effect=RuntimeError('snapshot unavailable')) as api:
+                with self.assertRaises(RuntimeError):
+                    requester.request_review(self.pr)
+                self.assertEqual(api.call_count, 1)
+            with patch.object(controller, 'api', side_effect=[{}, RuntimeError('review unavailable')]):
+                with self.assertRaises(RuntimeError):
+                    requester.request_review(self.pr)
+            with patch.object(controller, 'api') as api:
+                requester.request_review(self.pr)
+                self.assertEqual(api.call_count, 2)
 
     def test_thread_pagination_and_graphql_bot_login(self):
         def page(nodes, more=False):
@@ -138,8 +163,8 @@ class UpstreamAIReviewTests(unittest.TestCase):
                 patch.object(controller, 'api') as api:
             requester.request_review(self.pr)
             self.assertEqual(api.call_args_list[0].args[0], 'POST')
-            self.assertEqual(api.call_args_list[0].args[2], {'reviewers': [controller.AI_REVIEWER]})
-            self.assertEqual(api.call_args.args[2]['description'], self.pr['base']['sha'])
+            self.assertEqual(api.call_args.args[2], {'reviewers': [controller.AI_REVIEWER]})
+            self.assertEqual(api.call_args_list[0].args[2]['description'], self.pr['base']['sha'])
         for login in (controller.AI_REVIEWER, controller.AI_REVIEWER.removesuffix('[bot]'), 'Copilot'):
             self.pr['requested_reviewers'] = [{'login': login}]
             with self.subTest(login=login), \

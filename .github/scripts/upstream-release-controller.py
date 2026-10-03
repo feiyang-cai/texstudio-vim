@@ -65,6 +65,7 @@ owner, repo = repository.split('/', 1)
 token = os.environ.get('GH_TOKEN', '')
 AI_REVIEWER = 'copilot-pull-request-reviewer[bot]'
 AI_REVIEWER_LOGINS = {AI_REVIEWER, AI_REVIEWER.removesuffix('[bot]')}
+AI_BASE_CONTEXT = 'upstream-ai-review/base-snapshot'
 
 
 def api(method, path, payload=None, token_value=None):
@@ -129,10 +130,37 @@ def unresolved_ai_threads(number):
         cursor = threads['pageInfo']['endCursor']
 
 
-def ai_review_passes(pr):
+def review_base_snapshot(pr):
+    statuses = list_all(f'/repos/{repository}/commits/{pr["head"]["sha"]}/statuses')
+    snapshot = next((status for status in statuses if status['context'] == AI_BASE_CONTEXT), None)
+    if not snapshot or snapshot['state'] != 'success':
+        return None
+    if (snapshot.get('creator', {}).get('login') != 'github-actions[bot]'
+            or snapshot.get('creator', {}).get('type') != 'Bot'):
+        return None
+    match = re.fullmatch(r'https://github\.com/' + re.escape(repository)
+                         + r'/actions/runs/([0-9]+)', snapshot.get('target_url') or '')
+    if not match or not re.fullmatch(r'[0-9a-f]{40}', snapshot.get('description') or ''):
+        return None
+    run = api('GET', f'/repos/{repository}/actions/runs/{match[1]}')
+    if (run['event'] not in ('pull_request_target', 'schedule', 'workflow_dispatch')
+            or run['path'] not in ('.github/workflows/upstream-ai-review.yml',
+                                   '.github/workflows/upstream-release-sync.yml')
+            or run['head_repository']['full_name'] != repository
+            or run['head_branch'] != pr['base']['ref']):
+        return None
+    return snapshot
+
+
+def ai_review_passes(pr, base_sha=None):
     review = latest_ai_review(pr)
     if not review or review['state'] != 'APPROVED':
         print(f'PR #{pr["number"]} needs independent Copilot approval of {pr["head"]["sha"]}')
+        return False
+    snapshot = review_base_snapshot(pr)
+    if (not snapshot or snapshot['description'] != (base_sha or pr['base']['sha'])
+            or review['submitted_at'] <= snapshot['created_at']):
+        print(f'PR #{pr["number"]} needs a new AI review against the current base commit')
         return False
     if unresolved_ai_threads(pr['number']):
         print(f'PR #{pr["number"]} still has unresolved Copilot review findings')
@@ -526,7 +554,10 @@ def promote_release_candidate(run, baseline, dry_run=False):
     if not candidate_checks:
         raise RuntimeError('Exact source candidate checks are missing or failed')
     validate_sync_metadata(pr, baseline)
-    if not ai_review_passes(pr):
+    merge_commit = api('GET', f'/repos/{repository}/git/commits/{pr["merge_commit_sha"]}')
+    if len(merge_commit['parents']) != 2 or merge_commit['parents'][1]['sha'] != candidate_sha:
+        raise RuntimeError('Merged sync PR does not match the reviewed source candidate')
+    if not ai_review_passes(pr, merge_commit['parents'][0]['sha']):
         return
     changed = subprocess.check_output(
         ['git', 'diff', '--name-only', f'{candidate_sha}..{sha}'], text=True).splitlines()

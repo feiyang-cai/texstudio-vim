@@ -23,6 +23,7 @@ jobs:
       actions: write
       contents: write
       pull-requests: write
+      statuses: read
     steps:
       - uses: actions/checkout@v7
         with:
@@ -41,6 +42,7 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
+      statuses: write
     steps:
       - uses: actions/checkout@v7
         with:
@@ -55,6 +57,7 @@ jobs:
       - name: Request missing independent AI reviews
         env:
           GH_TOKEN: ${{ secrets.COPILOT_SYNC_TOKEN }}
+          REVIEW_STATE_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: python3 .github/scripts/request-upstream-ai-review.py
 
@@ -65,6 +68,7 @@ jobs:
       actions: write
       contents: write
       pull-requests: write
+      statuses: read
     steps:
       - uses: actions/checkout@v7
         with:
@@ -86,6 +90,7 @@ jobs:
       actions: write
       contents: write
       pull-requests: read
+      statuses: read
     steps:
       - uses: actions/checkout@v7
         with:

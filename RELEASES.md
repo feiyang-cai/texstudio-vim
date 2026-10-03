@@ -89,6 +89,11 @@ requires the review bot's latest review of the exact PR head to be `APPROVED`,
 and every Copilot review thread must be resolved. Missing, comment-only,
 changes-requested, dismissed, and stale reviews block merging and release
 tagging. A new commit needs a new review. GitHub API failures also block promotion.
+The requester records the base SHA in a commit status written by a trusted
+default-branch workflow. Approval must follow that snapshot and match both
+the head and base. If the base advances, the next daily/manual run requests a
+new review after any in-flight review finishes. Tagging checks the actual merge's
+first parent against the reviewed base, rather than the current branch tip.
 The review instructions focus on behavioral upstream/Vim interactions, including
 changes that Git merges without conflicts and gaps not covered by current tests.
 

@@ -16,6 +16,10 @@ controller = requester.controller
 
 class UpstreamAIReviewTests(unittest.TestCase):
     def setUp(self):
+        self.snapshot = {'description': 'b' * 40, 'created_at': '2026-10-01T00:00:00Z'}
+        self.snapshot_patch = patch.object(controller, 'review_base_snapshot', return_value=self.snapshot)
+        self.snapshot_patch.start()
+        self.addCleanup(self.snapshot_patch.stop)
         self.pr = {
             'number': 42, 'state': 'open', 'draft': False,
             'head': {'sha': 'a' * 40, 'ref': 'copilot/sync',
@@ -27,6 +31,7 @@ class UpstreamAIReviewTests(unittest.TestCase):
 
     def review(self, state='APPROVED', **changes):
         result = {'id': 1, 'commit_id': 'a' * 40, 'state': state,
+                  'submitted_at': '2026-10-01T00:01:00Z',
                   'user': {'login': controller.AI_REVIEWER, 'type': 'Bot'}}
         result.update(changes)
         return result
@@ -56,6 +61,48 @@ class UpstreamAIReviewTests(unittest.TestCase):
         with patch.object(controller, 'list_all', return_value=[self.review()]), \
                 patch.object(controller, 'unresolved_ai_threads', return_value=True):
             self.assertFalse(controller.ai_review_passes(self.pr))
+
+    def test_base_change_or_review_before_snapshot_blocks_approval(self):
+        for snapshot in (None, {'description': 'c' * 40, 'created_at': '2026-10-01T00:00:00Z'},
+                         {'description': 'b' * 40, 'created_at': '2026-10-01T00:02:00Z'}):
+            with self.subTest(snapshot=snapshot), \
+                    patch.object(controller, 'list_all', return_value=[self.review()]), \
+                    patch.object(controller, 'review_base_snapshot', return_value=snapshot), \
+                    patch.object(controller, 'unresolved_ai_threads') as threads:
+                self.assertFalse(controller.ai_review_passes(self.pr))
+                threads.assert_not_called()
+        # After merging, compare with the merge's first parent, not the moving base branch.
+        self.pr['base']['sha'] = 'f' * 40
+        with patch.object(controller, 'list_all', return_value=[self.review()]), \
+                patch.object(controller, 'unresolved_ai_threads', return_value=False):
+            self.assertTrue(controller.ai_review_passes(self.pr, 'b' * 40))
+
+    def test_snapshot_requires_trusted_workflow_provenance(self):
+        self.snapshot_patch.stop()
+        snapshot = dict(self.snapshot, state='success', context=controller.AI_BASE_CONTEXT,
+                        creator={'login': 'github-actions[bot]', 'type': 'Bot'},
+                        target_url=f'https://github.com/{controller.repository}/actions/runs/123')
+        run = {'event': 'pull_request_target', 'path': '.github/workflows/upstream-ai-review.yml',
+               'head_repository': {'full_name': controller.repository}, 'head_branch': 'master'}
+        with patch.object(controller, 'list_all', return_value=[snapshot]), \
+                patch.object(controller, 'api', return_value=run):
+            self.assertEqual(controller.review_base_snapshot(self.pr), snapshot)
+        for changed_run in (dict(run, event='push'), dict(run, head_branch='copilot/sync'),
+                            dict(run, path='.github/workflows/ci.yml')):
+            with patch.object(controller, 'list_all', return_value=[snapshot]), \
+                    patch.object(controller, 'api', return_value=changed_run):
+                self.assertIsNone(controller.review_base_snapshot(self.pr))
+        with patch.object(controller, 'list_all', return_value=[dict(snapshot, creator={'login': 'Copilot'})]):
+            self.assertIsNone(controller.review_base_snapshot(self.pr))
+
+    def test_base_change_requests_new_review_even_for_unchanged_head(self):
+        self.pr['base']['sha'] = 'f' * 40
+        with patch.object(controller, 'list_all', return_value=[self.review()]), \
+                patch.dict(os.environ, {'GITHUB_RUN_ID': '123', 'REVIEW_STATE_TOKEN': 'test-token'}), \
+                patch.object(controller, 'api') as api:
+            requester.request_review(self.pr)
+            self.assertEqual(len(api.call_args_list), 2)
+            self.assertEqual(api.call_args.args[2]['description'], 'f' * 40)
 
     def test_thread_pagination_and_graphql_bot_login(self):
         def page(nodes, more=False):
@@ -87,10 +134,12 @@ class UpstreamAIReviewTests(unittest.TestCase):
 
     def test_requests_review_again_after_new_commit_but_not_while_pending(self):
         with patch.object(controller, 'list_all', return_value=[self.review(commit_id='b' * 40)]), \
+                patch.dict(os.environ, {'GITHUB_RUN_ID': '123', 'REVIEW_STATE_TOKEN': 'test-token'}), \
                 patch.object(controller, 'api') as api:
             requester.request_review(self.pr)
-            self.assertEqual(api.call_args.args[0], 'POST')
-            self.assertEqual(api.call_args.args[2], {'reviewers': [controller.AI_REVIEWER]})
+            self.assertEqual(api.call_args_list[0].args[0], 'POST')
+            self.assertEqual(api.call_args_list[0].args[2], {'reviewers': [controller.AI_REVIEWER]})
+            self.assertEqual(api.call_args.args[2]['description'], self.pr['base']['sha'])
         for login in (controller.AI_REVIEWER, controller.AI_REVIEWER.removesuffix('[bot]'), 'Copilot'):
             self.pr['requested_reviewers'] = [{'login': login}]
             with self.subTest(login=login), \
@@ -107,7 +156,9 @@ class UpstreamAIReviewTests(unittest.TestCase):
                     patch.object(controller, 'workflows_pass', return_value=True), \
                     patch.object(controller.subprocess, 'run'), \
                     patch.object(controller.subprocess, 'check_output', return_value=run['head_sha']), \
-                    patch.object(controller, 'api', return_value={'parents': [{'sha': 'a' * 40}]}), \
+                    patch.object(controller, 'api', side_effect=[
+                        {'parents': [{'sha': 'a' * 40}]},
+                        {'parents': [{'sha': 'b' * 40}, {'sha': 'a' * 40}]}]), \
                     patch.object(controller, 'sync_pr_for_commit', return_value=pr), \
                     patch.object(controller, 'resolve_upstream_tag', return_value='c' * 40), \
                     patch.object(controller, 'validate_sync_metadata'), \

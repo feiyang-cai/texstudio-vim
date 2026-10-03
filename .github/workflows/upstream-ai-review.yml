@@ -6,6 +6,7 @@ on:
 
 permissions:
   contents: read
+  statuses: write
 
 jobs:
   request:
@@ -20,6 +21,7 @@ jobs:
       - name: Request separate Copilot code review
         env:
           GH_TOKEN: ${{ secrets.COPILOT_SYNC_TOKEN }}
+          REVIEW_STATE_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: python3 .github/scripts/request-upstream-ai-review.py

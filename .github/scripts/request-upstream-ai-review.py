@@ -20,7 +20,9 @@ def request_review(pr):
             or (pr['head'].get('repo') or {}).get('full_name') != controller.repository
             or not controller.marker_from(pr.get('body'))):
         return
-    if controller.latest_ai_review(pr):
+    snapshot = controller.review_base_snapshot(pr)
+    if (snapshot and snapshot['description'] == pr['base']['sha']
+            and controller.latest_ai_review(pr)):
         print(f'PR #{pr["number"]} already has an AI review for this commit')
         return
     if any(user['login'] in PENDING_REVIEWER_LOGINS for user in pr.get('requested_reviewers', [])):
@@ -28,6 +30,13 @@ def request_review(pr):
         return
     controller.api('POST', f'/repos/{controller.repository}/pulls/{pr["number"]}/requested_reviewers',
                    {'reviewers': [controller.AI_REVIEWER]})
+    # Record only after a new request succeeds. An in-flight review of an old
+    # base must finish before requesting and recording the new base.
+    controller.api('POST', f'/repos/{controller.repository}/statuses/{pr["head"]["sha"]}', {
+        'state': 'success', 'context': controller.AI_BASE_CONTEXT,
+        'description': pr['base']['sha'],
+        'target_url': f'https://github.com/{controller.repository}/actions/runs/{os.environ["GITHUB_RUN_ID"]}',
+    }, token_value=os.environ['REVIEW_STATE_TOKEN'])
     print(f'Requested independent Copilot review of PR #{pr["number"]} at {pr["head"]["sha"]}')
 
 

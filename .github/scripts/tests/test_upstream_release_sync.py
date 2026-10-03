@@ -126,6 +126,7 @@ class UpstreamReleaseSyncTests(unittest.TestCase):
     def test_release_control_edits_are_rejected(self):
         files = [
             {'filename': 'src/latexeditorview.cpp'},
+            {'filename': '.github/copilot-instructions.md'},
             {'filename': '.github/workflows/upstream-release-sync.yml'},
             {'filename': '.github/scripts/package_identity.py'},
             {'filename': '.github/scripts/smoke-appimage.py'},
@@ -133,6 +134,7 @@ class UpstreamReleaseSyncTests(unittest.TestCase):
             {'filename': 'old-tests.py', 'previous_filename': '.github/scripts/tests/test_old.py'},
         ]
         self.assertEqual(controller.changed_release_controls(files), [
+            '.github/copilot-instructions.md',
             '.github/workflows/upstream-release-sync.yml',
             '.github/scripts/package_identity.py',
             '.github/scripts/smoke-appimage.py',

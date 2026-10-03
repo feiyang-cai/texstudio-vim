@@ -20,6 +20,7 @@ PROTECTED_PATHS = {
     '.github/upstream-release-state.json',
     '.github/upstream-release-policy.json',
     '.github/release-request.json',
+    '.github/copilot-instructions.md',
     'RELEASES.md',
     '.github/workflows/ci.yml',
     '.github/workflows/cd.yml',
@@ -62,6 +63,9 @@ FORK_RELEASE_TAG = re.compile(r'texstudio-vim-(' + RELEASE_VERSION.pattern + r')
 repository = os.environ.get('GITHUB_REPOSITORY', 'feiyang-cai/texstudio-vim')
 owner, repo = repository.split('/', 1)
 token = os.environ.get('GH_TOKEN', '')
+AI_REVIEWER = 'copilot-pull-request-reviewer[bot]'
+AI_REVIEWER_LOGINS = {AI_REVIEWER, AI_REVIEWER.removesuffix('[bot]')}
+AI_BASE_CONTEXT = 'upstream-ai-review/base-snapshot'
 
 
 def api(method, path, payload=None, token_value=None):
@@ -85,6 +89,130 @@ def branch_sha(branch):
 def marker_from(body):
     match = MARKER.search(body or '')
     return tuple(match.groups()) if match else None
+
+
+def latest_ai_review(pr):
+    reviews = list(list_all(f'/repos/{repository}/pulls/{pr["number"]}/reviews'))
+    matching = [review for review in reviews
+                if review.get('user', {}).get('login') in AI_REVIEWER_LOGINS
+                and review.get('user', {}).get('type') == 'Bot'
+                and review.get('commit_id') == pr['head']['sha']]
+    return max(matching, key=lambda review: review['id']) if matching else None
+
+
+def unresolved_ai_threads(number):
+    query = '''query($owner:String!, $repo:String!, $number:Int!, $cursor:String) {
+      repository(owner:$owner, name:$repo) {
+        pullRequest(number:$number) {
+          reviewThreads(first:100, after:$cursor) {
+            nodes { isResolved comments(first:1) { nodes { author { login } } } }
+            pageInfo { hasNextPage endCursor }
+          }
+        }
+      }
+    }'''
+    cursor = None
+    while True:
+        response = api('POST', '/graphql', {
+            'query': query,
+            'variables': {'owner': owner, 'repo': repo, 'number': number, 'cursor': cursor},
+        })
+        if response.get('errors'):
+            raise RuntimeError('Could not verify AI review threads')
+        threads = response['data']['repository']['pullRequest']['reviewThreads']
+        for thread in threads['nodes']:
+            comments = thread['comments']['nodes']
+            if (not thread['isResolved'] and comments
+                    and (comments[0].get('author') or {}).get('login') in AI_REVIEWER_LOGINS):
+                return True
+        if not threads['pageInfo']['hasNextPage']:
+            return False
+        cursor = threads['pageInfo']['endCursor']
+
+
+def review_base_snapshot(pr):
+    statuses = list_all(f'/repos/{repository}/commits/{pr["head"]["sha"]}/statuses')
+    snapshot = next((status for status in statuses if status['context'] == AI_BASE_CONTEXT), None)
+    if not snapshot or snapshot['state'] != 'success':
+        return None
+    if (snapshot.get('creator', {}).get('login') != 'github-actions[bot]'
+            or snapshot.get('creator', {}).get('type') != 'Bot'):
+        return None
+    match = re.fullmatch(r'https://github\.com/' + re.escape(repository)
+                         + r'/actions/runs/([0-9]+)', snapshot.get('target_url') or '')
+    if not match or not re.fullmatch(r'[0-9a-f]{40}', snapshot.get('description') or ''):
+        return None
+    run = api('GET', f'/repos/{repository}/actions/runs/{match[1]}')
+    if (run['event'] not in ('pull_request_target', 'schedule', 'workflow_dispatch')
+            or run['path'] not in ('.github/workflows/upstream-ai-review.yml',
+                                   '.github/workflows/upstream-release-sync.yml')
+            or run['head_repository']['full_name'] != repository
+            or run['head_branch'] != pr['base']['ref']):
+        return None
+    return snapshot
+
+
+def ai_review_passes(pr, base_sha=None):
+    review = latest_ai_review(pr)
+    if not review or review['state'] != 'APPROVED':
+        print(f'PR #{pr["number"]} needs independent Copilot approval of {pr["head"]["sha"]}')
+        return False
+    snapshot = review_base_snapshot(pr)
+    if (not snapshot or snapshot['description'] != (base_sha or pr['base']['sha'])
+            or review['submitted_at'] <= snapshot['created_at']):
+        print(f'PR #{pr["number"]} needs a new AI review against the current base commit')
+        return False
+    if unresolved_ai_threads(pr['number']):
+        print(f'PR #{pr["number"]} still has unresolved Copilot review findings')
+        return False
+    if upstream_changes_need_human(pr) and not human_validation_passes(pr, snapshot):
+        print(f'PR #{pr["number"]} needs human validation of its proposed upstream changes')
+        return False
+    return True
+
+
+def upstream_changes_need_human(pr):
+    body = pr.get('body') or ''
+    if (body.count('<!-- upstream-behavior:preserved -->') != 1
+            or '<!-- upstream-behavior:human-validation-required -->' in body
+            or any(label['name'] == 'upstream-human-validation-required'
+                   for label in pr.get('labels', []))):
+        return True
+    marker = marker_from(body)
+    if not marker:
+        return True
+    _, _, upstream_sha, fork_base = marker
+    # Compare with Git's unmodified merge of the pinned inputs. Any conflict
+    # resolution or extra edits conservatively require a human, even if the
+    # agent describes them as compatibility changes.
+    merged = subprocess.run(['git', 'merge-tree', '--write-tree', fork_base, upstream_sha],
+                            capture_output=True, text=True, check=False)
+    if merged.returncode == 1:
+        return True
+    if merged.returncode != 0:
+        raise RuntimeError('Could not verify the unmodified upstream merge')
+    tree = merged.stdout.strip()
+    if not re.fullmatch(r'[0-9a-f]{40}', tree):
+        raise RuntimeError('Invalid automatic merge tree')
+    candidate_tree = subprocess.check_output(
+        ['git', 'rev-parse', f'{pr["head"]["sha"]}^{{tree}}'], text=True).strip()
+    return tree != candidate_tree
+
+
+def human_validation_passes(pr, snapshot):
+    policy = json.loads(Path('.github/upstream-release-policy.json').read_text())
+    allowed = set(policy.get('human_validation_reviewers', []))
+    latest = {}
+    for review in list_all(f'/repos/{repository}/pulls/{pr["number"]}/reviews'):
+        user = review.get('user') or {}
+        login = user.get('login')
+        if login in allowed and user.get('type') == 'User':
+            if login not in latest or review['id'] > latest[login]['id']:
+                latest[login] = review
+    return any(review['state'] == 'APPROVED'
+               and review.get('commit_id') == pr['head']['sha']
+               and review['submitted_at'] > snapshot['created_at']
+               for review in latest.values())
 
 
 def publication_enabled(policy):
@@ -338,6 +466,29 @@ def create_release_candidate(pr, baseline):
     print(f'Dispatched full verification for {tag} at {release_sha}')
 
 
+def merge_reviewed_commits(pr):
+    base, head = pr['base']['sha'], pr['head']['sha']
+    if not all(re.fullmatch(r'[0-9a-f]{40}', sha) for sha in (base, head)):
+        raise RuntimeError('Invalid reviewed commit SHA')
+    subprocess.run(['git', 'fetch', 'origin', base, head], check=True, capture_output=True)
+    tree = subprocess.check_output(
+        ['git', 'merge-tree', '--write-tree', base, head], text=True).strip()
+    if not re.fullmatch(r'[0-9a-f]{40}', tree):
+        raise RuntimeError('Could not construct a conflict-free reviewed merge tree')
+    merge_sha = subprocess.check_output([
+        'git', '-c', 'user.name=github-actions[bot]',
+        '-c', 'user.email=41898282+github-actions[bot]@users.noreply.github.com',
+        'commit-tree', tree, '-p', base, '-p', head,
+        '-m', f'Merge independently reviewed upstream sync PR #{pr["number"]}',
+    ], text=True).strip()
+    # A non-forced push is an atomic fast-forward check. A concurrent commit
+    # outside the reviewed ancestry makes the push fail, rather than changing
+    # the merge's first parent. Repository protections are respected as well.
+    subprocess.run(['git', 'push', 'origin', f'{merge_sha}:refs/heads/{pr["base"]["ref"]}'],
+                   check=True, capture_output=True)
+    return merge_sha
+
+
 def promote_candidate(run, dry_run=False, allow_publication=False):
     sha, branch = run['head_sha'], run['head_branch']
     if run['head_repository']['full_name'].lower() != repository.lower():
@@ -357,6 +508,8 @@ def promote_candidate(run, dry_run=False, allow_publication=False):
         print(f'No open Copilot sync pull request found for {sha}')
         return
     fresh, _, _ = verify_sync_pr(pr, baseline)
+    if not ai_review_passes(fresh):
+        return
     if branch_sha(baseline['branch']) != fresh['base']['sha']:
         raise RuntimeError('Default branch changed after checks completed')
     if dry_run:
@@ -365,13 +518,7 @@ def promote_candidate(run, dry_run=False, allow_publication=False):
     if not allow_publication:
         print('Publication disabled: verified sync PR is not merged')
         return
-    merged = api('PUT', f'/repos/{repository}/pulls/{fresh["number"]}/merge', {
-        'sha': sha,
-        'merge_method': 'merge',
-    })
-    if not merged.get('merged'):
-        raise RuntimeError('GitHub did not merge the verified sync PR')
-    merge_sha = merged['sha']
+    merge_sha = merge_reviewed_commits(fresh)
     if branch_sha(baseline['branch']) != merge_sha:
         raise RuntimeError('Default branch advanced unexpectedly during the merge')
     create_release_candidate(fresh, baseline)
@@ -471,6 +618,11 @@ def promote_release_candidate(run, baseline, dry_run=False):
     if not candidate_checks:
         raise RuntimeError('Exact source candidate checks are missing or failed')
     validate_sync_metadata(pr, baseline)
+    merge_commit = api('GET', f'/repos/{repository}/git/commits/{pr["merge_commit_sha"]}')
+    if len(merge_commit['parents']) != 2 or merge_commit['parents'][1]['sha'] != candidate_sha:
+        raise RuntimeError('Merged sync PR does not match the reviewed source candidate')
+    if not ai_review_passes(pr, merge_commit['parents'][0]['sha']):
+        return
     changed = subprocess.check_output(
         ['git', 'diff', '--name-only', f'{candidate_sha}..{sha}'], text=True).splitlines()
     if not trusted_overlay_only(changed):
@@ -564,10 +716,31 @@ def publish_progress(run, baseline):
 
 
 def main():
+    action = os.environ['CONTROLLER_ACTION']
+    if action == 'pending':
+        policy = json.loads(Path('.github/upstream-release-policy.json').read_text())
+        if not policy['dry_run'] and not publication_enabled(policy):
+            print('Publication disabled: pending syncs are not merged')
+            return
+        failures = []
+        for pr in list_all(f'/repos/{repository}/pulls?state=open'):
+            if (not pr.get('draft') and marker_from(pr.get('body'))
+                    and (pr['head'].get('repo') or {}).get('full_name') == repository
+                    and pr['user']['login'] in ('Copilot', 'copilot-swe-agent[bot]')):
+                try:
+                    promote_candidate({'head_sha': pr['head']['sha'],
+                                       'head_branch': pr['head']['ref'],
+                                       'head_repository': {'full_name': repository}},
+                                      policy['dry_run'], publication_enabled(policy))
+                except Exception as error:
+                    failures.append(pr['number'])
+                    print(f'PR #{pr["number"]} could not be promoted: {type(error).__name__}: {error}')
+        if failures:
+            raise RuntimeError(f'Sync reevaluation failed for PRs: {failures}')
+        return
     run = json.loads(os.environ['WORKFLOW_RUN'])
     if run['head_repository']['full_name'].lower() != repository.lower():
         return
-    action = os.environ['CONTROLLER_ACTION']
     baseline = json.loads(Path('.github/approved-vim-baseline.json').read_text())
     if action == 'merge':
         if run['conclusion'] == 'success':

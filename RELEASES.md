@@ -81,6 +81,62 @@ GitHub-required approval of Copilot workflow runs is not bypassed. Syncs preserv
 the approved Vim baseline and `VIM_REVISION`; changing either requires an
 owner-approved change.
 
+### Independent AI review
+
+Upstream syncs additionally require an independent **Copilot code review**,
+separate from the Copilot coding agent that prepares the merge. The controller
+requires the review bot's latest review of the exact PR head to be `APPROVED`,
+and every Copilot review thread must be resolved. Missing, comment-only,
+changes-requested, dismissed, and stale reviews block merging and release
+tagging. A new commit needs a new review. GitHub API failures also block promotion.
+The requester records the base SHA in a commit status written by a trusted
+default-branch workflow. Approval must follow that snapshot and match both
+the head and base. If the base advances, the next daily/manual run requests a
+new review after any in-flight review finishes. Tagging checks the actual merge's
+first parent against the reviewed base, rather than the current branch tip.
+Promotion builds a two-parent merge from the reviewed SHAs and uses a non-forced
+Git push. Unrelated concurrent default-branch commits make that update fail;
+the controller never retries by merging onto a different base. Branch protections
+still apply and can block this update; the controller does not bypass them.
+The review instructions focus on behavioral upstream/Vim interactions, including
+changes that Git merges without conflicts and gaps not covered by current tests.
+
+The trusted `Upstream AI review` workflow requests reviews when eligible sync PRs
+are ready or updated, without checking out candidate code. Daily/manual sync
+runs retry missing review requests and recheck reviewed PRs, so a review that
+finishes after CI can be picked up on the next daily check or manual run.
+Dry-run mode sends no review requests. Publication switches remain independent
+and disabled by default; AI approval alone cannot publish a release.
+
+Configure **Settings → Copilot → Code review → Auto-approval → Allow Copilot to
+approve pull requests** in this repository. Copilot otherwise normally submits
+comment-only reviews, which deliberately do not satisfy this gate. If the
+approval feature is unavailable for the account, automatic promotion remains
+blocked; a comment saying the code looks good is never treated as approval.
+Copilot review uses the existing `COPILOT_SYNC_TOKEN` user credential and
+subscription. Review findings need fixes and a new review; tests still remain
+required. AI review reduces risk but does not guarantee correctness.
+If Copilot already submitted a comment-only review before auto-approval was
+enabled, manually request another review on that PR. The workflow avoids
+repeated requests for a commit that Copilot has already reviewed.
+
+### Human validation of upstream changes
+
+Syncs must preserve upstream behavior and contain only Vim compatibility changes.
+The agent must escalate proposed upstream changes or uncertain behavior for human
+validation. Each PR declares `<!-- upstream-behavior:preserved -->` or
+`<!-- upstream-behavior:human-validation-required -->`; a missing declaration
+also blocks unattended promotion. The `upstream-human-validation-required` label
+can additionally flag concerns found during review.
+The controller compares the candidate tree with Git's automatic merge of the
+pinned fork and upstream commits. Conflicts or additional edits require a human
+even when described as Vim compatibility fixes. Before merging or tagging, the
+latest review from a configured `human_validation_reviewers` account must approve
+the exact head and follow the current base snapshot. Only `feiyang-cai` is
+configured initially. New commits or base changes require fresh validation;
+AI approval and passing tests remain necessary. This conservative check does not
+prove semantic equivalence; the independent reviewer must escalate uncertainties.
+
 ## Release naming and publishing
 
 Create each fork tag on its own tested merge commit, never on the unmodified

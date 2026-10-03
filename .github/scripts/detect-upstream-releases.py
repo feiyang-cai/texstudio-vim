@@ -30,6 +30,10 @@ def next_release(releases, kind, progress):
     return min(newer, key=lambda item: item['published_at']) if newer else None
 
 
+def sync_issue_mutations_enabled(policy):
+    return policy.get('dry_run') is False
+
+
 def api(method, path, payload=None):
     data = json.dumps(payload).encode() if payload is not None else None
     headers = {
@@ -77,12 +81,12 @@ def already_in_history(commit, tag):
                           check=False, capture_output=True).returncode == 0
 
 
-def sync_marker(kind, tag, commit):
-    return f'<!-- upstream-release-sync:{kind}:{tag}:{commit} -->'
+def sync_marker(kind, tag, commit, fork_base):
+    return f'<!-- upstream-release-sync:{kind}:{tag}:{commit}:{fork_base} -->'
 
 
-def sync_instructions(kind, release, commit, baseline):
-    marker = sync_marker(kind, release['tag_name'], commit)
+def sync_instructions(kind, release, commit, fork_base, baseline):
+    marker = sync_marker(kind, release['tag_name'], commit, fork_base)
     return f"""Automatically prepare the TeXstudio upstream release sync below.
 
 {marker}
@@ -91,12 +95,13 @@ def sync_instructions(kind, release, commit, baseline):
 - Exact upstream repository: {UPSTREAM}
 - Exact upstream release tag: `{release['tag_name']}`
 - Resolved upstream commit (do not substitute a moving branch): `{commit}`
-- Approved fork baseline: `{baseline['branch']}` at `{baseline['commit']}`
+- Exact published fork base for this release stream: `{fork_base}`
+- Approved Vim baseline: `{baseline['branch']}` at `{baseline['commit']}`
 - Approved `VIM_REVISION`: `{baseline['vim_revision']}`; preserve it unchanged.
 
-Create a separate sync branch from the current tip of `{baseline['branch']}` and
-merge the exact upstream tag. The pinned approved fork commit identifies the Vim
-implementation to preserve; do not reset the branch to that older commit.
+Create a separate sync branch from the exact published fork base above, not from
+the current tip of `{baseline['branch']}`. Merge the exact upstream tag. The
+approved Vim baseline identifies the Vim implementation to preserve.
 Resolve conflicts while retaining this fork's Vim
 support, registers, all modes, motions, search, substitution, undo/redo and
 Ctrl-click navigation. Preserve the fresh-config Vim default, saved preferences,
@@ -120,6 +125,7 @@ def main():
     state_path = Path('.github/upstream-release-state.json')
     state = json.loads(state_path.read_text())
     baseline = json.loads(Path('.github/approved-vim-baseline.json').read_text())
+    policy = json.loads(Path('.github/upstream-release-policy.json').read_text())
     if baseline['branch'] != os.environ.get('DEFAULT_BRANCH', 'master'):
         raise SystemExit('Approved baseline branch is not the repository default branch')
     revision = Path('VIM_REVISION').read_text().strip()
@@ -140,6 +146,7 @@ def main():
         if not release:
             continue
         tag = release['tag_name']
+        fork_base = progress['fork_sha']
         fork_tag = f"texstudio-vim-{tag}-r{baseline['vim_revision']}"
         if fork_tag in fork_tags:
             print(f'{fork_tag} already exists; waiting for its release controller')
@@ -148,9 +155,10 @@ def main():
         if already_in_history(commit, tag):
             print(f'{tag} ({commit}) is already in the fork history; no sync needed')
             continue
-        marker_prefix = f'<!-- upstream-release-sync:{kind}:{tag}:'
+        marker_prefix = f'<!-- upstream-release-sync:{kind}:{tag}:{commit}:'
         matching = [item for item in tracked if marker_prefix in (item.get('body') or '')]
-        if matching and sync_marker(kind, tag, commit) not in (matching[0].get('body') or ''):
+        marker = sync_marker(kind, tag, commit, fork_base)
+        if matching and marker not in (matching[0].get('body') or ''):
             raise RuntimeError(f'Pending sync for {tag} pins a different upstream commit')
         if any(item.get('merged') for item in matching if 'pull_request' in item):
             print(f'A sync PR for {tag} is merged; waiting for release verification')
@@ -161,12 +169,18 @@ def main():
         existing = next((item for item in matching if 'pull_request' not in item), None)
         reopened = False
         if existing and existing['state'] == 'closed':
+            if not sync_issue_mutations_enabled(policy):
+                print(f'Dry run: would reopen and assign sync issue #{existing["number"]} for {tag}')
+                continue
             api('PATCH', f'/repos/{repository}/issues/{existing["number"]}',
                 {'state': 'open'})
             existing['state'] = 'open'
             reopened = True
         if existing and existing['state'] == 'open':
             issue_number = existing['number']
+            if not sync_issue_mutations_enabled(policy):
+                print(f'Dry run: would reuse and assign sync issue #{issue_number} for {tag}')
+                continue
             if reopened or not any(user['login'] in ('Copilot', 'copilot-swe-agent[bot]')
                                    for user in existing.get('assignees', [])):
                 api('POST', f'/repos/{repository}/issues/{issue_number}/assignees', {
@@ -182,9 +196,13 @@ def main():
             print(f'Reused sync issue #{issue_number} for {tag}')
             continue
 
+        if not sync_issue_mutations_enabled(policy):
+            print(f'Dry run: would create and assign sync issue for {tag} ({commit}) '
+                  f'from approved fork base {fork_base}')
+            continue
         api('POST', f'/repos/{repository}/issues', {
             'title': f'[Upstream sync] TeXstudio {tag}',
-            'body': sync_instructions(kind, release, commit, baseline),
+            'body': sync_instructions(kind, release, commit, fork_base, baseline),
             'assignees': ['copilot-swe-agent[bot]'],
             'agent_assignment': {
                 'target_repo': repository,

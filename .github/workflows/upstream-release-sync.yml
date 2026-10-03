@@ -50,11 +50,12 @@ jobs:
           CONTROLLER_ACTION: merge
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
+          UPSTREAM_RELEASE_PUBLICATION_ENABLED: ${{ vars.UPSTREAM_RELEASE_PUBLICATION_ENABLED || 'false' }}
           WORKFLOW_RUN: ${{ toJSON(github.event.workflow_run) }}
         run: python3 .github/scripts/upstream-release-controller.py
 
   tag:
-    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.full_name == github.repository && github.event.workflow_run.head_branch == github.event.repository.default_branch
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.full_name == github.repository && startsWith(github.event.workflow_run.head_branch, 'release-sync/')
     runs-on: ubuntu-24.04
     permissions:
       actions: write
@@ -69,6 +70,7 @@ jobs:
           CONTROLLER_ACTION: tag
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
+          UPSTREAM_RELEASE_PUBLICATION_ENABLED: ${{ vars.UPSTREAM_RELEASE_PUBLICATION_ENABLED || 'false' }}
           WORKFLOW_RUN: ${{ toJSON(github.event.workflow_run) }}
         run: python3 .github/scripts/upstream-release-controller.py
 
@@ -87,5 +89,6 @@ jobs:
           CONTROLLER_ACTION: publish
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
+          UPSTREAM_RELEASE_PUBLICATION_ENABLED: ${{ vars.UPSTREAM_RELEASE_PUBLICATION_ENABLED || 'false' }}
           WORKFLOW_RUN: ${{ toJSON(github.event.workflow_run) }}
         run: python3 .github/scripts/upstream-release-controller.py

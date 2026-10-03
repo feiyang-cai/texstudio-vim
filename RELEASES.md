@@ -39,7 +39,34 @@ only intentional fork differences.
 ## Daily upstream synchronization
 
 The `Upstream release sync` workflow checks stable and prerelease releases daily
-and can be run manually from the default branch. Configure
+and can be run manually from the default branch. It starts each candidate from
+the matching stream's latest published fork commit, never from the moving
+`master` tip, and requires the candidate to contain only one merge of that base
+and the pinned upstream commit. It verifies that the published base and candidate
+both retain the approved `VIM_REVISION`. Sync PRs cannot change workflow,
+action, script, test, package
+identity, or publication controls.
+
+After merge, the trusted controller stages the tested application tree with the
+current base-branch `.github` tree, then reruns CD and Vim-platform checks on that
+exact release candidate. This ensures the tag's CD release job enforces the
+publication switch even though release source commits are based on earlier
+published tags.
+
+Dry-run procedure: run **Actions → Upstream release sync → Run workflow** on the
+default branch. `.github/upstream-release-policy.json` defaults to
+`"dry_run": true` and `"publication_enabled": false`; the run reports releases
+and planned issue/controller actions without creating issues, merging PRs,
+tagging, or publishing. To permit sync issue creation and assignment, an owner
+must change `dry_run` to `false` in a reviewed default-branch change. Automatic
+merge and release tagging additionally require an owner-reviewed change setting
+`publication_enabled` to `true` and the repository Actions variable
+`UPSTREAM_RELEASE_PUBLICATION_ENABLED=true`. The Actions variable is also checked
+by the current CD release job. Either switch being disabled keeps automatic
+release mutations off. Create release tags only through the trusted controller;
+older immutable CD workflow revisions predate this guard.
+
+Configure
 `COPILOT_SYNC_TOKEN` as a user-to-server token that can create issues and assign
 Copilot; it is exposed only to the trusted detector step. Each issue pins the
 upstream release tag and resolved commit SHA. The trusted controller reuses

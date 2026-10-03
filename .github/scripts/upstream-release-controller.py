@@ -383,8 +383,12 @@ def create_release_tag(pr, merge_sha, release_sha, baseline, dry_run=False):
     tag = f'texstudio-vim-{upstream_tag}-r{baseline["vim_revision"]}'
     if not RELEASE_VERSION.fullmatch(upstream_tag):
         raise RuntimeError('Invalid upstream release in merged PR marker')
-    if branch_sha(baseline['branch']) != merge_sha:
-        raise RuntimeError('Default branch changed after post-merge verification')
+    subprocess.run(['git', 'fetch', 'origin',
+                    f'+refs/heads/{baseline["branch"]}:refs/remotes/verified-default'],
+                   check=True, capture_output=True)
+    if subprocess.run(['git', 'merge-base', '--is-ancestor', merge_sha,
+                       'refs/remotes/verified-default'], check=False).returncode:
+        raise RuntimeError('Merged sync PR is no longer on the default branch')
     if resolve_upstream_tag(upstream_tag) != upstream_sha:
         raise RuntimeError('Upstream release tag moved after the sync was prepared')
     if subprocess.run(['git', 'merge-base', '--is-ancestor', upstream_sha, release_sha],

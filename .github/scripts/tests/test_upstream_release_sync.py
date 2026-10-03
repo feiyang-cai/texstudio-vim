@@ -94,20 +94,21 @@ class UpstreamReleaseSyncTests(unittest.TestCase):
         self.assertTrue(checked_in['dry_run'])
         self.assertFalse(checked_in['publication_enabled'])
 
-    def test_dry_run_never_creates_release_tag_refs(self):
+    def test_dry_run_never_creates_release_tag_refs_and_allows_advanced_default_branch(self):
         upstream_sha, fork_base, candidate = 'a' * 40, 'b' * 40, 'c' * 40
         pr = {
             'body': detector.sync_marker('stable', '5.0.0', upstream_sha, fork_base),
             'head': {'sha': candidate},
         }
         missing_tag = HTTPError('https://api.github.com/ref', 404, 'not found', {}, None)
-        with patch.object(controller, 'branch_sha', return_value='d' * 40), \
+        with patch.object(controller, 'branch_sha') as branch_sha, \
                 patch.object(controller, 'resolve_upstream_tag', return_value=upstream_sha), \
                 patch.object(controller.subprocess, 'run',
                              return_value=type('Result', (), {'returncode': 0})()), \
                 patch.object(controller, 'api', side_effect=missing_tag) as api:
             controller.create_release_tag(
-                pr, 'd' * 40, {'branch': 'master', 'vim_revision': 1}, dry_run=True)
+                pr, 'd' * 40, candidate, {'branch': 'master', 'vim_revision': 1}, dry_run=True)
+        branch_sha.assert_not_called()
         self.assertFalse(any(call.args[0] != 'GET' for call in api.call_args_list))
 
     def test_missing_or_skipped_required_jobs_do_not_pass(self):

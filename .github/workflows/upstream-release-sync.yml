@@ -2,7 +2,9 @@ name: Upstream release sync
 
 on:
   schedule:
-    - cron: '17 13 * * *'
+    # Explicit Sunday-Saturday range preserves the daily time and refreshes
+    # GitHub's cron registration under the owner-authored schedule edit.
+    - cron: '17 13 * * 0-6'
   workflow_dispatch:
   workflow_run:
     workflows: [CD, Vim desktop tests]

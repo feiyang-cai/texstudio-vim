@@ -195,6 +195,126 @@ void LatexEditorViewTest::vimCtrlClickNavigation()
     edView->updateSettings();
 }
 
+void LatexEditorViewTest::vimMouseSelection_data()
+{
+    QTest::addColumn<int>("anchorLine");
+    QTest::addColumn<int>("anchorColumn");
+    QTest::addColumn<int>("activeLine");
+    QTest::addColumn<int>("activeColumn");
+    QTest::addColumn<QString>("selected");
+    QTest::addColumn<QString>("keys");
+    QTest::addColumn<QString>("registerText");
+    QTest::addColumn<QString>("remaining");
+    const QString original = "abcdef\nghijkl";
+    QTest::newRow("forward-yank") << 0 << 1 << 0 << 4 << QString("bcd") << QString("y") << QString("bcd") << original;
+    QTest::newRow("backward-yank") << 0 << 4 << 0 << 1 << QString("bcd") << QString("y") << QString("bcd") << original;
+    QTest::newRow("forward-delete") << 0 << 1 << 0 << 4 << QString("bcd") << QString("d") << QString("bcd") << QString("aef\nghijkl");
+    QTest::newRow("backward-delete") << 0 << 4 << 0 << 1 << QString("bcd") << QString("d") << QString("bcd") << QString("aef\nghijkl");
+    QTest::newRow("multiline") << 0 << 2 << 1 << 3 << QString("cdef\nghi") << QString("y") << QString("cdef\nghi") << original;
+    QTest::newRow("backward-multiline") << 1 << 3 << 0 << 2 << QString("cdef\nghi") << QString("d") << QString("cdef\nghi") << QString("abjkl");
+    QTest::newRow("forward-extend") << 0 << 1 << 0 << 4 << QString("bcd") << QString("ly") << QString("bcde") << original;
+    QTest::newRow("backward-extend") << 0 << 4 << 0 << 1 << QString("bcd") << QString("hy") << QString("abcd") << original;
+    QTest::newRow("backward-shrink") << 0 << 4 << 0 << 1 << QString("bcd") << QString("ly") << QString("cd") << original;
+    QTest::newRow("cross-anchor-backward") << 0 << 1 << 0 << 4 << QString("bcd") << QString("hhhy") << QString("ab") << original;
+    QTest::newRow("cross-anchor-forward") << 0 << 4 << 0 << 1 << QString("bcd") << QString("llly") << QString("de") << original;
+    QTest::newRow("line-end") << 0 << 1 << 0 << 6 << QString("bcdef") << QString("y") << QString("bcdef") << original;
+    QTest::newRow("newline-boundary") << 0 << 2 << 1 << 0 << QString("cdef\n") << QString("hy") << QString("cdef") << original;
+    QTest::newRow("backward-newline-boundary") << 1 << 0 << 0 << 2 << QString("cdef\n") << QString("hy") << QString("bcdef\n") << original;
+}
+
+void LatexEditorViewTest::vimMouseSelection()
+{
+    if (skipVimUiTestInQuickRuns()) return;
+    QFETCH(int, anchorLine);
+    QFETCH(int, anchorColumn);
+    QFETCH(int, activeLine);
+    QFETCH(int, activeColumn);
+    QFETCH(QString, selected);
+    QFETCH(QString, keys);
+    QFETCH(QString, registerText);
+    QFETCH(QString, remaining);
+    LatexEditorViewConfig config = *edView->getConfig();
+    config.editingMode = LatexEditorViewConfig::VimEditing;
+    LatexDocument document;
+    LatexEditorView view(nullptr, &config, &document);
+    view.resize(800, 600);
+    view.editor->setText("abcdef\nghijkl", false);
+    view.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&view));
+    view.editor->setFocus();
+    auto point = [&](int line, int column) {
+        return QPoint(qRound(document.line(line).cursorToDocumentOffset(column).x()),
+                      qRound(view.editor->lineRect(line).center().y()));
+    };
+    QWidget *viewport = view.editor->viewport();
+    const QPoint start = point(anchorLine, anchorColumn), end = point(activeLine, activeColumn);
+    QTest::mousePress(viewport, Qt::LeftButton, Qt::NoModifier, start);
+    QMouseEvent drag(QEvent::MouseMove, QPointF(end), QPointF(viewport->mapToGlobal(end)),
+                     Qt::NoButton, Qt::LeftButton, Qt::NoModifier);
+    QApplication::sendEvent(viewport, &drag);
+    QCOMPARE(view.editor->cursor().selectedText(), selected);
+    QCOMPARE(view.editor->inputModeLabel(), QString("VISUAL"));
+    QTest::mouseRelease(viewport, Qt::LeftButton, Qt::NoModifier, end);
+    QCOMPARE(view.editor->cursor().selectedText(), selected);
+    QCOMPARE(view.editor->inputModeLabel(), QString("VISUAL"));
+    QTest::keyClicks(view.editor, keys);
+    QCOMPARE(vimRegisters().read('"').text, registerText);
+    QCOMPARE(document.textLines().join("\n"), remaining);
+    QCOMPARE(view.editor->inputModeLabel(), QString("NORMAL"));
+    QVERIFY(!view.editor->cursor().hasSelection());
+}
+
+void LatexEditorViewTest::vimMouseClickAndInsertSelection_data()
+{
+    QTest::addColumn<QString>("entry");
+    QTest::addColumn<QString>("mode");
+    QTest::newRow("insert") << QString("i") << QString("INSERT");
+    QTest::newRow("replace") << QString("R") << QString("REPLACE");
+}
+
+void LatexEditorViewTest::vimMouseClickAndInsertSelection()
+{
+    if (skipVimUiTestInQuickRuns()) return;
+    QFETCH(QString, entry);
+    QFETCH(QString, mode);
+    LatexEditorViewConfig config = *edView->getConfig();
+    config.editingMode = LatexEditorViewConfig::VimEditing;
+    LatexDocument document;
+    LatexEditorView view(nullptr, &config, &document);
+    view.resize(800, 600);
+    view.editor->setText("abcdef", false);
+    view.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&view));
+    view.editor->setFocus();
+    QWidget *viewport = view.editor->viewport();
+    auto point = [&](int column) {
+        return QPoint(qRound(document.line(0).cursorToDocumentOffset(column).x()),
+                      qRound(view.editor->lineRect(0).center().y()));
+    };
+    QTest::mouseClick(viewport, Qt::LeftButton, Qt::NoModifier, point(2));
+    QCOMPARE(view.editor->inputModeLabel(), QString("NORMAL"));
+    QVERIFY(!view.editor->cursor().hasSelection());
+    QTest::keyClicks(view.editor, entry);
+    QTest::mousePress(viewport, Qt::LeftButton, Qt::NoModifier, point(1));
+    const QPoint end = point(4);
+    QMouseEvent drag(QEvent::MouseMove, QPointF(end), QPointF(viewport->mapToGlobal(end)),
+                     Qt::NoButton, Qt::LeftButton, Qt::NoModifier);
+    QApplication::sendEvent(viewport, &drag);
+    QTest::mouseRelease(viewport, Qt::LeftButton, Qt::NoModifier, end);
+    QCOMPARE(view.editor->inputModeLabel(), mode);
+    QCOMPARE(view.editor->cursor().selectedText(), QString("bcd"));
+    QTest::keyClick(view.editor, Qt::Key_Escape);
+    QVERIFY(!view.editor->cursor().hasSelection());
+    QTest::mouseDClick(viewport, Qt::LeftButton, Qt::NoModifier, point(2));
+    QTest::mouseRelease(viewport, Qt::LeftButton, Qt::NoModifier, point(2));
+    QCOMPARE(view.editor->inputModeLabel(), QString("VISUAL"));
+    QCOMPARE(view.editor->cursor().selectedText(), QString("abcdef"));
+    QTest::keyClick(view.editor, Qt::Key_Escape);
+    QCOMPARE(view.editor->inputModeLabel(), QString("NORMAL"));
+    QVERIFY(!view.editor->cursor().hasSelection());
+    QCOMPARE(document.textLines().join("\n"), QString("abcdef"));
+}
+
 void LatexEditorViewTest::vimCursorStyles()
 {
     if (skipVimUiTestInQuickRuns())
@@ -785,6 +905,8 @@ void LatexEditorViewTest::vimRegisterCommands_data()
     QTest::newRow("named paste count") << "abc" << "\"ayl\"a3p" << "aaaabc";
     QTest::newRow("count before register") << "one\ntwo\nthree" << "2\"ayyG\"aP" << "one\ntwo\none\ntwo\nthree";
     QTest::newRow("visual named yank") << "abc" << "vl\"ay\"aP" << "ababc";
+    QTest::newRow("backward visual keeps anchor") << "abcdef" << "llvhd" << "adef";
+    QTest::newRow("visual direction crosses anchor") << "abcdef" << "llvhhllld" << "abef";
     QTest::newRow("visual paste uses original source") << "abc" << "ylvlp" << "ac";
     QTest::newRow("explicit visual paste") << "abc" << "\"ayl vl\"ap" << "ac";
     QTest::newRow("replace does not overwrite yank") << "abc" << "ylrzp" << "zabc";

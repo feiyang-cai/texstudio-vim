@@ -465,6 +465,8 @@ public:
     {
         if (m_defaultBinding)
             m_defaultBinding->postMouseMoveEvent(event, editor);
+        if (event->buttons() & Qt::LeftButton)
+            adoptMouseSelection(event, editor, false);
     }
 
     bool mousePressEvent(QMouseEvent *event, QEditor *editor) override
@@ -482,19 +484,15 @@ public:
 
     bool mouseReleaseEvent(QMouseEvent *event, QEditor *editor) override
     {
-        if (m_mode == VimMode::Insert || m_mode == VimMode::Replace) {
-            return m_defaultBinding ? m_defaultBinding->mouseReleaseEvent(event, editor) : false;
-        }
-        bool handled = m_defaultBinding ? m_defaultBinding->mouseReleaseEvent(event, editor) : false;
-        normalizeNormalCursor(editor);
-        setMode(VimMode::Normal, editor);
-        return handled;
+        return m_defaultBinding ? m_defaultBinding->mouseReleaseEvent(event, editor) : false;
     }
 
     void postMouseReleaseEvent(QMouseEvent *event, QEditor *editor) override
     {
         if (m_defaultBinding)
             m_defaultBinding->postMouseReleaseEvent(event, editor);
+        if (event->button() == Qt::LeftButton)
+            adoptMouseSelection(event, editor, true);
     }
 
     bool mouseDoubleClickEvent(QMouseEvent *event, QEditor *editor) override
@@ -508,6 +506,8 @@ public:
     {
         if (m_defaultBinding)
             m_defaultBinding->postMouseDoubleClickEvent(event, editor);
+        if (event->button() == Qt::LeftButton)
+            adoptMouseSelection(event, editor, false);
     }
 
     bool contextMenuEvent(QContextMenuEvent *event, QEditor *editor) override
@@ -596,6 +596,30 @@ public:
     }
 
 private:
+    void adoptMouseSelection(QMouseEvent *event, QEditor *editor, bool released)
+    {
+        if (!editor || m_mode == VimMode::Insert || m_mode == VimMode::Replace
+                || (event->modifiers() & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier)))
+            return;
+        const QDocumentCursor cursor = editor->cursor();
+        if (cursor.hasSelection()) {
+            QDocumentCursor anchor(editor->document(), cursor.anchorLineNumber(), cursor.anchorColumnNumber());
+            // Mouse ranges are end-exclusive; Vim's anchor is a character.
+            // Keep the native range verbatim and adjust only our anchor.
+            if (qMakePair(cursor.lineNumber(), cursor.columnNumber())
+                    < qMakePair(anchor.lineNumber(), anchor.columnNumber()))
+                anchor.movePosition(1, QDocumentCursor::PreviousCharacter);
+            m_visualAnchorLine = anchor.lineNumber();
+            m_visualAnchorColumn = anchor.columnNumber();
+            editor->clearCursorMirrors();
+            setMode(VimMode::Visual, editor);
+        } else {
+            setMode(VimMode::Normal, editor);
+            if (released)
+                normalizeNormalCursor(editor);
+        }
+    }
+
     bool handleRegisterPrefix(QKeyEvent *event, QEditor *editor)
     {
         if (m_waitingForRegister) {
@@ -1348,7 +1372,9 @@ private:
         QDocumentCursor cursor = editor->cursor();
         if (m_mode == VimMode::VisualBlock)
             cursor = QDocumentCursor(editor->document(), cursor.lineNumber(), m_visualBlockPreferredColumn);
-        if (m_mode == VimMode::Visual && cursor.hasSelection() && cursor.columnNumber() > 0)
+        if (m_mode == VimMode::Visual && cursor.hasSelection()
+                && qMakePair(cursor.lineNumber(), cursor.columnNumber())
+                    > qMakePair(m_visualAnchorLine, m_visualAnchorColumn))
             cursor.movePosition(1, QDocumentCursor::PreviousCharacter);
         const bool vertical = motion.kind == VimMotion::Up || motion.kind == VimMotion::Down;
         int preferredColumn = cursor.columnNumber();
@@ -1626,8 +1652,18 @@ private:
                 startColumn = anchorLineLength;
                 endColumn = 0;
             }
-        } else if (!cursor.atLineEnd() || editor->document()->line(currentLine).length() == 0) {
-            endColumn += 1;
+        } else {
+            QDocumentCursor anchor(editor->document(), startLine, startColumn);
+            QDocumentCursor active = cursor;
+            active.clearSelection();
+            if (qMakePair(currentLine, endColumn) < qMakePair(startLine, startColumn))
+                anchor.movePosition(1, QDocumentCursor::NextCharacter);
+            else
+                active.movePosition(1, QDocumentCursor::NextCharacter);
+            startLine = anchor.lineNumber();
+            startColumn = anchor.columnNumber();
+            endLine = active.lineNumber();
+            endColumn = active.columnNumber();
         }
         QDocumentCursor selection(editor->document(), startLine, startColumn, endLine, endColumn);
         editor->setCursor(selection);

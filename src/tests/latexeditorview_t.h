@@ -19,6 +19,10 @@ class LatexEditorViewTest: public QObject{
         void vimEditingModeSwitches();
         void vimCursorStyles();
         void vimCtrlClickNavigation();
+        void vimMouseSelection_data();
+        void vimMouseSelection();
+        void vimMouseClickAndInsertSelection_data();
+        void vimMouseClickAndInsertSelection();
         void vimInsertEscape();
         void vimVisualLineStaysOnCurrentLine();
         void vimVisualBlockCtrlV();

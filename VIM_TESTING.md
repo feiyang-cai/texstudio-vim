@@ -26,6 +26,7 @@ coverage of every combination. No release is authorized by these tests.
 | Marks, exact and line jumps, operator marks | `vimMarks` | Cursor and editing assertions |
 | Ex write/quit dispatch, numeric line command | `vimExCommands` | Command signals and cursor assertions |
 | Ctrl-hover and Ctrl-click reference navigation in Normal/Insert/Replace | `vimCtrlClickNavigation` | Actual overlay, navigation signal, unchanged text/mode, Control release cleanup |
+| Mouse drag selection in Normal mode | `vimMouseSelection`, `vimMouseClickAndInsertSelection` | Forward/backward and multiline ranges, yank/delete, Visual motions across anchors, newline boundaries, plain clicks, double-click/Escape and Insert/Replace selection |
 | Insert-mode completion | Focused `LatexCompleterTest` cases | Editor/completion integration |
 
 Coverage still needs expansion for paragraph/pair motions, whole-word */#

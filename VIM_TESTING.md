@@ -29,6 +29,8 @@ coverage of every combination. No release is authorized by these tests.
 | Mouse drag selection in Normal mode | `vimMouseSelection`, `vimMouseClickAndInsertSelection` | Forward/backward and multiline ranges, yank/delete, Visual motions across anchors, newline boundaries, plain clicks, double-click/Escape and Insert/Replace selection |
 | Visual boundaries and cancellation | `vimMouseDragCancellation`, `vimCtrlClickFromVisual`, `vimVisualBoundaries`, `vimFoldedMouseSelection` | Empty drag ranges, Ctrl-click cleanup, Unicode-safe exits, blank-line mode switches and exact folded-text payloads |
 | Vertical motions after mouse input | `vimMouseSelectionResetsMotionColumn` | A new mouse selection resets the remembered keyboard column before `j`/`k` |
+| Modified mouse actions and context menus | `vimModifiedMouseCleanup` | Ctrl-drag/right-click cleanup, native menu dismissal, selection available while the menu is open, and subsequent single-character edits |
+| Visual indentation | `vimVisualIndentation` | Blank lines, forward/backward newline boundaries, and indentation through the end of the document |
 | Insert-mode completion | Focused `LatexCompleterTest` cases | Editor/completion integration |
 
 Coverage still needs expansion for paragraph/pair motions, whole-word */#

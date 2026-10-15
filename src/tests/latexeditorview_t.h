@@ -30,6 +30,10 @@ class LatexEditorViewTest: public QObject{
         void vimVisualBoundaries();
         void vimFoldedMouseSelection_data();
         void vimFoldedMouseSelection();
+        void vimModifiedMouseCleanup_data();
+        void vimModifiedMouseCleanup();
+        void vimVisualIndentation_data();
+        void vimVisualIndentation();
         void vimInsertEscape();
         void vimVisualLineStaysOnCurrentLine();
         void vimVisualBlockCtrlV();

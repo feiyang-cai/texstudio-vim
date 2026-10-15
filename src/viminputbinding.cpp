@@ -499,6 +499,8 @@ public:
             m_defaultBinding->postMouseReleaseEvent(event, editor);
         if (event->button() == Qt::LeftButton)
             adoptMouseSelection(event, editor, true);
+        else if (m_mode == VimMode::Normal)
+            normalizeNormalCursor(editor);
     }
 
     bool mouseDoubleClickEvent(QMouseEvent *event, QEditor *editor) override
@@ -520,7 +522,12 @@ public:
     {
         clearPending(editor);
         leaveVisualMode(editor, false);
-        return m_defaultBinding ? m_defaultBinding->contextMenuEvent(event, editor) : false;
+        const bool handled = m_defaultBinding ? m_defaultBinding->contextMenuEvent(event, editor) : false;
+        // Keep the native range available to Copy/Cut until the menu closes.
+        // Some platforms consume the mouse release while the menu is open.
+        if (handled && m_mode == VimMode::Normal)
+            normalizeNormalCursor(editor);
+        return handled;
     }
 
     void resetForEditor(QEditor *editor)
@@ -607,7 +614,7 @@ private:
         if (!editor || m_mode == VimMode::Insert || m_mode == VimMode::Replace)
             return;
         if (event->modifiers() & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier)) {
-            if (released && m_mode == VimMode::Normal && !editor->cursor().hasSelection())
+            if (released && m_mode == VimMode::Normal)
                 normalizeNormalCursor(editor);
             return;
         }
@@ -1388,6 +1395,8 @@ private:
             cursor = QDocumentCursor(editor->document(), cursor.lineNumber(), m_visualBlockPreferredColumn);
         if (m_mode == VimMode::Visual)
             cursor = visualActiveCursor(editor);
+        const auto originalPosition = qMakePair(cursor.lineNumber(), cursor.columnNumber());
+        const bool visualNewline = m_mode == VimMode::Visual && cursor.atLineEnd();
         const bool vertical = motion.kind == VimMotion::Up || motion.kind == VimMotion::Down;
         int preferredColumn = cursor.columnNumber();
         if (vertical && m_verticalPreferredColumn >= 0
@@ -1397,7 +1406,9 @@ private:
         if (m_mode == VimMode::VisualBlock)
             m_visualBlockPreferredColumn = vertical ? preferredColumn : cursor.columnNumber();
         editor->setCursor(cursor);
-        if (m_mode != VimMode::VisualBlock)
+        // A no-op motion must retain a newline included by a native drag.
+        if (m_mode != VimMode::VisualBlock
+                && !(visualNewline && originalPosition == qMakePair(cursor.lineNumber(), cursor.columnNumber())))
             normalizeNormalCursor(editor);
         m_verticalPreferredColumn = vertical ? preferredColumn : -1;
         m_lastVerticalLine = editor->cursor().lineNumber();
@@ -1868,7 +1879,11 @@ private:
 
     void shiftLines(QEditor *editor, int startLine, int endLine, bool indent)
     {
-        QDocumentCursor cursor(editor->document(), qMin(startLine, endLine), 0, qMin(editor->document()->lineCount() - 1, qMax(startLine, endLine) + 1), 0);
+        const int lastLine = qMin(editor->document()->lineCount() - 1, qMax(startLine, endLine));
+        QDocumentCursor cursor(editor->document(), qMin(startLine, endLine), 0,
+                               lastLine, editor->document()->line(lastLine).length());
+        if (lastLine + 1 < editor->document()->lineCount())
+            cursor.select(qMin(startLine, endLine), 0, lastLine + 1, 0);
         editor->setCursor(cursor);
         if (indent)
             editor->indentSelection();
@@ -1883,7 +1898,11 @@ private:
     void shiftVisualSelection(QEditor *editor, bool indent)
     {
         const QDocumentCursor selection = editor->cursor();
-        shiftLines(editor, selection.startLineNumber(), selection.endLineNumber(), indent);
+        int lastLine = selection.endLineNumber();
+        if (m_mode == VimMode::Visual && lastLine > selection.startLineNumber()
+                && selection.selectionEnd().columnNumber() == 0)
+            --lastLine;
+        shiftLines(editor, selection.startLineNumber(), lastLine, indent);
         leaveVisualMode(editor, true);
     }
 

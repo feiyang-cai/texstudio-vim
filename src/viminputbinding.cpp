@@ -472,6 +472,8 @@ public:
     bool mousePressEvent(QMouseEvent *event, QEditor *editor) override
     {
         clearPending(editor);
+        if (m_mode == VimMode::OperatorPending)
+            setMode(VimMode::Normal, editor);
         leaveVisualMode(editor, false);
         return m_defaultBinding ? m_defaultBinding->mousePressEvent(event, editor) : false;
     }
@@ -484,7 +486,10 @@ public:
 
     bool mouseReleaseEvent(QMouseEvent *event, QEditor *editor) override
     {
-        return m_defaultBinding ? m_defaultBinding->mouseReleaseEvent(event, editor) : false;
+        const bool handled = m_defaultBinding ? m_defaultBinding->mouseReleaseEvent(event, editor) : false;
+        if (handled && m_mode == VimMode::Normal && !editor->cursor().hasSelection())
+            normalizeNormalCursor(editor);
+        return handled;
     }
 
     void postMouseReleaseEvent(QMouseEvent *event, QEditor *editor) override
@@ -598,9 +603,13 @@ public:
 private:
     void adoptMouseSelection(QMouseEvent *event, QEditor *editor, bool released)
     {
-        if (!editor || m_mode == VimMode::Insert || m_mode == VimMode::Replace
-                || (event->modifiers() & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier)))
+        if (!editor || m_mode == VimMode::Insert || m_mode == VimMode::Replace)
             return;
+        if (event->modifiers() & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier)) {
+            if (released && m_mode == VimMode::Normal && !editor->cursor().hasSelection())
+                normalizeNormalCursor(editor);
+            return;
+        }
         const QDocumentCursor cursor = editor->cursor();
         if (cursor.hasSelection()) {
             QDocumentCursor anchor(editor->document(), cursor.anchorLineNumber(), cursor.anchorColumnNumber());
@@ -1250,7 +1259,9 @@ private:
         }
         if (!(event->modifiers() & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier)) && event->text().size() == 1 && event->text().at(0).isDigit()) {
             if (event->text() == QLatin1String("0") && m_count == 0) {
-                moveToLineStart(editor);
+                VimMotion motion;
+                motion.kind = VimMotion::LineStart;
+                moveByMotion(editor, motion);
                 updateVisualSelection(editor);
                 return true;
             }
@@ -1624,8 +1635,11 @@ private:
             editor->setCursor(cursor);
             editor->clearCursorMirrors();
         }
-        if (m_mode == VimMode::Visual || m_mode == VimMode::VisualLine || m_mode == VimMode::VisualBlock)
+        if (m_mode == VimMode::Visual || m_mode == VimMode::VisualLine || m_mode == VimMode::VisualBlock) {
             setMode(VimMode::Normal, editor);
+            if (clearSelection)
+                normalizeNormalCursor(editor);
+        }
     }
 
     void updateVisualSelection(QEditor *editor)

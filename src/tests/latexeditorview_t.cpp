@@ -168,10 +168,11 @@ void LatexEditorViewTest::vimCtrlClickNavigation()
     QSignalSpy navigation(edView, SIGNAL(gotoDefinition(QDocumentCursor)));
     QVERIFY(navigation.isValid());
     const QString text = edView->editor->document()->text();
-    for (const QString &mode : {QString("NORMAL"), QString("INSERT"), QString("REPLACE")}) {
+    for (const QString &mode : {QString("NORMAL"), QString("INSERT"), QString("REPLACE"), QString("OPERATOR")}) {
         QTest::keyClick(edView->editor, Qt::Key_Escape);
         if (mode == "INSERT") QTest::keyClick(edView->editor, Qt::Key_I);
         if (mode == "REPLACE") QTest::keyClicks(edView->editor, "R");
+        if (mode == "OPERATOR") QTest::keyClick(edView->editor, Qt::Key_D);
         QTest::mouseMove(viewport, point);
         QTest::keyPress(edView->editor, Qt::Key_Control, Qt::ControlModifier);
         QVERIFY(edView->editor->hasMouseTracking());
@@ -184,11 +185,16 @@ void LatexEditorViewTest::vimCtrlClickNavigation()
         const int previous = navigation.count();
         QTest::mouseClick(viewport, Qt::LeftButton, Qt::ControlModifier, point);
         QCOMPARE(navigation.count(), previous + 1);
-        QCOMPARE(edView->editor->inputModeLabel(), mode);
+        QCOMPARE(edView->editor->inputModeLabel(), mode == "OPERATOR" ? QString("NORMAL") : mode);
         QCOMPARE(edView->editor->document()->text(), text);
         QTest::keyRelease(edView->editor, Qt::Key_Control);
         QVERIFY(!edView->editor->hasMouseTracking());
         QVERIFY(!edView->hasLinkOverlay());
+        if (mode == "OPERATOR") {
+            QTest::keyClick(edView->editor, Qt::Key_I);
+            QCOMPARE(edView->editor->inputModeLabel(), QString("INSERT"));
+            QCOMPARE(edView->editor->document()->text(), text);
+        }
     }
     QTest::keyClick(edView->editor, Qt::Key_Escape);
     edView->getConfig()->editingMode = oldMode;
@@ -220,6 +226,10 @@ void LatexEditorViewTest::vimMouseSelection_data()
     QTest::newRow("line-end") << 0 << 1 << 0 << 6 << QString("bcdef") << QString("y") << QString("bcdef") << original;
     QTest::newRow("newline-boundary") << 0 << 2 << 1 << 0 << QString("cdef\n") << QString("hy") << QString("cdef") << original;
     QTest::newRow("backward-newline-boundary") << 1 << 0 << 0 << 2 << QString("cdef\n") << QString("hy") << QString("bcdef\n") << original;
+    QTest::newRow("escape-line-end-then-delete") << 0 << 1 << 0 << 6 << QString("bcdef") << QString("<Esc>x") << QString("f") << QString("abcde\nghijkl");
+    QTest::newRow("yank-line-end-then-delete") << 0 << 1 << 0 << 6 << QString("bcdef") << QString("yx") << QString("f") << QString("abcde\nghijkl");
+    QTest::newRow("newline-boundary-zero-yank") << 0 << 2 << 1 << 0 << QString("cdef\n") << QString("0y") << QString("abc") << original;
+    QTest::newRow("newline-boundary-zero-delete") << 0 << 2 << 1 << 0 << QString("cdef\n") << QString("0d") << QString("abc") << QString("def\nghijkl");
 }
 
 void LatexEditorViewTest::vimMouseSelection()
@@ -257,7 +267,14 @@ void LatexEditorViewTest::vimMouseSelection()
     QTest::mouseRelease(viewport, Qt::LeftButton, Qt::NoModifier, end);
     QCOMPARE(view.editor->cursor().selectedText(), selected);
     QCOMPARE(view.editor->inputModeLabel(), QString("VISUAL"));
-    QTest::keyClicks(view.editor, keys);
+    if (keys.startsWith("<Esc>")) {
+        QTest::keyClick(view.editor, Qt::Key_Escape);
+        QCOMPARE(view.editor->cursor().lineNumber(), 0);
+        QCOMPARE(view.editor->cursor().columnNumber(), 5);
+        QTest::keyClicks(view.editor, keys.mid(5));
+    } else {
+        QTest::keyClicks(view.editor, keys);
+    }
     QCOMPARE(vimRegisters().read('"').text, registerText);
     QCOMPARE(document.textLines().join("\n"), remaining);
     QCOMPARE(view.editor->inputModeLabel(), QString("NORMAL"));
@@ -291,6 +308,13 @@ void LatexEditorViewTest::vimMouseClickAndInsertSelection()
         return QPoint(qRound(document.line(0).cursorToDocumentOffset(column).x()),
                       qRound(view.editor->lineRect(0).center().y()));
     };
+    QTest::keyClick(view.editor, Qt::Key_D);
+    QTest::mouseClick(viewport, Qt::LeftButton, Qt::ControlModifier, point(6));
+    QCOMPARE(view.editor->cursor().columnNumber(), 5);
+    QTest::keyClick(view.editor, Qt::Key_I);
+    QCOMPARE(view.editor->inputModeLabel(), QString("INSERT"));
+    QTest::keyClick(view.editor, Qt::Key_Escape);
+    QCOMPARE(view.editor->cursor().columnNumber(), 5);
     QTest::mouseClick(viewport, Qt::LeftButton, Qt::NoModifier, point(2));
     QCOMPARE(view.editor->inputModeLabel(), QString("NORMAL"));
     QVERIFY(!view.editor->cursor().hasSelection());

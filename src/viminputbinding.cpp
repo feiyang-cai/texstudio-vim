@@ -472,6 +472,7 @@ public:
     bool mousePressEvent(QMouseEvent *event, QEditor *editor) override
     {
         clearPending(editor);
+        m_verticalPreferredColumn = -1;
         if (m_mode == VimMode::OperatorPending)
             setMode(VimMode::Normal, editor);
         leaveVisualMode(editor, false);

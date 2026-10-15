@@ -24,6 +24,7 @@ class LatexEditorViewTest: public QObject{
         void vimMouseClickAndInsertSelection_data();
         void vimMouseClickAndInsertSelection();
         void vimMouseDragCancellation();
+        void vimMouseSelectionResetsMotionColumn();
         void vimCtrlClickFromVisual();
         void vimVisualBoundaries_data();
         void vimVisualBoundaries();

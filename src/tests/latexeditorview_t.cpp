@@ -374,6 +374,36 @@ void LatexEditorViewTest::vimMouseDragCancellation()
     QCOMPARE(document.textLines().join("\n"), QString("ghijkl"));
 }
 
+void LatexEditorViewTest::vimMouseSelectionResetsMotionColumn()
+{
+    if (skipVimUiTestInQuickRuns()) return;
+    LatexEditorViewConfig config = *edView->getConfig();
+    config.editingMode = LatexEditorViewConfig::VimEditing;
+    LatexDocument document;
+    LatexEditorView view(nullptr, &config, &document);
+    view.resize(800, 600);
+    view.editor->setText("abcdefghijk\nxyz\nabcdefghijk", false);
+    view.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&view));
+    view.editor->setCursorPosition(0, 9, false);
+    QTest::keyClick(view.editor, Qt::Key_J);
+    QCOMPARE(view.editor->cursor().columnNumber(), 2);
+    QWidget *viewport = view.editor->viewport();
+    auto point = [&](int column) {
+        return QPoint(qRound(document.line(1).cursorToDocumentOffset(column).x()),
+                      qRound(view.editor->lineRect(1).center().y()));
+    };
+    const QPoint start = point(0), end = point(3);
+    QTest::mousePress(viewport, Qt::LeftButton, Qt::NoModifier, start);
+    QMouseEvent drag(QEvent::MouseMove, QPointF(end), QPointF(viewport->mapToGlobal(end)),
+                     Qt::NoButton, Qt::LeftButton, Qt::NoModifier);
+    QApplication::sendEvent(viewport, &drag);
+    QTest::mouseRelease(viewport, Qt::LeftButton, Qt::NoModifier, end);
+    QCOMPARE(view.editor->cursor().selectedText(), QString("xyz"));
+    QTest::keyClicks(view.editor, "jy");
+    QCOMPARE(vimRegisters().read('"').text, QString("xyz\nabc"));
+}
+
 void LatexEditorViewTest::vimCtrlClickFromVisual()
 {
     if (skipVimUiTestInQuickRuns()) return;

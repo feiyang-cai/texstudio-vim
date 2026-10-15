@@ -64,7 +64,9 @@ examples are in [VIM_DEVELOPMENT.md](VIM_DEVELOPMENT.md).
 - characterwise visual: `v`
 - in Normal mode, mouse-dragging text enters characterwise Visual mode and keeps
   the exact highlighted range; `y`, `d`, `c`, Vim motions and Escape then apply
-  to that selection. Double-click word selection also enters Visual mode.
+  to that selection. Characterwise yanks return to the selection's start;
+  Escape leaves the cursor on the active character. Double-click word selection
+  also enters Visual mode.
   Insert/Replace mode retains native mouse selection; Ctrl-click keeps navigation.
 - linewise visual: `V`
 - blockwise visual: platform visual-block shortcut

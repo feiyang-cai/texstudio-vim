@@ -23,6 +23,12 @@ class LatexEditorViewTest: public QObject{
         void vimMouseSelection();
         void vimMouseClickAndInsertSelection_data();
         void vimMouseClickAndInsertSelection();
+        void vimMouseDragCancellation();
+        void vimCtrlClickFromVisual();
+        void vimVisualBoundaries_data();
+        void vimVisualBoundaries();
+        void vimFoldedMouseSelection_data();
+        void vimFoldedMouseSelection();
         void vimInsertEscape();
         void vimVisualLineStaysOnCurrentLine();
         void vimVisualBlockCtrlV();

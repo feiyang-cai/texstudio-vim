@@ -12,6 +12,10 @@ All manual conflict resolutions and edits beyond the automatic pinned merge
 require human validation. Do not remove an escalation or treat AI approval as
 human approval. Independent AI review and tests remain required as well.
 
+For owner-approved Vim changes, update VIM_CHANGELOG.md with the user-visible
+behavior and validation. Vim patch revisions use r1.1, r1.2, etc.; upstream-only
+syncs preserve the approved Vim revision and do not invent a new Vim revision.
+
 Inspect upstream changes together with the fork integration, especially:
 - Keyboard and mouse event routing, shortcuts, Ctrl-click navigation, and IME.
 - Normal, Insert, Replace, and all Visual modes; pending operators and counts.

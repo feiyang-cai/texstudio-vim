@@ -10,6 +10,7 @@ class TexStudioTest : public QObject
 public:
     explicit TexStudioTest(bool executeAllTests) : allTests(executeAllTests) {};
 private slots:
+    void pdfAsyncForwardingSlotSignature();
     void checkIncludes_data();
     void checkIncludes();
     void checkIncludesCached_data();

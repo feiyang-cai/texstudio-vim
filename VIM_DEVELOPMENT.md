@@ -1,8 +1,9 @@
 # Vim development test build
 
-This branch is a development snapshot based on `texstudio-vim-4.9.9beta2-r1`.
-`VIM_REVISION` remains `1`, matching the owner-approved baseline. It creates no
-release tags or GitHub releases; a fork revision change requires owner approval.
+This branch combines upstream `4.9.9rc1` with the owner-approved Vim `r1.1`
+mouse-selection patch. It prepares `texstudio-vim-4.9.9rc1-r1.1`, an upstream
+prerelease. The [Vim changelog](VIM_CHANGELOG.md) records each Vim revision.
+Branch builds create no release tags or GitHub releases.
 
 ## Linux x86_64 testing
 

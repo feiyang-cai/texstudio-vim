@@ -32,6 +32,7 @@ public:
     Version(QString number, QString tp, int rev = 0, int count = 0) : versionNumber(number), type(tp), revision(rev), commitsAfter(count) {}
     static Version current();
     static Version fromVimTag(const QString &tag);
+    int vimPatchRevision = 0; // optional patch component, e.g. r1.1
     int vimRevision = -1; // -1 for upstream versions; >= 0 for this fork
 
 	QString platform;       // "win" or "mac" or "linux"

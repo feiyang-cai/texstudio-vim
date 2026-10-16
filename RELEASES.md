@@ -1,5 +1,26 @@
 # Upstream sync and fork releases
 
+## Vim revision history
+
+Vim revisions are independent of the upstream version. Major revisions use `r1`,
+`r2`, etc.; compatible fixes use `r1.1`, `r1.2`, etc. Compare components numerically,
+so `r1.10` is newer than `r1.2`. Record every Vim revision in
+[VIM_CHANGELOG.md](VIM_CHANGELOG.md); upstream-only syncs keep the Vim revision.
+
+The owner-approved mouse-selection changes prepare
+`texstudio-vim-4.9.9rc1-r1.1`. This is a prerelease because its upstream base is
+`4.9.9rc1`. The combined owner-reviewed PR is a manual revision transition, not
+an automatic sync candidate: it intentionally contains a new Vim revision and
+release-tool changes. Keep publication disabled until its checks and review pass.
+Do not reuse or move the existing `r1` release tags.
+
+After publishing, record the actual tag and immutable source SHA in the matching
+stream of `.github/upstream-release-state.json`. Until a stream has a published
+`r1.1` base, the automatic controller rejects a revision mismatch; the stable
+stream also needs an owner-reviewed baseline refresh before automatic promotion
+can use the new Vim revision. Do not invent a published baseline or weaken that
+check merely to advance the automation.
+
 The fork preserves native Vim editing on two upstream release bases:
 
 | Fork tag | Upstream tag | Upstream commit |

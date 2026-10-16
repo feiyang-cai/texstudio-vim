@@ -6,6 +6,14 @@
 
 extern Texstudio *txsInstance;
 
+void TexStudioTest::pdfAsyncForwardingSlotSignature()
+{
+    // Qt's moc generates callable slot overloads for trailing default arguments.
+    // The PDF viewer emits four arguments; changing upstream code is unnecessary.
+    const auto &meta = Texstudio::staticMetaObject;
+    QVERIFY(meta.indexOfSlot("runCommandAsyncFwd(QString,QFileInfo,QFileInfo,int)") >= 0);
+}
+
 void TexStudioTest::checkIncludes_data(){
     if (!allTests){
         qDebug("skipped includes tests");

@@ -169,6 +169,7 @@ private:
 	SymbolWidget *symbolWidget;
     QTreeView *fileView; ///< file explorer in docks
     QFileSystemModel *fileExplorerModel = nullptr;
+    QDockWidget *fileExplorerDockWidget = nullptr; ///< dock widget for fileExplorer
     GitWidget *gitWidget = nullptr; ///< git source control dock panel
     QDockWidget *gitDockWidget = nullptr; ///< dock widget for gitWidget
 	QString hiddenLeftPanelWidgets;
@@ -530,6 +531,7 @@ private slots:
     bool runCommandNoSpecialChars(QString commandline, QString *buffer = nullptr, QTextCodec *codecForBuffer = nullptr);
 	void setStatusMessageProcess(const QString &message);
     bool runCommandAsync(const QString &commandline, const char *returnCMD);
+    bool runCommandAsyncFwd(const QString &unparsedCommandLine, const QFileInfo &mainFile, const QFileInfo &currentFile = QFileInfo(), int currentLine = 0, QString *buffer = nullptr, QString *errorMsg = nullptr, QObject *returnObj=nullptr,const char * returnCmd = nullptr);
 protected slots:
 	void processNotification(const QString &message);
     void clearLogs();

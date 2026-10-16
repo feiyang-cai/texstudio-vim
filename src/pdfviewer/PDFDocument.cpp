@@ -3483,6 +3483,9 @@ void PDFDocument::init(bool embedded)
 		act->setData(QVariant(level));
 		connect(act, SIGNAL(triggered()), this, SLOT(zoomFromAction()));
 	}
+    QAction *act = new QAction(scaleActions);
+    act->setText(tr("Custom..."));
+    connect(act, SIGNAL(triggered()), this, SLOT(customZoomFromAction()));
 	scaleButton->addActions(scaleActions->actions());
 
 	buttonZoomOut = new QToolButton(statusBar());
@@ -4021,7 +4024,7 @@ void PDFDocument::toggleAutoHideToolbars()
 
 void PDFDocument::runQuickBuild()
 {
-	emit runCommand("txs:///quick", masterFile, QFileInfo(lastSyncPoint.filename), lastSyncPoint.line);
+    emit runCommandAsync("txs:///quick", masterFile, QFileInfo(lastSyncPoint.filename), lastSyncPoint.line);
 }
 
 void PDFDocument::setGrid()
@@ -4813,6 +4816,17 @@ void PDFDocument::zoomFromAction()
 	if (comboZoom)
 		comboZoom->setDefaultAction(act);
 }
+/*!
+ * \brief ask for target zoom level on pop-up
+ */
+void PDFDocument::customZoomFromAction()
+{
+    bool ok;
+    int factor = QInputDialog::getInt(this, tr("Custom Zoom"), tr("Zoom Factor (%):"), 100, 10, 400, 10, &ok);
+    if (ok) {
+        pdfWidget->fixedScale(0.01 * factor);
+    }
+}
 
 void PDFDocument::setResolution(int res)
 {
@@ -5041,7 +5055,7 @@ void PDFDocument::printPDF()
 	} else return;
 
     for (int i = 0; i < printer.copyCount(); i++)
-		emit runCommand(command, masterFile, masterFile, 0);
+        emit runCommandAsync(command, masterFile, masterFile, 0);
 }
 
 void PDFDocument::setAutoHideToolbars(bool enabled)

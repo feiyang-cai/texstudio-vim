@@ -2,6 +2,12 @@
 ## TeXstudio 4.9.9
 
 - fix help/check latex installation
+- allow setting line ending per script [#4667](https://github.com/texstudio-org/texstudio/issues/4667)
+- fix find usages with multiple entries in one line [#4672](https://github.com/texstudio-org/texstudio/issues/4672)
+- fix compiling not rerunning [#4686](https://github.com/texstudio-org/texstudio/issues/4686)
+- remove latex-l2tabu.cwl
+- disable fileexplorer updates when not visible
+- fix display of cached lines (typically disabled) [#4699](https://github.com/texstudio-org/texstudio/issues/4699)
 
 ## TeXstudio 4.9.8
 

@@ -36,6 +36,107 @@ modes, editing, visual blocks, marks, substitution, Ex commands, insert-mode
 completion, and fork version parsing. Check both logs as well as exit status. Review the merged diff against the upstream tag so it contains
 only intentional fork differences.
 
+## Daily upstream synchronization
+
+The `Upstream release sync` workflow checks stable and prerelease releases daily
+and can be run manually from the default branch. It starts each candidate from
+the matching stream's latest published fork commit, never from the moving
+`master` tip, and requires the candidate to contain only one merge of that base
+and the pinned upstream commit. It verifies that the published base and candidate
+both retain the approved `VIM_REVISION`. Sync PRs cannot change workflow,
+action, script, test, package
+identity, or publication controls.
+
+After merge, the trusted controller stages the tested application tree with the
+current base-branch `.github` tree, then reruns CD and Vim-platform checks on that
+exact release candidate. This ensures the tag's CD release job enforces the
+publication switch even though release source commits are based on earlier
+published tags.
+
+Dry-run procedure: run **Actions → Upstream release sync → Run workflow** on the
+default branch. `.github/upstream-release-policy.json` defaults to
+`"dry_run": true` and `"publication_enabled": false`; the run reports releases
+and planned issue/controller actions without creating issues, merging PRs,
+tagging, or publishing. To permit sync issue creation and assignment, an owner
+must change `dry_run` to `false` in a reviewed default-branch change. Automatic
+merge and release tagging additionally require an owner-reviewed change setting
+`publication_enabled` to `true` and the repository Actions variable
+`UPSTREAM_RELEASE_PUBLICATION_ENABLED=true`. The Actions variable is also checked
+by the current CD release job. Either switch being disabled keeps automatic
+release mutations off. Create release tags only through the trusted controller;
+older immutable CD workflow revisions predate this guard.
+
+Configure
+`COPILOT_SYNC_TOKEN` as a user-to-server token that can create issues and assign
+Copilot; it is exposed only to the trusted detector step. Each issue pins the
+upstream release tag and resolved commit SHA. The trusted controller reuses
+pending issues/PRs and requires the `CD` and `Vim desktop tests` workflows to
+pass on the exact sync head before merging. It then dispatches both workflows
+on the merge commit, creates an immutable fork tag only after those checks pass,
+and dispatches `CD` on that tag. Publication waits for all platform builds and
+all nine packaged GUI checks. Stable and prerelease progress is recorded
+separately only after the matching fork release is published.
+
+GitHub-required approval of Copilot workflow runs is not bypassed. Syncs preserve
+the approved Vim baseline and `VIM_REVISION`; changing either requires an
+owner-approved change.
+
+### Independent AI review
+
+Upstream syncs additionally require an independent **Copilot code review**,
+separate from the Copilot coding agent that prepares the merge. The controller
+requires the review bot's latest review of the exact PR head to be `APPROVED`,
+and every Copilot review thread must be resolved. Missing, comment-only,
+changes-requested, dismissed, and stale reviews block merging and release
+tagging. A new commit needs a new review. GitHub API failures also block promotion.
+The requester records the base SHA in a commit status written by a trusted
+default-branch workflow. Approval must follow that snapshot and match both
+the head and base. If the base advances, the next daily/manual run requests a
+new review after any in-flight review finishes. Tagging checks the actual merge's
+first parent against the reviewed base, rather than the current branch tip.
+Promotion builds a two-parent merge from the reviewed SHAs and uses a non-forced
+Git push. Unrelated concurrent default-branch commits make that update fail;
+the controller never retries by merging onto a different base. Branch protections
+still apply and can block this update; the controller does not bypass them.
+The review instructions focus on behavioral upstream/Vim interactions, including
+changes that Git merges without conflicts and gaps not covered by current tests.
+
+The trusted `Upstream AI review` workflow requests reviews when eligible sync PRs
+are ready or updated, without checking out candidate code. Daily/manual sync
+runs retry missing review requests and recheck reviewed PRs, so a review that
+finishes after CI can be picked up on the next daily check or manual run.
+Dry-run mode sends no review requests. Publication switches remain independent
+and disabled by default; AI approval alone cannot publish a release.
+
+Configure **Settings → Copilot → Code review → Auto-approval → Allow Copilot to
+approve pull requests** in this repository. Copilot otherwise normally submits
+comment-only reviews, which deliberately do not satisfy this gate. If the
+approval feature is unavailable for the account, automatic promotion remains
+blocked; a comment saying the code looks good is never treated as approval.
+Copilot review uses the existing `COPILOT_SYNC_TOKEN` user credential and
+subscription. Review findings need fixes and a new review; tests still remain
+required. AI review reduces risk but does not guarantee correctness.
+If Copilot already submitted a comment-only review before auto-approval was
+enabled, manually request another review on that PR. The workflow avoids
+repeated requests for a commit that Copilot has already reviewed.
+
+### Human validation of upstream changes
+
+Syncs must preserve upstream behavior and contain only Vim compatibility changes.
+The agent must escalate proposed upstream changes or uncertain behavior for human
+validation. Each PR declares `<!-- upstream-behavior:preserved -->` or
+`<!-- upstream-behavior:human-validation-required -->`; a missing declaration
+also blocks unattended promotion. The `upstream-human-validation-required` label
+can additionally flag concerns found during review.
+The controller compares the candidate tree with Git's automatic merge of the
+pinned fork and upstream commits. Conflicts or additional edits require a human
+even when described as Vim compatibility fixes. Before merging or tagging, the
+latest review from a configured `human_validation_reviewers` account must approve
+the exact head and follow the current base snapshot. Only `feiyang-cai` is
+configured initially. New commits or base changes require fresh validation;
+AI approval and passing tests remain necessary. This conservative check does not
+prove semantic equivalence; the independent reviewer must escalate uncertainties.
+
 ## Release naming and publishing
 
 Create each fork tag on its own tested merge commit, never on the unmodified
@@ -43,9 +144,12 @@ upstream commit. Use `texstudio-vim-<upstream-version>-r<fork-revision>` for tag
 files. The numeric version inside the application follows upstream; the Git
 revision shown in About and `--version` includes the full fork release name.
 
-`r0` is the current Vim baseline. Increment the number in `VIM_REVISION` for
-released fork changes on the same upstream base (including Vim and packaging
-fixes). Reset it to `0` when adopting a new upstream version. Keep the upstream
+`r1` is the approved Vim baseline, recorded with its commit and branch in
+`.github/approved-vim-baseline.json`. Preserve `VIM_REVISION` when adopting a
+new upstream version; an upstream update alone does not authorize a revision
+change. Automatic sync releases use the approved Vim baseline and must not
+include unapproved Vim development from `master`. Advance the approved baseline
+only through owner-approved changes. Keep the upstream
 beta/alpha/rc designation, for example `texstudio-vim-4.9.9beta2-r1`. The fork
 revision is separate from upstream's beta number and Git commits since the tag.
 

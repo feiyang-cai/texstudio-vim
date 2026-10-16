@@ -1,0 +1,16 @@
+{
+  "stable": {
+    "upstream_tag": "4.9.8",
+    "upstream_sha": "00f7c1c3db1d629a854ff5eb8ee25eb402c8178e",
+    "published_at": "2026-09-11T15:30:35Z",
+    "fork_tag": "texstudio-vim-4.9.8-r1",
+    "fork_sha": "f585da64e6406d30d7a374f51f9d6df935bf62ef"
+  },
+  "prerelease": {
+    "upstream_tag": "4.9.9beta2",
+    "upstream_sha": "263f2615005cdbe5c24d4ee9a7c5746f731e25ac",
+    "published_at": "2026-09-18T16:07:45Z",
+    "fork_tag": "texstudio-vim-4.9.9beta2-r1",
+    "fork_sha": "213e5998ba8a3701ba85bf5595e197115d3ca671"
+  }
+}

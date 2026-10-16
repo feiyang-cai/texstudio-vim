@@ -1731,10 +1731,12 @@ QMultiHash<QDocumentLineHandle *, int> LatexDocument::getLabels(const QString &n
     foreach (const LatexDocument *elem, getListOfDocs()) {
         QList<QDocumentLineHandle*>lst=elem->mLabelHash.values(name);
         foreach(QDocumentLineHandle *dlh, lst){
-            ReferencePair rp = elem->mLabelItem.value(dlh);
-            ++count;
-            if(rp.name==name){
-                result.insert(dlh, rp.start);
+            QList<ReferencePair> rps = elem->mLabelItem.values(dlh);
+            foreach(const ReferencePair &rp,rps){
+                if(rp.name==name){
+                    ++count;
+                    result.insert(dlh, rp.start);
+                }
             }
         }
     }
@@ -1819,9 +1821,11 @@ QMultiHash<QDocumentLineHandle *, int> LatexDocument::getRefs(const QString &nam
 	foreach (const LatexDocument *elem, getListOfDocs()) {
         QList<QDocumentLineHandle*>lst=elem->mRefHash.values(name);
         foreach(QDocumentLineHandle *dlh, lst){
-            ReferencePair rp = elem->mRefItem.value(dlh);
-            if(rp.name==name){
-                result.insert(dlh, rp.start);
+            QList<ReferencePair> rps = elem->mRefItem.values(dlh);
+            foreach(const ReferencePair &rp, rps){
+                if(rp.name==name){
+                    result.insert(dlh, rp.start);
+                }
             }
 		}
 	}

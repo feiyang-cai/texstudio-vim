@@ -39,6 +39,19 @@ else ()
     set(TEXSTUDIO_GIT_REVISION ${GIT_FULL_VERSION})
 endif ()
 
+# Carry the source Vim revision in development builds as well as tagged builds.
+# git describe may select the newly merged upstream tag or an older fork tag.
+if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/VIM_REVISION")
+    file(READ "${PROJECT_SOURCE_DIR}/VIM_REVISION" VIM_SOURCE_REVISION)
+    string(STRIP "${VIM_SOURCE_REVISION}" VIM_SOURCE_REVISION)
+    if(NOT VIM_SOURCE_REVISION MATCHES "^[0-9]+(\\.[0-9]+)?$")
+        message(FATAL_ERROR "Invalid VIM_REVISION")
+    endif()
+    if(TEXSTUDIO_GIT_REVISION MATCHES "^(texstudio-vim-|upstream/)?([0-9]+\\.[0-9]+\\.[0-9]+((alpha|beta|rc)[0-9]+)?)(-r[0-9]+(\\.[0-9]+)?)?(-[0-9]+-g[0-9a-f]+)?$")
+        set(TEXSTUDIO_GIT_REVISION "texstudio-vim-${CMAKE_MATCH_2}-r${VIM_SOURCE_REVISION}${CMAKE_MATCH_7}")
+    endif()
+endif()
+
 if (NOT PROJECT_VERSION)
     if (GIT_VERSION)
         set(PROJECT_VERSION ${GIT_VERSION})

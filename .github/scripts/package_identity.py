@@ -9,7 +9,7 @@ def package_identity(version, expected_sha, archive_name):
     if commit and expected_sha.startswith(commit.group(1)):
         return 'binary commit suffix'
     # The Windows MSYS workaround intentionally emits a pure tag at a release.
-    tag = re.fullmatch(r'TeXstudio ([0-9]+\.[0-9]+\.[0-9]+) \((texstudio-vim-([0-9]+\.[0-9]+\.[0-9]+)(?:(?:alpha|beta|rc)[0-9]+)?-r[0-9]+)\)\s*', version)
+    tag = re.fullmatch(r'TeXstudio ([0-9]+\.[0-9]+\.[0-9]+) \((texstudio-vim-([0-9]+\.[0-9]+\.[0-9]+)(?:(?:alpha|beta|rc)[0-9]+)?-r[0-9]+(?:\.[0-9]+)?)\)\s*', version)
     archive = Path(archive_name).name
     archive_commit = re.search(r'-git_([0-9a-f]{7,40})\.zip$', archive)
     if (tag and tag.group(1) == tag.group(3) and archive_commit

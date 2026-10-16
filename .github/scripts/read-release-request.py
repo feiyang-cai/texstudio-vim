@@ -11,7 +11,7 @@ from urllib.request import Request, urlopen
 repository = os.environ['GITHUB_REPOSITORY']
 request = json.loads(Path('.github/release-request.json').read_text())
 tag, sha, run_id = request['tag'], request['sha'], request['build_run_id']
-if not re.fullmatch(r'texstudio-vim-[0-9]+\.[0-9]+\.[0-9]+(?:(?:alpha|beta|rc)[0-9]+)?-r[0-9]+', tag):
+if not re.fullmatch(r'texstudio-vim-[0-9]+\.[0-9]+\.[0-9]+(?:(?:alpha|beta|rc)[0-9]+)?-r[0-9]+(?:\.[0-9]+)?', tag):
     raise SystemExit('Invalid fork release tag')
 if not re.fullmatch(r'[0-9a-f]{40}', sha) or not isinstance(run_id, int):
     raise SystemExit('Invalid source build identity')

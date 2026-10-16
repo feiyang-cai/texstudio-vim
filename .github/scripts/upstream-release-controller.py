@@ -58,7 +58,7 @@ VIM_JOBS = {
     'Vim desktop (macos-15-intel)',
     'Vim desktop (macos-14)',
 }
-FORK_RELEASE_TAG = re.compile(r'texstudio-vim-(' + RELEASE_VERSION.pattern + r')-r([0-9]+)')
+FORK_RELEASE_TAG = re.compile(r'texstudio-vim-(' + RELEASE_VERSION.pattern + r')-r([0-9]+(?:\.[0-9]+)?)')
 
 repository = os.environ.get('GITHUB_REPOSITORY', 'feiyang-cai/texstudio-vim')
 owner, repo = repository.split('/', 1)

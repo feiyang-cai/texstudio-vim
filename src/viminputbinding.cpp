@@ -465,11 +465,16 @@ public:
     {
         if (m_defaultBinding)
             m_defaultBinding->postMouseMoveEvent(event, editor);
+        if (event->buttons() & Qt::LeftButton)
+            adoptMouseSelection(event, editor, false);
     }
 
     bool mousePressEvent(QMouseEvent *event, QEditor *editor) override
     {
         clearPending(editor);
+        m_verticalPreferredColumn = -1;
+        if (m_mode == VimMode::OperatorPending)
+            setMode(VimMode::Normal, editor);
         leaveVisualMode(editor, false);
         return m_defaultBinding ? m_defaultBinding->mousePressEvent(event, editor) : false;
     }
@@ -482,12 +487,9 @@ public:
 
     bool mouseReleaseEvent(QMouseEvent *event, QEditor *editor) override
     {
-        if (m_mode == VimMode::Insert || m_mode == VimMode::Replace) {
-            return m_defaultBinding ? m_defaultBinding->mouseReleaseEvent(event, editor) : false;
-        }
-        bool handled = m_defaultBinding ? m_defaultBinding->mouseReleaseEvent(event, editor) : false;
-        normalizeNormalCursor(editor);
-        setMode(VimMode::Normal, editor);
+        const bool handled = m_defaultBinding ? m_defaultBinding->mouseReleaseEvent(event, editor) : false;
+        if (handled && m_mode == VimMode::Normal)
+            normalizeNormalCursor(editor);
         return handled;
     }
 
@@ -495,6 +497,10 @@ public:
     {
         if (m_defaultBinding)
             m_defaultBinding->postMouseReleaseEvent(event, editor);
+        if (event->button() == Qt::LeftButton)
+            adoptMouseSelection(event, editor, true);
+        else if (m_mode == VimMode::Normal)
+            normalizeNormalCursor(editor);
     }
 
     bool mouseDoubleClickEvent(QMouseEvent *event, QEditor *editor) override
@@ -508,13 +514,20 @@ public:
     {
         if (m_defaultBinding)
             m_defaultBinding->postMouseDoubleClickEvent(event, editor);
+        if (event->button() == Qt::LeftButton)
+            adoptMouseSelection(event, editor, false);
     }
 
     bool contextMenuEvent(QContextMenuEvent *event, QEditor *editor) override
     {
         clearPending(editor);
         leaveVisualMode(editor, false);
-        return m_defaultBinding ? m_defaultBinding->contextMenuEvent(event, editor) : false;
+        const bool handled = m_defaultBinding ? m_defaultBinding->contextMenuEvent(event, editor) : false;
+        // Keep the native range available to Copy/Cut until the menu closes.
+        // Some platforms consume the mouse release while the menu is open.
+        if (handled && m_mode == VimMode::Normal)
+            normalizeNormalCursor(editor);
+        return handled;
     }
 
     void resetForEditor(QEditor *editor)
@@ -596,6 +609,36 @@ public:
     }
 
 private:
+    void adoptMouseSelection(QMouseEvent *event, QEditor *editor, bool released)
+    {
+        if (!editor || m_mode == VimMode::Insert || m_mode == VimMode::Replace)
+            return;
+        if (event->modifiers() & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier)) {
+            if (released && m_mode == VimMode::Normal)
+                normalizeNormalCursor(editor);
+            return;
+        }
+        const QDocumentCursor cursor = editor->cursor();
+        if (cursor.hasSelection()
+                && qMakePair(cursor.lineNumber(), cursor.columnNumber())
+                    != qMakePair(cursor.anchorLineNumber(), cursor.anchorColumnNumber())) {
+            QDocumentCursor anchor(editor->document(), cursor.anchorLineNumber(), cursor.anchorColumnNumber());
+            // Mouse ranges are end-exclusive; Vim's anchor is a character.
+            // Keep the native range verbatim and adjust only our anchor.
+            if (qMakePair(cursor.lineNumber(), cursor.columnNumber())
+                    < qMakePair(anchor.lineNumber(), anchor.columnNumber()))
+                anchor.movePosition(1, QDocumentCursor::PreviousCharacter, QDocumentCursor::ThroughFolding);
+            m_visualAnchorLine = anchor.lineNumber();
+            m_visualAnchorColumn = anchor.columnNumber();
+            editor->clearCursorMirrors();
+            setMode(VimMode::Visual, editor);
+        } else {
+            setMode(VimMode::Normal, editor);
+            if (released)
+                normalizeNormalCursor(editor);
+        }
+    }
+
     bool handleRegisterPrefix(QKeyEvent *event, QEditor *editor)
     {
         if (m_waitingForRegister) {
@@ -1226,7 +1269,9 @@ private:
         }
         if (!(event->modifiers() & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier)) && event->text().size() == 1 && event->text().at(0).isDigit()) {
             if (event->text() == QLatin1String("0") && m_count == 0) {
-                moveToLineStart(editor);
+                VimMotion motion;
+                motion.kind = VimMotion::LineStart;
+                moveByMotion(editor, motion);
                 updateVisualSelection(editor);
                 return true;
             }
@@ -1348,8 +1393,10 @@ private:
         QDocumentCursor cursor = editor->cursor();
         if (m_mode == VimMode::VisualBlock)
             cursor = QDocumentCursor(editor->document(), cursor.lineNumber(), m_visualBlockPreferredColumn);
-        if (m_mode == VimMode::Visual && cursor.hasSelection() && cursor.columnNumber() > 0)
-            cursor.movePosition(1, QDocumentCursor::PreviousCharacter);
+        if (m_mode == VimMode::Visual)
+            cursor = visualActiveCursor(editor);
+        const auto originalPosition = qMakePair(cursor.lineNumber(), cursor.columnNumber());
+        const bool visualNewline = m_mode == VimMode::Visual && cursor.atLineEnd();
         const bool vertical = motion.kind == VimMotion::Up || motion.kind == VimMotion::Down;
         int preferredColumn = cursor.columnNumber();
         if (vertical && m_verticalPreferredColumn >= 0
@@ -1359,7 +1406,9 @@ private:
         if (m_mode == VimMode::VisualBlock)
             m_visualBlockPreferredColumn = vertical ? preferredColumn : cursor.columnNumber();
         editor->setCursor(cursor);
-        if (m_mode != VimMode::VisualBlock)
+        // A no-op motion must retain a newline included by a native drag.
+        if (m_mode != VimMode::VisualBlock
+                && !(visualNewline && originalPosition == qMakePair(cursor.lineNumber(), cursor.columnNumber())))
             normalizeNormalCursor(editor);
         m_verticalPreferredColumn = vertical ? preferredColumn : -1;
         m_lastVerticalLine = editor->cursor().lineNumber();
@@ -1523,6 +1572,17 @@ private:
             cursor.moveTo(cursor.lineNumber(), qMax(0, index));
     }
 
+    QDocumentCursor visualActiveCursor(QEditor *editor) const
+    {
+        QDocumentCursor cursor = editor->cursor();
+        if (m_mode == VimMode::Visual && cursor.hasSelection()
+                && qMakePair(cursor.lineNumber(), cursor.columnNumber())
+                    > qMakePair(m_visualAnchorLine, m_visualAnchorColumn))
+            cursor.movePosition(1, QDocumentCursor::PreviousCharacter, QDocumentCursor::ThroughFolding);
+        cursor.clearSelection();
+        return cursor;
+    }
+
     void beginVisual(QEditor *editor)
     {
         const QDocumentCursor cursor = editor->cursor();
@@ -1535,9 +1595,11 @@ private:
 
     void beginVisualLine(QEditor *editor)
     {
-        const QDocumentCursor cursor = editor->cursor();
-        m_visualAnchorLine = cursor.lineNumber();
+        const QDocumentCursor cursor = visualActiveCursor(editor);
+        if (m_mode != VimMode::Visual)
+            m_visualAnchorLine = cursor.lineNumber();
         m_visualAnchorColumn = 0;
+        editor->setCursor(cursor);
         editor->clearCursorMirrors();
         setMode(VimMode::VisualLine, editor);
         updateVisualSelection(editor);
@@ -1545,10 +1607,13 @@ private:
 
     void beginVisualBlock(QEditor *editor)
     {
-        const QDocumentCursor cursor = editor->cursor();
-        m_visualAnchorLine = cursor.lineNumber();
-        m_visualAnchorColumn = cursor.columnNumber();
+        const QDocumentCursor cursor = visualActiveCursor(editor);
+        if (m_mode != VimMode::Visual) {
+            m_visualAnchorLine = cursor.lineNumber();
+            m_visualAnchorColumn = cursor.columnNumber();
+        }
         m_visualBlockPreferredColumn = cursor.columnNumber();
+        editor->setCursor(cursor);
         setMode(VimMode::VisualBlock, editor);
         updateVisualSelection(editor);
     }
@@ -1593,13 +1658,15 @@ private:
         if (!editor)
             return;
         if (clearSelection) {
-            QDocumentCursor cursor = editor->cursor();
-            cursor.clearSelection();
+            QDocumentCursor cursor = visualActiveCursor(editor);
             editor->setCursor(cursor);
             editor->clearCursorMirrors();
         }
-        if (m_mode == VimMode::Visual || m_mode == VimMode::VisualLine || m_mode == VimMode::VisualBlock)
+        if (m_mode == VimMode::Visual || m_mode == VimMode::VisualLine || m_mode == VimMode::VisualBlock) {
             setMode(VimMode::Normal, editor);
+            if (clearSelection)
+                normalizeNormalCursor(editor);
+        }
     }
 
     void updateVisualSelection(QEditor *editor)
@@ -1626,8 +1693,18 @@ private:
                 startColumn = anchorLineLength;
                 endColumn = 0;
             }
-        } else if (!cursor.atLineEnd() || editor->document()->line(currentLine).length() == 0) {
-            endColumn += 1;
+        } else {
+            QDocumentCursor anchor(editor->document(), startLine, startColumn);
+            QDocumentCursor active = cursor;
+            active.clearSelection();
+            if (qMakePair(currentLine, endColumn) < qMakePair(startLine, startColumn))
+                anchor.movePosition(1, QDocumentCursor::NextCharacter, QDocumentCursor::ThroughFolding);
+            else
+                active.movePosition(1, QDocumentCursor::NextCharacter, QDocumentCursor::ThroughFolding);
+            startLine = anchor.lineNumber();
+            startColumn = anchor.columnNumber();
+            endLine = active.lineNumber();
+            endColumn = active.columnNumber();
         }
         QDocumentCursor selection(editor->document(), startLine, startColumn, endLine, endColumn);
         editor->setCursor(selection);
@@ -1802,7 +1879,11 @@ private:
 
     void shiftLines(QEditor *editor, int startLine, int endLine, bool indent)
     {
-        QDocumentCursor cursor(editor->document(), qMin(startLine, endLine), 0, qMin(editor->document()->lineCount() - 1, qMax(startLine, endLine) + 1), 0);
+        const int lastLine = qMin(editor->document()->lineCount() - 1, qMax(startLine, endLine));
+        QDocumentCursor cursor(editor->document(), qMin(startLine, endLine), 0,
+                               lastLine, editor->document()->line(lastLine).length());
+        if (lastLine + 1 < editor->document()->lineCount())
+            cursor.select(qMin(startLine, endLine), 0, lastLine + 1, 0);
         editor->setCursor(cursor);
         if (indent)
             editor->indentSelection();
@@ -1817,12 +1898,18 @@ private:
     void shiftVisualSelection(QEditor *editor, bool indent)
     {
         const QDocumentCursor selection = editor->cursor();
-        shiftLines(editor, selection.startLineNumber(), selection.endLineNumber(), indent);
+        int lastLine = selection.endLineNumber();
+        if (m_mode == VimMode::Visual && lastLine > selection.startLineNumber()
+                && selection.selectionEnd().columnNumber() == 0)
+            --lastLine;
+        shiftLines(editor, selection.startLineNumber(), lastLine, indent);
         leaveVisualMode(editor, true);
     }
 
     void yankVisualSelection(QEditor *editor)
     {
+        const bool characterWise = m_mode == VimMode::Visual;
+        const QDocumentCursor start = editor->cursor().selectionStart();
         if (m_mode == VimMode::VisualBlock) {
             VimRegister value;
             value.type = VimRegisterType::BlockWise;
@@ -1836,6 +1923,10 @@ private:
             setRegisterFromSelection(editor->cursor(), VimRegisterType::CharacterWise, true);
         }
         leaveVisualMode(editor, true);
+        if (characterWise) {
+            editor->setCursor(start);
+            normalizeNormalCursor(editor);
+        }
     }
 
     void deleteVisualSelection(QEditor *editor, bool enterInsert)
@@ -2185,8 +2276,10 @@ private:
         QDocumentCursor cursor = editor->cursor();
         cursor.clearSelection();
         const QDocumentLine line = cursor.line();
-        if (line.isValid() && line.length() > 0 && cursor.columnNumber() >= line.length())
-            cursor.moveTo(cursor.lineNumber(), line.length() - 1);
+        if (line.isValid() && line.length() > 0 && cursor.columnNumber() >= line.length()) {
+            cursor.moveTo(cursor.lineNumber(), line.length());
+            cursor.movePosition(1, QDocumentCursor::PreviousCharacter, QDocumentCursor::ThroughFolding);
+        }
         editor->setCursor(cursor);
     }
 

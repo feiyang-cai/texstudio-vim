@@ -8,7 +8,7 @@ See [VIM_MODE.md](VIM_MODE.md) for supported commands and limitations.
 
 Get Linux, Windows and macOS builds from [GitHub Releases](https://github.com/feiyang-cai/texstudio-vim/releases).
 
-Versions use `texstudio-vim-<upstream-version>-rN`, where `rN` tracks the fork revision independently of upstream.
+Versions use `texstudio-vim-<upstream-version>-r<vim-version>`, such as `texstudio-vim-4.9.9rc1-r1.1`. The Vim revision is independent of upstream; see the [Vim changelog](VIM_CHANGELOG.md).
 
 ## Important warning
 

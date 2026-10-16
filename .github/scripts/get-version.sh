@@ -2,9 +2,10 @@
 TXS_VERSION=$(sed -ne 's/^#define TXSVERSION "\(.*\)".*$/\1/p' ../src/utilsVersion.h)
 echo "TXS_VERSION = ${TXS_VERSION}"
 FORK_REVISION=$(cat ../VIM_REVISION)
-case "$FORK_REVISION" in
-    ""|*[!0-9]*) echo "Invalid VIM_REVISION: expected a nonnegative integer" >&2; return 1 ;;
-esac
+if ! printf '%s\n' "$FORK_REVISION" | grep -Eq '^[0-9]+(\.[0-9]+)?$'; then
+    echo "Invalid VIM_REVISION: expected a revision such as 1 or 1.1" >&2
+    return 1
+fi
 
 GIT_HASH=$(git show --no-patch --pretty="%h")
 echo "GIT_HASH = ${GIT_HASH}"
@@ -12,14 +13,17 @@ echo "GIT_HASH = ${GIT_HASH}"
 GIT_DATE=$(git show --no-patch --pretty="%ci")
 echo "GIT_DATE = ${GIT_DATE}"
 
-# Use the triggering fork tag, never an imported upstream tag or another release.
+# Tagged builds use their triggering tag. Branch builds follow the nearest
+# merged release tag and the source Vim revision.
 if [ "${GITHUB_REF_TYPE:-}" = "tag" ]; then
     RELEASE_TAG=${GITHUB_REF_NAME}
 else
-    RELEASE_TAG=$(git describe --tags --match 'texstudio-vim-*' --abbrev=0 2>/dev/null || true)
+    RELEASE_TAG=$(git describe --tags --abbrev=0 2>/dev/null || true)
 fi
 case "$RELEASE_TAG" in
     texstudio-vim-*) GIT_VERSION=${RELEASE_TAG#texstudio-vim-} ;;
+    upstream/*) GIT_VERSION=${RELEASE_TAG#upstream/} ;;
+    [0-9]*) GIT_VERSION=${RELEASE_TAG} ;;
     *) GIT_VERSION=${TXS_VERSION} ;;
 esac
 # Legacy releases are the r0 baseline; numbered tags carry their own revision.

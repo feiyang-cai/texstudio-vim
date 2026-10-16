@@ -26,6 +26,32 @@ private slots:
         QVERIFY(Version::fromVimTag("texstudio-vim-4.10.0beta1-r0") > r10);
         QVERIFY(Version::fromVimTag("texstudio-vim-4.9.9beta3-r0") > r10);
     }
+    void forkPatchRevisionComparison() {
+        const auto r1 = Version::fromVimTag("texstudio-vim-4.9.9rc1-r1");
+        const auto r11 = Version::fromVimTag("texstudio-vim-4.9.9rc1-r1.1");
+        const auto r12 = Version::fromVimTag("texstudio-vim-4.9.9rc1-r1.2");
+        const auto r110 = Version::fromVimTag("texstudio-vim-4.9.9rc1-r1.10");
+        QVERIFY(r11.isValid());
+        QCOMPARE(r11.vimPatchRevision, 1);
+        QCOMPARE(Version::versionToString(r11), QString("texstudio-vim-4.9.9rc1-r1.1"));
+        QVERIFY(r11 > r1);
+        QVERIFY(r12 > r11);
+        QVERIFY(r110 > r12);
+        QVERIFY(Version::fromVimTag("texstudio-vim-4.9.9rc1-r2") > r110);
+        QVERIFY(Version::fromVimTag("texstudio-vim-4.9.9-r1") > r110);
+        const auto dev = Version::fromVimTag("texstudio-vim-4.9.9rc1-r1.1-7-gabcdef");
+        QCOMPARE(dev.commitsAfter, 7);
+        QVERIFY(dev > r11);
+        QVERIFY(r12 > dev);
+        QVERIFY(!Version::fromVimTag("texstudio-vim-4.9.9rc1-r1.1.1").isValid());
+        QVERIFY(!Version::fromVimTag("texstudio-vim-4.9.9rc1-r1.999999999999999999").isValid());
+        const auto releases = UpdateChecker::releaseVersions(R"([
+          {"tag_name":"texstudio-vim-4.9.9rc1-r1.1","published_at":"2026-10-16","prerelease":true},
+          {"tag_name":"texstudio-vim-4.9.9rc1-r1","published_at":"2026-10-15","prerelease":true}
+        ])");
+        QCOMPARE(releases.size(), 2);
+        QVERIFY(releases[0] > releases[1]);
+    }
     void forkDevelopmentRevisionComparison() {
         const auto development = Version::fromVimTag("texstudio-vim-4.9.9beta2-r0-22-g29d7acf46");
         QVERIFY(development.isValid());
@@ -152,6 +178,7 @@ private slots:
 
         QTest::newRow("forkStableR0") << "texstudio-vim-4.9.8-r0" << QStringList({"4.9.8","","",""}) << true;
         QTest::newRow("forkBetaR0") << "texstudio-vim-4.9.9beta2-r0" << QStringList({"4.9.9","beta","2",""}) << true;
+        QTest::newRow("forkPatchRc") << "texstudio-vim-4.9.9rc1-r1.1-3-g123abc" << QStringList({"4.9.9","rc","1","3"}) << true;
         QTest::newRow("forkStableRevision") << "texstudio-vim-4.9.8-r12-3-g123abc" << QStringList({"4.9.8","","","3"}) << true;
         QTest::newRow("forkBetaRevision") << "texstudio-vim-4.9.9beta2-r1-3-g123abc" << QStringList({"4.9.9","beta","2","3"}) << true;
         QTest::newRow("unprefixedRevision") << "4.9.8-r0-5-g123abc" << QStringList({"4.9.8","","","5"}) << true;

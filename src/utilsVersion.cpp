@@ -33,7 +33,7 @@ QStringList Version::parseGitData(const QString &data) {
 }
 
 QStringList Version::stringVersion2Parts(const QString &str) {
-    QRegularExpression rx("^(?:texstudio-vim-|upstream/)?((\\d+)(\\.\\d+)*)([a-zA-Z]+)?(\\d*)?(?:-r[0-9]+)?(-(\\d+)-)?($|[^.])");	// version tag, ex: 4.3.0beta1, git revison, ex: 4.3.0beta1-24-g5c925a387
+    QRegularExpression rx("^(?:texstudio-vim-|upstream/)?((\\d+)(\\.\\d+)*)([a-zA-Z]+)?(\\d*)?(?:-r[0-9]+(?:\\.[0-9]+)?)?(-(\\d+)-)?($|[^.])");	// version tag, ex: 4.3.0beta1, git revison, ex: 4.3.0beta1-24-g5c925a387
 
     QRegularExpressionMatch rxMatch = rx.match(str);
     if (rxMatch.hasMatch()) {
@@ -117,15 +117,19 @@ Version::VersionCompareResult Version::compareIntVersion(const QList<int> &v1, c
  */
 Version Version::fromVimTag(const QString &tag)
 {
-    static const QRegularExpression pattern(QStringLiteral("^texstudio-vim-([0-9]+\\.[0-9]+\\.[0-9]+)(?:(alpha|beta|rc)([0-9]+))?-r([0-9]+)(?:-([0-9]+)-g[0-9a-f]+)?$"));
+    static const QRegularExpression pattern(QStringLiteral("^texstudio-vim-([0-9]+\\.[0-9]+\\.[0-9]+)(?:(alpha|beta|rc)([0-9]+))?-r([0-9]+)(?:\\.([0-9]+))?(?:-([0-9]+)-g[0-9a-f]+)?$"));
     const auto match = pattern.match(tag);
     if (!match.hasMatch()) return Version();
     bool revisionOk = false;
     const int vimRevision = match.captured(4).toInt(&revisionOk);
     if (!revisionOk) return Version();
+    bool patchOk = true;
+    const int vimPatchRevision = match.captured(5).isEmpty() ? 0 : match.captured(5).toInt(&patchOk);
+    if (!patchOk) return Version();
     Version v(match.captured(1), match.captured(2).isEmpty() ? "stable" : match.captured(2),
-              match.captured(3).toInt(), match.captured(5).toInt());
+              match.captured(3).toInt(), match.captured(6).toInt());
     v.vimRevision = vimRevision;
+    v.vimPatchRevision = vimPatchRevision;
     return v;
 }
 
@@ -175,7 +179,10 @@ QString Version::versionToString(const Version &v)
 		if (!(v.type.toLower() == "stable") || v.revision > 0) {
 			s += v.type + QString("%1").arg(v.revision);
 		}
-        if (v.vimRevision >= 0) s = "texstudio-vim-" + s + QString("-r%1").arg(v.vimRevision);
+        if (v.vimRevision >= 0) {
+            s = "texstudio-vim-" + s + QString("-r%1").arg(v.vimRevision);
+            if (v.vimPatchRevision > 0) s += QString(".%1").arg(v.vimPatchRevision);
+        }
 		if (v.commitsAfter > 0)
 			s += QString("-%1").arg(v.commitsAfter);
 	}
@@ -190,6 +197,7 @@ bool Version::operator >(const Version &other) const
     if (type.toLower() == other.type.toLower()){
         if (revision != other.revision) return revision > other.revision;
         if (vimRevision != other.vimRevision) return vimRevision > other.vimRevision;
+        if (vimPatchRevision != other.vimPatchRevision) return vimPatchRevision > other.vimPatchRevision;
         return commitsAfter > other.commitsAfter;
     }
     int lvl = levelList.indexOf(type.toLower());

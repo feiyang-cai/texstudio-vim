@@ -214,6 +214,12 @@ class UpstreamReleaseSyncTests(unittest.TestCase):
                 'texstudio-vim-5.0.0beta2-r1').groups(),
             ('5.0.0beta2', '1'))
         self.assertIsNone(controller.FORK_RELEASE_TAG.fullmatch('texstudio-vim-5.0.0'))
+        self.assertEqual(
+            controller.FORK_RELEASE_TAG.fullmatch('texstudio-vim-4.9.9rc1-r1.1').groups(),
+            ('4.9.9rc1', '1.1'))
+        self.assertIsNone(controller.FORK_RELEASE_TAG.fullmatch('texstudio-vim-4.9.9rc1-r1.1.1'))
+        self.assertTrue(controller.has_approved_revision('1.1\n', {'vim_revision': '1.1'}))
+        self.assertFalse(controller.has_approved_revision('1\n', {'vim_revision': '1.1'}))
 
     def test_required_release_gates_cover_all_packages_and_gui_environments(self):
         self.assertTrue({

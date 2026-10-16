@@ -12,6 +12,12 @@
 //#include <stdlib.h>
 //#include "/usr/include/valgrind/callgrind.h"
 
+#include <csignal>
+#include <cstdlib>
+#ifndef Q_OS_WIN
+#include <unistd.h>
+#endif
+#include <QAtomicInt>
 #include "texstudio.h"
 #include "latexeditorview.h"
 
@@ -752,15 +758,16 @@ void Texstudio::setupDockWidgets()
     if(!dock){
         fileView=new QTreeView();
         fileExplorerModel = new QFileSystemModel(this);
+        //fileExplorerModel->setOption(QFileSystemModel::DontWatchForChanges,true);
 		QString rootDir = QDir::currentPath();
 		if (rootDir == "/tmp")
 			rootDir = "/";
-        fileExplorerModel->setRootPath(rootDir);
+        //fileExplorerModel->setRootPath(rootDir); // don't set, populate on demand
         fileView->setModel(fileExplorerModel);
         fileView->setColumnHidden(1,true);
         fileView->setColumnHidden(2,true);
         fileView->setColumnHidden(3,true);
-        fileView->setRootIndex(fileExplorerModel->index(rootDir));
+        //fileView->setRootIndex(fileExplorerModel->index(rootDir));
         fileView->setDragEnabled(true);
         fileView->setDragDropMode(QAbstractItemView::DragOnly);
         QAction *act=new QAction();
@@ -769,7 +776,7 @@ void Texstudio::setupDockWidgets()
         fileView->addAction(act);
         fileView->setContextMenuPolicy(Qt::ActionsContextMenu);
         connect(fileView,&QAbstractItemView::doubleClicked,this,&Texstudio::openFromExplorer);
-        addDock("explorer", "folder_R90",tr("Files"), fileView);
+        fileExplorerDockWidget=addDock("explorer", "folder_R90",tr("Files"), fileView);
     }
     // setup a dock widget with a git source control panel
     dock=findChild<QDockWidget *>("git",Qt::FindDirectChildrenOnly);
@@ -1969,8 +1976,8 @@ void Texstudio::currentEditorChanged()
     QString rootDir=fi.absoluteDir().path();
 	if (rootDir == "/tmp")
 		rootDir = "/";
-    if(fileExplorerModel->rootPath()!=rootDir){
-        // only change when necessary
+    if(fileExplorerDockWidget && fileExplorerDockWidget->property("isVisible").toBool()&& fileExplorerModel->rootPath()!=rootDir){
+        // only change when necessary, i.e. path changed and dock is visible
         fileExplorerModel->setRootPath(rootDir);
         fileView->setRootIndex(fileExplorerModel->index(rootDir));
     }
@@ -3879,15 +3886,17 @@ void Texstudio::restoreSession(const Session &s, bool showProgress, bool warnMis
             updateTOCs();
         }
         //Explicitely set fileExplorer root dir
-        LatexDocument *rootDoc=doc->getRootDocument();
-        QFileInfo fi=rootDoc->getFileInfo();
-        QString rootDir=fi.absoluteDir().path();
-        if (rootDir == "/tmp")
-            rootDir = "/";
-        if(fileExplorerModel->rootPath()!=rootDir){
-            // only change when necessary
-            fileExplorerModel->setRootPath(rootDir);
-            fileView->setRootIndex(fileExplorerModel->index(rootDir));
+        if(fileExplorerDockWidget && fileExplorerDockWidget->property("isVisible").toBool()){
+            LatexDocument *rootDoc=doc->getRootDocument();
+            QFileInfo fi=rootDoc->getFileInfo();
+            QString rootDir=fi.absoluteDir().path();
+            if (rootDir == "/tmp")
+                rootDir = "/";
+            if(fileExplorerModel->rootPath()!=rootDir){
+                // only change when necessary
+                fileExplorerModel->setRootPath(rootDir);
+                fileView->setRootIndex(fileExplorerModel->index(rootDir));
+            }
         }
         //check if second editor view (side-by-side)
         if(useSideBySide){
@@ -4360,24 +4369,25 @@ void Texstudio::editEraseWordCmdEnv()
             } else {
                 currentEditorView()->editor->document()->beginMacro();
                 cursor.select(QDocumentCursor::WordOrCommandUnderCursor);
-                cursor.removeSelectedText();
+                QDocumentCursor cursorCommand=cursor;
+                //cursor.removeSelectedText();
                 // remove curly brakets as well
                 if (cursor.nextChar() == QChar('{')) {
-                    cursor.movePosition(1); // move position to end of opening bracket
+                    //cursor.movePosition(1); // move position to end of opening bracket
                     QDocumentCursor orig, to;
                     cursor.getMatchingPair(orig, to, false);
                     if (orig.isValid() && to.isValid()){
                         if(to>orig){
                             to.removeSelectedText();
                             orig.removeSelectedText();
-                            cursor.moveTo(orig);
                         }else{
                             orig.removeSelectedText();
                             to.removeSelectedText();
-                            cursor.moveTo(to);
                         }
                     }
                 }
+                cursorCommand.removeSelectedText();
+                cursor.moveTo(cursorCommand);
                 currentEditorView()->editor->document()->endMacro();
             }
             handled=true;
@@ -6529,6 +6539,28 @@ bool Texstudio::runCommandAsync(const QString &commandline, const char * returnC
     }
     return true;
 }
+/*!
+ * \brief call from pdf viewer
+ * Allow disabling compile/quick buttons when a command is running.
+ * \param unparsedCommandLine
+ * \param mainFile
+ * \param currentFile
+ * \param currentLine
+ * \param buffer
+ * \param errorMsg
+ * \param returnObj
+ * \param returnCmd
+ * \return
+ */
+bool Texstudio::runCommandAsyncFwd(const QString &unparsedCommandLine, const QFileInfo &mainFile, const QFileInfo &currentFile, int currentLine, QString *buffer, QString *errorMsg, QObject *returnObj, const char *returnCmd)
+{
+    // disable buttons
+    if(unparsedCommandLine==BuildManager::CMD_COMPILE || unparsedCommandLine== BuildManager::CMD_QUICK){
+        setBuildButtonsDisabled(true);
+    }
+    // call buildmanager
+    return buildManager.runCommandAsync(unparsedCommandLine, mainFile, currentFile, currentLine, buffer, errorMsg, returnObj, returnCmd);
+}
 
 void Texstudio::runInternalPdfViewer(const QFileInfo &master, const QString &options)
 {
@@ -7659,7 +7691,6 @@ void Texstudio::texdocHelp()
 		packages.removeDuplicates();
 		packages.removeAll("latex-209");
 		packages.removeAll("latex-dev");
-		packages.removeAll("latex-l2tabu");
 		packages.removeAll("latex-document");
 		packages.removeAll("tex");
 	}
@@ -8563,7 +8594,7 @@ QObject *Texstudio::newPdfPreviewer(bool embedded)
     connect(pdfviewerWindow, SIGNAL(syncSource(const QString&,int,bool,QString)), SLOT(syncFromViewer(const QString&,int,bool,QString)));
 	connect(pdfviewerWindow, SIGNAL(focusEditor()), SLOT(focusEditor()));
     connect(pdfviewerWindow, SIGNAL(runCommand(const QString&,const QFileInfo&,const QFileInfo&,int)), &buildManager, SLOT(runCommand(const QString&,const QFileInfo&,const QFileInfo&,int)));
-    connect(pdfviewerWindow, SIGNAL(runCommandAsync(const QString&,const QFileInfo&,const QFileInfo&,int)), &buildManager, SLOT(runCommandAsync(const QString&,const QFileInfo&,const QFileInfo&,int)));
+    connect(pdfviewerWindow, SIGNAL(runCommandAsync(const QString&,const QFileInfo&,const QFileInfo&,int)), this, SLOT(runCommandAsyncFwd(const QString&,const QFileInfo&,const QFileInfo&,int)));
 	connect(pdfviewerWindow, SIGNAL(triggeredClone()), SLOT(newPdfPreviewer()));
 
 	PDFDocument *from = qobject_cast<PDFDocument *>(sender());
@@ -11914,6 +11945,12 @@ void recover()
 
 void Texstudio::recoverFromCrash()
 {
+	// guard against unbounded re-entry on any thread (each re-entry grows the faulting stack)
+	static QAtomicInt totalCrashes(0);
+	if (totalCrashes.fetchAndAddOrdered(1) > 20) {
+		signal(SIGSEGV, SIG_DFL);
+		_exit(1);
+	}
 	bool wasLoop;
 	QString backtraceFilename;
 	QString name = getLastCrashInformation(wasLoop);
@@ -12891,6 +12928,27 @@ void Texstudio::updateDockVisibility(bool visible)
                     QFileInfo fi=rootDoc->getFileInfo();
                     gitWidget->setPath(fi.absoluteFilePath()); // force update when it becomes visible
                 }
+            }
+        }
+        if(dock->objectName()=="explorer" && fileExplorerModel){
+            fileExplorerModel->setOption(QFileSystemModel::DontWatchForChanges,!visible);
+            if(visible){
+                LatexEditorView *edView = currentEditorView();
+                QString rootDir=QDir::currentPath();
+                if(edView){
+                    LatexDocument *doc=edView->document;
+                    LatexDocument *rootDoc=doc->getRootDocument();
+                    QFileInfo fi=rootDoc->getFileInfo();
+                    rootDir=fi.absoluteDir().path();
+                }
+                if (rootDir == "/tmp")
+                    rootDir = "/";
+                if(fileExplorerModel->rootPath()==rootDir){
+                    // force update
+                    fileExplorerModel->setRootPath(QString());
+                }
+                fileExplorerModel->setRootPath(rootDir);
+                fileView->setRootIndex(fileExplorerModel->index(rootDir));
             }
         }
     }

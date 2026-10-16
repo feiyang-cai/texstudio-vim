@@ -8,6 +8,10 @@ Vim revision unchanged. Release names combine the two versions:
 
 Intended first package: `texstudio-vim-4.9.9rc1-r1.1` (upstream prerelease).
 
+Upgrade note: existing `r1` binaries recognize only whole-number Vim revisions,
+so install `r1.1` manually from this repository's releases. The new updater
+recognizes both old and dotted revisions for subsequent update notifications.
+
 - Dragging text in Normal mode enters characterwise Visual mode and preserves
   the exact selection. Double-click word selection also enters Visual mode.
 - Vim motions, yank/delete, Escape and Visual mode switches handle forward and

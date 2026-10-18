@@ -101,6 +101,7 @@ HEADERS += \
     $$PWD/universalinputdialog.h \
     $$PWD/unixutils.h \
     $$PWD/updatechecker.h \
+    $$PWD/appimageupdate.h \
     $$PWD/usermacro.h \
     $$PWD/usermenudialog.h \
     $$PWD/userquickdialog.h \
@@ -208,6 +209,7 @@ SOURCES += \
     $$PWD/universalinputdialog.cpp \
     $$PWD/unixutils.cpp \
     $$PWD/updatechecker.cpp \
+    $$PWD/appimageupdate.cpp \
     $$PWD/usermacro.cpp \
     $$PWD/usermenudialog.cpp \
     $$PWD/userquickdialog.cpp \

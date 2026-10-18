@@ -513,6 +513,7 @@ ConfigManager::ConfigManager(QObject *parent): QObject (parent),
 
 	//updates
 	registerOption("Update/AutoCheck", &autoUpdateCheck, true, &pseudoDialog->checkBoxAutoUpdateCheck);
+    registerOption("Update/AutoInstallAppImage", &autoInstallAppImageUpdates, false, &pseudoDialog->checkBoxAutoInstallAppImage);
 	registerOption("Update/UpdateLevel", &updateLevel, 0, &pseudoDialog->comboBoxUpdateLevel);
 	registerOption("Update/AutoCheckInvervalDays", &autoUpdateCheckIntervalDays, 7, &pseudoDialog->spinBoxAutoUpdateCheckIntervalDays);
 	registerOption("Update/LastCheck", &lastUpdateCheck, QDateTime());

@@ -168,12 +168,16 @@ and a version tag; passing these checks alone does not publish or bump a version
 The update checker reads published releases from `feiyang-cai/texstudio-vim`
 and links to this fork's release downloads. It ignores drafts, upstream-only tags,
 and development commit snapshots. It compares the upstream version and channel
-before the numeric Vim revision, so `texstudio-vim-4.9.9beta2-r1` updates r0 of the
-same beta. Stable, release-candidate and development preferences still apply.
+before the numeric Vim major/patch revision, so `r1.2` updates `r1.1` on the
+same upstream base. A newer upstream version also updates the complete package.
+Stable, release-candidate and development preferences still apply.
 Checks use the most recent 100 releases returned by GitHub. A release must use
 our `texstudio-vim-<upstream-version>-r<revision>` tag format; beta/RC releases
 should be marked as prereleases.
 
-Automatic checking shows a notification and download link. It does not download
-or install the new application automatically. Existing installations receive
-this fork-specific checker only after installing a build containing this change.
+Automatic checking normally shows a notification and download link. An unreleased
+opt-in installer for writable Linux x86_64 AppImages downloads verified packages
+and replaces the complete application on normal exit, keeping a backup. The next
+launch uses the updated TeXstudio and Vim versions. Other platforms retain download
+notifications. See [application update setup](RELEASES.md#application-updates-unreleased-test-feature).
+Existing installations need a manual upgrade to a release containing the installer.

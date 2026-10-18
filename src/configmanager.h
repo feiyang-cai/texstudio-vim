@@ -115,6 +115,7 @@ public:
 
 	//update
 	bool autoUpdateCheck;
+    bool autoInstallAppImageUpdates;
 	int updateLevel;
 	int autoUpdateCheckIntervalDays;
 	QDateTime lastUpdateCheck;

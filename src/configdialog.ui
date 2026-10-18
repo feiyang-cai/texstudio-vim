@@ -499,6 +499,18 @@
                   <string>Update</string>
                  </property>
                  <layout class="QGridLayout" name="gridLayout03">
+                  <item row="2" column="0" colspan="7">
+                   <widget class="QCheckBox" name="checkBoxAutoInstallAppImage">
+                    <property name="text"><string>Download updates automatically and install when closing</string></property>
+                    <property name="toolTip"><string>For writable Linux x86_64 AppImages. Installs the complete application after you close normally, keeps a backup, and follows your Update Level. The next launch uses the new version.</string></property>
+                   </widget>
+                  </item>
+                  <item row="3" column="0" colspan="7">
+                   <widget class="QLabel" name="labelAutomaticUpdateStatus">
+                    <property name="text"><string>Automatic installation is optional.</string></property>
+                    <property name="wordWrap"><bool>true</bool></property>
+                   </widget>
+                  </item>
                   <item row="0" column="6">
                    <widget class="QComboBox" name="comboBoxUpdateLevel">
                     <property name="sizePolicy">

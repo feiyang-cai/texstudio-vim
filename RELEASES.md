@@ -34,6 +34,39 @@ The fork preserves native Vim editing on these published upstream release bases:
 4.9.9beta2 and 4.9.9rc1 are prereleases. These include the features and known gaps in
 [VIM_MODE.md](VIM_MODE.md).
 
+## Application updates (unreleased test feature)
+
+The optional installer updates the **whole application**, including upstream
+TeXstudio and the Vim integration. It compares upstream version and release stage
+first, then numeric Vim major/patch revisions. For example, both
+`4.9.9rc1-r1.1 → 4.9.9-r1.1` and `4.9.9rc1-r1.1 → 4.9.9rc1-r1.2` are upgrades.
+A higher Vim revision never causes an upstream downgrade.
+
+In **Options → Configure TeXstudio → General → Update**, enable automatic checks
+and **Download updates automatically and install when closing**. Installation is
+opt-in and available for writable Linux x86_64 AppImages run as a normal user.
+Choose **Release Candidates** to receive RCs as well as stable releases, or
+**Development Versions** to include betas/alphas. Stable-only remains the default.
+Checks happen at startup when due and hourly during long sessions, respecting the
+configured day interval. Check Now works independently of the automatic schedule.
+
+Downloads come from this repository's published GitHub release assets over HTTPS
+and must match GitHub's SHA-256 digest and size. The on-disk AppImage must also
+match the running version's published asset; locally modified/development builds
+use download notifications. There is no forced restart: close normally, resolve
+any unsaved-document prompts, then launch again. The old image remains beside
+the installed image as `<original>.previous-<suffix>.AppImage`; use that executable
+for rollback after turning off automatic installation. Settings and documents
+are not replaced. A failed verification or
+installation keeps the installed AppImage unchanged. Turning off automatic
+installation prevents an already-downloaded update from installing on exit.
+Other package types and platforms continue to offer release download links.
+
+Existing releases do not contain this installer. Install the first release that
+includes it manually; later published versions can use it. Development snapshots use manual
+download notifications. Validating a real automatic upgrade requires two eligible
+published AppImages, with the installer present in the older one.
+
 ## Safe sync
 
 Start with a clean checkout and create a backup branch at the current fork commit.

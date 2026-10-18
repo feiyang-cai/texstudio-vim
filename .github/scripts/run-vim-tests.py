@@ -43,7 +43,7 @@ totals = re.findall(r"Totals: (\d+) passed, (\d+) failed, (\d+) skipped", text)
 for line in text.splitlines():
     if any(word in line for word in ("Totals:", "FAIL!", "QFATAL", "desktop platform:")):
         print(line)
-if result or len(totals) != 3 or any(int(failed) or int(skipped) for _, failed, skipped in totals):
+if result or len(totals) != 4 or any(int(failed) or int(skipped) for _, failed, skipped in totals):
     sys.exit(f"Vim tests failed or coverage was incomplete (exit {result}); see vim-tests.log")
 if not (output / "vim-desktop.png").is_file():
     sys.exit("Desktop test screenshot was not generated")

@@ -34,6 +34,7 @@
 		src/tests/execprogram_t.h \
 		src/tests/qsearchreplacepanel_t.h \
 		src/tests/updatechecker_t.h \
+                src/tests/appimageupdate_t.h \
 		src/tests/qdocumentcursor_t.h \
 		src/tests/qdocumentline_t.h \
 		src/tests/qdocumentsearch_t.h \

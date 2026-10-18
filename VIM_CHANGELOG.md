@@ -4,9 +4,9 @@ Each Vim revision records user-visible changes here. Upstream-only syncs keep th
 Vim revision unchanged. Release names combine the two versions:
 `texstudio-vim-<upstream-version>-r<vim-version>`.
 
-## r1.1 — release candidate
+## r1.1 — 2026-10-18
 
-Intended first package: `texstudio-vim-4.9.9rc1-r1.1` (upstream prerelease).
+Published as `texstudio-vim-4.9.9rc1-r1.1` (upstream prerelease).
 
 Upgrade note: existing `r1` binaries recognize only whole-number Vim revisions,
 so install `r1.1` manually from this repository's releases. The new updater

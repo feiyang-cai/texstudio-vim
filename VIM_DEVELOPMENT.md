@@ -1,7 +1,7 @@
 # Vim development test build
 
 This branch combines upstream `4.9.9rc1` with the owner-approved Vim `r1.1`
-mouse-selection patch. It prepares `texstudio-vim-4.9.9rc1-r1.1`, an upstream
+mouse-selection patch, published as `texstudio-vim-4.9.9rc1-r1.1`, an upstream
 prerelease. The [Vim changelog](VIM_CHANGELOG.md) records each Vim revision.
 Branch builds create no release tags or GitHub releases.
 

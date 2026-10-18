@@ -7,11 +7,12 @@ Vim revisions are independent of the upstream version. Major revisions use `r1`,
 so `r1.10` is newer than `r1.2`. Record every Vim revision in
 [VIM_CHANGELOG.md](VIM_CHANGELOG.md); upstream-only syncs keep the Vim revision.
 
-The owner-approved mouse-selection changes prepare
+The owner-approved mouse-selection changes are released as
 `texstudio-vim-4.9.9rc1-r1.1`. This is a prerelease because its upstream base is
 `4.9.9rc1`. The combined owner-reviewed PR is a manual revision transition, not
 an automatic sync candidate: it intentionally contains a new Vim revision and
-release-tool changes. Keep publication disabled until its checks and review pass.
+release-tool changes. Publication followed the complete tagged build and GUI
+checks. Automatic publication remains separately controlled by its policy switches.
 Do not reuse or move the existing `r1` release tags.
 
 After publishing, record the actual tag and immutable source SHA in the matching
@@ -21,15 +22,16 @@ stream also needs an owner-reviewed baseline refresh before automatic promotion
 can use the new Vim revision. Do not invent a published baseline or weaken that
 check merely to advance the automation.
 
-The fork preserves native Vim editing on two upstream release bases:
+The fork preserves native Vim editing on these published upstream release bases:
 
 | Fork tag | Upstream tag | Upstream commit |
 | --- | --- | --- |
-| `texstudio-vim-4.9.8-r0` | `4.9.8` | `00f7c1c3db1d629a854ff5eb8ee25eb402c8178e` |
-| `texstudio-vim-4.9.9beta2-r0` | `4.9.9beta2` | `263f2615005cdbe5c24d4ee9a7c5746f731e25ac` |
+| `texstudio-vim-4.9.8-r1` | `4.9.8` | `00f7c1c3db1d629a854ff5eb8ee25eb402c8178e` |
+| `texstudio-vim-4.9.9beta2-r1` | `4.9.9beta2` | `263f2615005cdbe5c24d4ee9a7c5746f731e25ac` |
+| `texstudio-vim-4.9.9rc1-r1.1` | `4.9.9rc1` | `929e24d85d2cee396d3ea80e0273902cafef2924` |
 
 4.9.8 is a stable upstream base; the fork's Vim implementation remains experimental.
-4.9.9beta2 is a prerelease. Both include the features and known gaps in
+4.9.9beta2 and 4.9.9rc1 are prereleases. These include the features and known gaps in
 [VIM_MODE.md](VIM_MODE.md).
 
 ## Safe sync

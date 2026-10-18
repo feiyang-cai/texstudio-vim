@@ -1,0 +1,42 @@
+import importlib.util
+from pathlib import Path
+import unittest
+
+ROOT = Path(__file__).resolve().parents[3]
+spec = importlib.util.spec_from_file_location('owner_publisher', ROOT / '.github/scripts/publish-owner-approved-release.py')
+publisher = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(publisher)
+
+
+class OwnerPublicationTests(unittest.TestCase):
+    def test_requires_successful_exact_tag_and_all_named_checks(self):
+        sha, tag = 'a' * 40, 'texstudio-vim-4.9.9rc1-r1.1'
+        run = {'head_sha': sha, 'head_branch': tag, 'event': 'push',
+               'head_repository': {'full_name': 'feiyang-cai/texstudio-vim'},
+               'conclusion': 'success'}
+        jobs = [{'name': name, 'conclusion': 'success'} for name in publisher.CD_JOBS]
+        publisher.verify_jobs(run, jobs, publisher.CD_JOBS, sha, tag)
+        for invalid in (dict(run, head_sha='b' * 40), dict(run, head_branch='master'),
+                        dict(run, conclusion='failure'), dict(run, event='pull_request')):
+            with self.assertRaises(RuntimeError):
+                publisher.verify_jobs(invalid, jobs, publisher.CD_JOBS, sha, tag)
+        with self.assertRaises(RuntimeError):
+            publisher.verify_jobs(run, jobs[:-1], publisher.CD_JOBS, sha, tag)
+        jobs[0]['conclusion'] = 'skipped'
+        with self.assertRaises(RuntimeError):
+            publisher.verify_jobs(run, jobs, publisher.CD_JOBS, sha, tag)
+        self.assertEqual(len(publisher.CD_JOBS), 15)
+        self.assertEqual(len(publisher.VIM_JOBS), 4)
+
+    def test_requires_complete_uploaded_assets_with_expected_sizes_and_digests(self):
+        tag = 'texstudio-vim-4.9.9rc1-r1.1'
+        expected = {'test.AppImage': (123, 'abc')}
+        asset = {'name': 'test.AppImage', 'size': 123, 'digest': 'sha256:abc', 'state': 'uploaded'}
+        release = {'tag_name': tag, 'prerelease': True, 'assets': [asset]}
+        publisher.verify_assets(release, expected, tag)
+        for changed in ({'size': 122}, {'digest': 'sha256:wrong'}, {'state': 'new'}, {'name': 'wrong'}):
+            with self.assertRaises(RuntimeError):
+                publisher.verify_assets(dict(release, assets=[dict(asset, **changed)]), expected, tag)
+        for changed in ({'assets': []}, {'prerelease': False}, {'tag_name': 'wrong'}):
+            with self.assertRaises(RuntimeError):
+                publisher.verify_assets(dict(release, **changed), expected, tag)

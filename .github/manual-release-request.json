@@ -1,0 +1,8 @@
+{
+  "repository": "feiyang-cai/texstudio-vim",
+  "tag": "texstudio-vim-4.9.9rc1-r1.1",
+  "sha": "cbbf179933adf0b106e40f7d4d48564eb97d8338",
+  "upstream_tag": "4.9.9rc1",
+  "upstream_sha": "929e24d85d2cee396d3ea80e0273902cafef2924",
+  "vim_revision": "1.1"
+}

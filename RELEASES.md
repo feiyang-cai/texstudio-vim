@@ -7,20 +7,18 @@ Vim revisions are independent of the upstream version. Major revisions use `r1`,
 so `r1.10` is newer than `r1.2`. Record every Vim revision in
 [VIM_CHANGELOG.md](VIM_CHANGELOG.md); upstream-only syncs keep the Vim revision.
 
-The owner-approved mouse-selection changes are released as
-`texstudio-vim-4.9.9rc1-r1.1`. This is a prerelease because its upstream base is
-`4.9.9rc1`. The combined owner-reviewed PR is a manual revision transition, not
-an automatic sync candidate: it intentionally contains a new Vim revision and
-release-tool changes. Publication followed the complete tagged build and GUI
-checks. Automatic publication remains separately controlled by its policy switches.
-Do not reuse or move the existing `r1` release tags.
+The stable `texstudio-vim-4.9.9-r1.1` release combines upstream `4.9.9` with
+the existing Vim `r1.1` implementation and the optional AppImage updater.
+The earlier `texstudio-vim-4.9.9rc1-r1.1` is a prerelease. The Vim revision stays
+unchanged because the sync introduces no Vim implementation changes.
+Automatic publication remains separately controlled by its policy switches;
+owner-requested publication does not enable unattended future releases.
+Do not reuse or move existing release tags.
 
-After publishing, record the actual tag and immutable source SHA in the matching
-stream of `.github/upstream-release-state.json`. Until a stream has a published
-`r1.1` base, the automatic controller rejects a revision mismatch; the stable
-stream also needs an owner-reviewed baseline refresh before automatic promotion
-can use the new Vim revision. Do not invent a published baseline or weaken that
-check merely to advance the automation.
+After publication, record the actual tag and immutable source SHA in the matching
+stream of `.github/upstream-release-state.json`. A newly published stable
+`r1.1` source refreshes the older `4.9.8-r1` stable baseline. Do not invent a
+published baseline or weaken the controller's revision checks.
 
 The fork preserves native Vim editing on these published upstream release bases:
 
@@ -29,12 +27,13 @@ The fork preserves native Vim editing on these published upstream release bases:
 | `texstudio-vim-4.9.8-r1` | `4.9.8` | `00f7c1c3db1d629a854ff5eb8ee25eb402c8178e` |
 | `texstudio-vim-4.9.9beta2-r1` | `4.9.9beta2` | `263f2615005cdbe5c24d4ee9a7c5746f731e25ac` |
 | `texstudio-vim-4.9.9rc1-r1.1` | `4.9.9rc1` | `929e24d85d2cee396d3ea80e0273902cafef2924` |
+| `texstudio-vim-4.9.9-r1.1` | `4.9.9` | `d285921900394dc8aa151a12f5a12022bddbb351` |
 
-4.9.8 is a stable upstream base; the fork's Vim implementation remains experimental.
+4.9.8 and 4.9.9 are stable upstream bases; the fork's Vim implementation remains experimental.
 4.9.9beta2 and 4.9.9rc1 are prereleases. These include the features and known gaps in
 [VIM_MODE.md](VIM_MODE.md).
 
-## Application updates (unreleased test feature)
+## Application updates
 
 The optional installer updates the **whole application**, including upstream
 TeXstudio and the Vim integration. It compares upstream version and release stage
@@ -62,10 +61,11 @@ installation keeps the installed AppImage unchanged. Turning off automatic
 installation prevents an already-downloaded update from installing on exit.
 Other package types and platforms continue to offer release download links.
 
-Existing releases do not contain this installer. Install the first release that
-includes it manually; later published versions can use it. Development snapshots use manual
-download notifications. Validating a real automatic upgrade requires two eligible
-published AppImages, with the installer present in the older one.
+Install `texstudio-vim-4.9.9-r1.1` manually once to get this installer; older
+releases cannot install it automatically. Later eligible published AppImages can
+use it. Development snapshots use manual download notifications. The installer's
+selection and safe replacement paths have regression coverage; a real automatic
+release-to-release upgrade still needs validation against a subsequent release.
 
 ## Safe sync
 

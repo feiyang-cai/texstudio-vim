@@ -175,9 +175,9 @@ Checks use the most recent 100 releases returned by GitHub. A release must use
 our `texstudio-vim-<upstream-version>-r<revision>` tag format; beta/RC releases
 should be marked as prereleases.
 
-Automatic checking normally shows a notification and download link. An unreleased
-opt-in installer for writable Linux x86_64 AppImages downloads verified packages
+Automatic checking normally shows a notification and download link. Since
+`texstudio-vim-4.9.9-r1.1`, an opt-in installer for writable Linux x86_64 AppImages downloads verified packages
 and replaces the complete application on normal exit, keeping a backup. The next
 launch uses the updated TeXstudio and Vim versions. Other platforms retain download
-notifications. See [application update setup](RELEASES.md#application-updates-unreleased-test-feature).
-Existing installations need a manual upgrade to a release containing the installer.
+notifications. See [application update setup](RELEASES.md#application-updates).
+Older installations need one manual upgrade to `texstudio-vim-4.9.9-r1.1` to get the installer.

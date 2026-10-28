@@ -4,7 +4,11 @@ Each Vim revision records user-visible changes here. Upstream-only syncs keep th
 Vim revision unchanged. Release names combine the two versions:
 `texstudio-vim-<upstream-version>-r<vim-version>`.
 
-## Unreleased — test build only
+## TeXstudio 4.9.9 with r1.1 — 2026-10-28
+
+Stable upstream base `4.9.9`, retaining Vim revision `r1.1` and its mouse-selection
+fixes. The Vim implementation is unchanged; this release also includes the
+following fork updater improvements:
 
 - Optional automatic installation for writable Linux x86_64 AppImages. Download
   and verify the complete application, then replace it atomically on normal exit,
@@ -14,7 +18,8 @@ Vim revision unchanged. Release names combine the two versions:
 - Independent update requests keep their own settings; long sessions also check
   the configured interval hourly.
 
-No new Vim revision or release is assigned until owner approval.
+Upgrade once manually to `texstudio-vim-4.9.9-r1.1` to get the AppImage installer.
+Automatic installation is off by default. Existing settings are preserved.
 
 ## r1.1 — 2026-10-18
 

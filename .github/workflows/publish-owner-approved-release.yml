@@ -1,0 +1,34 @@
+name: Publish owner-approved stable release
+on:
+  push:
+    branches: [release/publish-4.9.9-r1.1]
+    paths:
+      - .github/manual-release-request.json
+      - .github/scripts/publish-owner-approved-release.py
+      - .github/workflows/publish-owner-approved-release.yml
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: owner-publication-4.9.9-r1.1
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.repository == 'feiyang-cai/texstudio-vim' && github.actor == 'feiyang-cai'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Verify exact-tag builds and publish the complete stable release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 .github/scripts/publish-owner-approved-release.py
+      - name: Retain publication evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: owner-publication-evidence
+          path: publication-evidence.json
+          if-no-files-found: warn

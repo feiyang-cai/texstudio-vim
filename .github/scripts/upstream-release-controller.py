@@ -45,7 +45,7 @@ CD_JOBS = {
     'Packaged GUI (windows-latest)',
     'Packaged GUI (windows-11-arm)',
     'Packaged GUI (macos-15-intel)',
-    'Packaged GUI (macos-14)',
+    'Packaged GUI (macos-15)',
     'AppImage desktop (ubuntu-22.04)',
     'AppImage desktop (ubuntu-24.04)',
     'AppImage desktop (debian-12)',
@@ -56,7 +56,7 @@ VIM_JOBS = {
     'Vim desktop (windows-latest)',
     'Vim desktop (windows-11-arm)',
     'Vim desktop (macos-15-intel)',
-    'Vim desktop (macos-14)',
+    'Vim desktop (macos-15)',
 }
 FORK_RELEASE_TAG = re.compile(r'texstudio-vim-(' + RELEASE_VERSION.pattern + r')-r([0-9]+(?:\.[0-9]+)?)')
 

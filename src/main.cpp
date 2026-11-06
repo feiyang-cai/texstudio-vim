@@ -19,6 +19,8 @@
  */
 
 #include "texstudio.h"
+#include "remoteworkspace/remoteclient.h"
+#include <cstring>
 #include "smallUsefulFunctions.h"
 #include "debughelper.h"
 #include "debuglogger.h"
@@ -196,6 +198,8 @@ bool handleCommandLineOnly(const QStringList &cmdLine) {
 
 int main(int argc, char **argv)
 {
+    if (argc > 1 && std::strcmp(argv[1], "--remote-workspace-worker") == 0)
+        return RemoteWorkspace::workerMain(argc, argv);
 	QString appId = generateAppId();
 #if QT_VERSION >= QT_VERSION_CHECK(5,6,0)
     if(qEnvironmentVariableIntValue("TEXSTUDIO_HIDPI_SCALE")>0){

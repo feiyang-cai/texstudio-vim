@@ -78,6 +78,7 @@ add_subdirectory(src/qtsingleapplication)
 
 # main
 set(RESOURCE_FILES
+    src/remoteworkspace/remote.qrc
 	texstudio.qrc
 	symbols.qrc
 	completion.qrc
@@ -305,6 +306,7 @@ if(${TEXSTUDIO_ENABLE_TESTS})
 		src/tests/testmanager.h
 		src/tests/testutil.h
                 src/tests/texstudio_t.h
+                src/tests/remoteworkspace_t.h
 		src/tests/updatechecker_t.h
                 src/tests/appimageupdate_t.h
 		src/tests/usermacro_t.h
@@ -338,6 +340,7 @@ if(${TEXSTUDIO_ENABLE_TESTS})
 		src/tests/testmanager.cpp
 		src/tests/testutil.cpp
                 src/tests/texstudio_t.cpp
+                src/tests/remoteworkspace_t.cpp
 		src/tests/usermacro_t.cpp
 	)
 else()

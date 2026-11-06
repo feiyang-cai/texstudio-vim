@@ -69,3 +69,6 @@ SOURCES += \
     $$PWD/latexstyleparser_t.cpp
 
 
+
+SOURCES += $$PWD/remoteworkspace_t.cpp
+HEADERS += $$PWD/remoteworkspace_t.h

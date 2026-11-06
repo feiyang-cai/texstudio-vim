@@ -1,4 +1,5 @@
 #include "buildmanager.h"
+#include "remoteworkspace/remoteworkspace.h"
 
 #include "smallUsefulFunctions.h"
 #include "configmanagerinterface.h"
@@ -2023,7 +2024,7 @@ BuildManager::Dvi2PngMode BuildManager::guessDvi2PngMode() {
 //Then ghostscript to convert it to
 void BuildManager::preview(const QString &preamble, const PreviewSource &source, const QString &masterFile, QTextCodec *outputCodec, const QString &atBeginDocument, const QString &atEndDocument)
 {
-	QString tempPath = QDir::tempPath() + QDir::separator() + "." + QDir::separator();
+	QString tempPath = RemoteWorkspace::previewDirectory(masterFile) + QDir::separator() + "." + QDir::separator();
 	Dvi2PngMode dvi2pngModeDerived = guessDvi2PngMode();
 
 	//process preamble
@@ -2725,8 +2726,16 @@ void ProcessX::startCommand()
 		}
 	}
 #endif
-	ExecProgram execProgram(cmd, BuildManager::resolvePaths(BuildManager::additionalSearchPaths));
-	execProgram.execAndNoWait(*this);
+    QStringList remoteArguments;
+    if (!(subCommandFlags & (RCF_SINGLE_INSTANCE | RCF_DETACH))
+            && RemoteWorkspace::Controller::prepareCommand(file, cmd, overrideEnvironment(), &remoteArguments)) {
+        stdoutCodec = QTextCodec::codecForName("UTF-8");
+        setProperty("remoteWorkspaceCommand", true);
+        QProcess::start(QCoreApplication::applicationFilePath(), remoteArguments);
+    } else {
+        ExecProgram execProgram(cmd, BuildManager::resolvePaths(BuildManager::additionalSearchPaths));
+        execProgram.execAndNoWait(*this);
+    }
 
 	if (error() == FailedToStart || error() == Crashed)
 		isStarted = ended = true; //prevent call of waitForStarted, if it failed to start (see QTBUG-33021)
@@ -2853,6 +2862,10 @@ void ProcessX::onStarted()
 
 void ProcessX::onError(ProcessError error)
 {
+    if (error == QProcess::FailedToStart && property("remoteWorkspaceCommand").toBool()) {
+        setProperty("remoteWorkspaceCommand", false);
+        RemoteWorkspace::Controller::commandFinished(file);
+    }
 	if (error == FailedToStart) {
 		emit processNotification(tr("Error: Could not start the command: %1").arg(cmd));
 
@@ -2866,6 +2879,10 @@ void ProcessX::onError(ProcessError error)
 
 void ProcessX::onFinished(int error)
 {
+    if (property("remoteWorkspaceCommand").toBool()) {
+        setProperty("remoteWorkspaceCommand", false);
+        RemoteWorkspace::Controller::commandFinished(file);
+    }
 	if (cmd.contains("AcroRd32.exe") && error == 1) error = 0; // fix for Adobe Reader: It returns 1 on success
 	if (error) {
 		emit processNotification(tr("Process exited with error(s)"));

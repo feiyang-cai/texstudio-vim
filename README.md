@@ -3,6 +3,7 @@
 An experimental fork of [TeXstudio](https://github.com/texstudio-org/texstudio) with native Vim-style editing. Vim mode is enabled by default for fresh configurations.
 
 See [VIM_MODE.md](VIM_MODE.md) for supported commands and limitations.
+The unreleased [SSH workspace feature](REMOTE_WORKSPACE.md) supports editing and compiling projects on another Windows, macOS or Linux computer.
 
 ## Downloads
 

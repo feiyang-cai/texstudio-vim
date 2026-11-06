@@ -5,6 +5,8 @@ set(INC_DIRECTORIES
 )
 
 set(HEADER_FILES ${HEADER_FILES}
+    ${CMAKE_CURRENT_SOURCE_DIR}/remoteworkspace/remoteclient.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/remoteworkspace/remoteworkspace.h
     ${CMAKE_CURRENT_SOURCE_DIR}/aboutdialog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/aichatassistant.h
     ${CMAKE_CURRENT_SOURCE_DIR}/aiquerystoragemodel.h
@@ -122,6 +124,9 @@ set(HEADER_FILES ${HEADER_FILES}
 )
 
 set(SOURCE_FILES ${SOURCE_FILES}
+    ${CMAKE_CURRENT_SOURCE_DIR}/remoteworkspace/remoteclient.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/remoteworkspace/remoteworker.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/remoteworkspace/remoteworkspace.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/aboutdialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/additionaltranslations.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/aichatassistant.cpp

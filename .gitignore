@@ -33,3 +33,6 @@ symbols-ng/gesymb-ng.o
 CMakeLists.txt.user
 # personal files
 js_*
+
+# Python helpers and tests
+__pycache__/

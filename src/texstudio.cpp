@@ -60,6 +60,7 @@
 #include "grammarcheck.h"
 #include "qmetautils.h"
 #include "updatechecker.h"
+#include "remoteworkspace/remoteworkspace.h"
 #include "session.h"
 #include "searchquery.h"
 #include "fileselector.h"
@@ -928,6 +929,15 @@ void Texstudio::setupMenus()
 
 	//file
 	QMenu *menu = newManagedMenu("main/file", tr("&File"));
+    if (auto remoteWorkspaces = RemoteWorkspace::Controller::instance()) {
+        remoteWorkspaces->addMenu(menu);
+    } else {
+        auto createdRemoteWorkspaces = new RemoteWorkspace::Controller(this, menu);
+        connect(createdRemoteWorkspaces, &RemoteWorkspace::Controller::openFile, this,
+                [this](const QString &path) { load(path); });
+        connect(createdRemoteWorkspaces, &RemoteWorkspace::Controller::status, this,
+                [this](const QString &text) { statusBar()->showMessage(text, 15000); });
+    }
     //getManagedMenu("main/file");
 	newManagedAction(menu, "new", tr("&New"), SLOT(fileNew()), QKeySequence::New, "document-new");
 	newManagedAction(menu, "newfromtemplate", tr("New From &Template..."), SLOT(fileNewFromTemplate()));
@@ -2100,6 +2110,8 @@ QEditor *Texstudio::currentEditor() const
 
 void Texstudio::configureNewEditorView(LatexEditorView *edit)
 {
+    connect(edit->editor, &QEditor::saved, this,
+            [](QEditor *, const QString &path) { RemoteWorkspace::Controller::saved(path); });
     REQUIRE(m_languages);
     REQUIRE(edit->codeeditor);
     m_languages->setLanguage(edit->codeeditor->editor(), ".tex");
@@ -2553,6 +2565,7 @@ LatexEditorView *Texstudio::load(const QString &f , bool asProject, bool recheck
 	runScriptsInList(Macro::ST_LOAD_THIS_FILE, doc->localMacros);
 
 	emit infoLoadFile(f_real);
+    RemoteWorkspace::Controller::opened(f_real);
 
     // notify collaboration manager
     bool wasRegistered=registerFileForCollab(doc->getFileName());
@@ -3489,6 +3502,7 @@ bool Texstudio::canCloseNow(bool saveSettings)
 {
     if(programStopped) return true; // avoid running through here twice. (Qt6/OSX)
 	if (!saveAllFilesForClosing()) return false;
+    if (!RemoteWorkspace::Controller::confirmClose()) return false;
 #ifndef NO_POPPLER_PREVIEW
 	foreach (PDFDocument *viewer, PDFDocument::documentList())
 		viewer->saveGeometryToConfig();

@@ -38,6 +38,7 @@ bool applyPull(const Profile &profile, QString *error, const std::function<bool(
     const QString manifest = profile.directory() + "/pull.json";
     if (!QFileInfo::exists(manifest)) return true;
     QLockFile lock(profile.directory() + "/sync.lock");
+    lock.setStaleLockTime(0); // Long builds remain locked; dead owners are still detected by PID.
     auto fail = [&](const QString &reason) { if (error) *error = reason; return false; };
     if (!lock.tryLock(100)) return fail("Another workspace transfer is running; downloaded files are preserved.");
     QFile file(manifest), state(profile.directory() + "/state.json");

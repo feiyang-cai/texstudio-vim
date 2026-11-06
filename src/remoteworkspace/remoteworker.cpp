@@ -148,6 +148,7 @@ int workerMain(int argc, char **argv)
         const auto document = QJsonDocument::fromJson(QByteArray::fromBase64(args.at(4).toLatin1()));
         require(document.isObject(), "Invalid SSH workspace request."); const auto request = document.object();
         QLockFile lock(profile.directory() + "/sync.lock");
+        lock.setStaleLockTime(0);
         require(lock.tryLock(300000), "Another workspace synchronization is still running. Local edits are preserved.");
         // The GUI must apply a completed download before another worker can
         // publish a new one. Release the lock while it handles that completion.

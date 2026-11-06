@@ -9,6 +9,7 @@
 #include "qdocumentcursor.h"
 #include "qeditor.h"
 #include "texstudio.h"
+#include <QScopeGuard>
 #ifndef NO_POPPLER_PREVIEW
 #include "pdfviewer/PDFDocument.h"
 #include "pdfviewer/qsynctex.h"
@@ -76,8 +77,13 @@ void RemoteWorkspaceGuiTest::sshEditCompilePreviewAndSyncTeX()
     auto configuration = dynamic_cast<ConfigManager *>(ConfigManagerInterface::getInstance());
     QVERIFY(configuration);
     PDFDocument viewer(configuration->pdfDocumentConfig);
+    viewer.setAttribute(Qt::WA_DeleteOnClose, false);
+    viewer.resize(1100, 900);
     viewer.loadFile(pdf, QFileInfo(source)); viewer.show();
     QVERIFY(QTest::qWaitForWindowExposed(&viewer));
+    viewer.setResolution(96);
+    viewer.widget()->zoom(1.0);
+    viewer.goToPage(1);
     viewer.fillRenderCache();
     QTRY_VERIFY_WITH_TIMEOUT(viewer.popplerDoc(), 15000);
     QCOMPARE(viewer.popplerDoc()->numPages(), 1);
@@ -86,6 +92,14 @@ void RemoteWorkspaceGuiTest::sshEditCompilePreviewAndSyncTeX()
     const QImage rendered = page->renderToImage(96, 96);
     QVERIFY(!rendered.isNull());
     QVERIFY(page->text(QRectF()).contains("Office revision"));
+    const QString diagnostics = qEnvironmentVariable("TEXSTUDIO_TEST_SCREENSHOT_DIR");
+    QVERIFY(!diagnostics.isEmpty());
+    const auto evidence = qScopeGuard([&] {
+        txsInstance->grab().save(diagnostics + "/remote-editor.png");
+        viewer.grab().save(diagnostics + "/remote-pdf-viewer.png");
+        viewer.widget()->grab().save(diagnostics + "/remote-paper-widget.png");
+        rendered.save(diagnostics + "/remote-rendered-page.png");
+    });
     // The viewer renders asynchronously. Wait for ink inside the actual paper
     // area, so a blank placeholder cannot count as a working GUI preview.
     const auto previewHasText = [&] {
@@ -111,11 +125,6 @@ void RemoteWorkspaceGuiTest::sshEditCompilePreviewAndSyncTeX()
     QVERIFY(back.hasNext());
     const auto backwardSource = scanner.getNameFileInfo(QDir(m_profile.cache()), back.next());
     QCOMPARE(backwardSource.absoluteFilePath(), source);
-    const QString diagnostics = qEnvironmentVariable("TEXSTUDIO_TEST_SCREENSHOT_DIR");
-    QVERIFY(!diagnostics.isEmpty());
-    QVERIFY(txsInstance->grab().save(diagnostics + "/remote-editor.png"));
-    QVERIFY(viewer.grab().save(diagnostics + "/remote-pdf-viewer.png"));
-    QVERIFY(rendered.save(diagnostics + "/remote-rendered-page.png"));
     // This stack-owned test viewer stays alive until all asynchronous preview
     // work finishes; closing a WA_DeleteOnClose window would delete it early.
     const QString preview = previewDirectory(source) + "/preview.tex";

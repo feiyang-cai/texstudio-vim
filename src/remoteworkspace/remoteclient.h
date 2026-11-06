@@ -23,6 +23,7 @@ QString toLocal(const Profile &profile, const QString &remote);
 QString mapCommandArgument(const Profile &profile, const QString &argument);
 QString mapSourcePath(const QString &context, const QString &remote);
 QString previewDirectory(const QString &master);
+QString workerProgram();
 QStringList workerArguments(const Profile &profile, const QString &operation, const QJsonObject &data = {});
 QByteArray fileHash(const QString &path);
 bool writeJson(const QString &path, const QJsonObject &object, QString *error = nullptr);

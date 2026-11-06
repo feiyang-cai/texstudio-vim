@@ -209,6 +209,24 @@ QString mapCommandArgument(const Profile &profile, const QString &argument)
     replaceRoot(windowsCache);
     return mapped;
 }
+QString workerProgram()
+{
+#ifdef Q_OS_LINUX
+    // Standalone AppImages invoke their bundled ELF loader directly. Qt then
+    // reports that loader as applicationFilePath(), which cannot accept our
+    // worker options. Re-enter the bundle through its normal AppRun launcher.
+    const QFileInfo directory(qEnvironmentVariable("APPDIR"));
+    const QString root = directory.canonicalFilePath();
+    const QFileInfo executable(QCoreApplication::arguments().value(0));
+    const QString binary = executable.canonicalFilePath();
+    const QString running = QFileInfo(QCoreApplication::applicationFilePath()).canonicalFilePath();
+    const QFileInfo launcher(root + "/AppRun");
+    if (directory.isAbsolute() && !root.isEmpty()
+            && (binary.startsWith(root + "/") || running.startsWith(root + "/"))
+            && launcher.isFile() && launcher.isExecutable()) return launcher.absoluteFilePath();
+#endif
+    return QCoreApplication::applicationFilePath();
+}
 QStringList workerArguments(const Profile &profile, const QString &operation, const QJsonObject &data)
 {
     return {"--remote-workspace-worker", profile.manifest, operation,
@@ -229,14 +247,14 @@ bool Connection::open(Profile &profile)
     if (!helper.open(QIODevice::ReadOnly)) { m_error = "The SSH workspace helper is missing."; return false; }
     const QByteArray code = helper.readAll();
     const QString bootstrap = profile.python + " -u -c \"import sys;exec(sys.stdin.buffer.read(int(sys.stdin.buffer.readline())))\"";
-    QStringList args{"-T", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes", "-o", "ConnectTimeout=15",
+    QStringList args{"-T", "-o", "BatchMode=yes", "-o", "RemoteCommand=none", "-o", "StrictHostKeyChecking=yes", "-o", "ConnectTimeout=15",
                      "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=2"};
     if (!profile.sshConfig.isEmpty()) args << "-F" << profile.sshConfig;
     args << profile.host << bootstrap;
     // SSH uses the operating system's libraries, including in an AppImage.
     auto environment = QProcessEnvironment::systemEnvironment();
 #ifdef Q_OS_LINUX
-    if (environment.contains("APPIMAGE")) environment.remove("LD_LIBRARY_PATH");
+    if (environment.contains("APPIMAGE") || environment.contains("APPDIR")) environment.remove("LD_LIBRARY_PATH");
 #endif
     m_process.setProcessEnvironment(environment);
     m_process.start(ssh, args);

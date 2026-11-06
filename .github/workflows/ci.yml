@@ -46,6 +46,7 @@ jobs:
         cmake -S tests/remote -B build-remote-tests
         cmake --build build-remote-tests --parallel 2
         python3 tests/remote/run_ssh_tests.py build-remote-tests/remote-workspace-tests
+        python3 tests/remote/run_ssh_tests.py build-remote-tests/remote-workspace-tests --through-loader
 
     - name: X11 remote editor, compiler, PDF and SyncTeX
       run: xvfb-run -a bash -c 'openbox > /tmp/remote-openbox.log 2>&1 & python3 tests/remote/run_gui_tests.py ./texstudio'

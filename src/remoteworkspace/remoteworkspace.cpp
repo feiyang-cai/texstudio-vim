@@ -60,11 +60,22 @@ void Controller::showConnectionDialog()
     auto root = new QLineEdit(&dialog); root->setPlaceholderText(tr("Absolute folder on the remote machine"));
     auto python = new QComboBox(&dialog); python->addItems({"python3", "python", "py -3"});
     auto config = new QLineEdit(&dialog); config->setPlaceholderText(tr("Optional OpenSSH config file"));
+    auto configRow = new QWidget(&dialog); auto configLayout = new QHBoxLayout(configRow);
+    configLayout->setContentsMargins(0, 0, 0, 0);
+    auto browseConfig = new QPushButton(tr("Browse…"), configRow);
+    configLayout->addWidget(config); configLayout->addWidget(browseConfig);
+    connect(browseConfig, &QPushButton::clicked, &dialog, [=, &dialog] {
+        const QString selected = QFileDialog::getOpenFileName(&dialog, tr("Select OpenSSH config file"),
+                config->text().isEmpty() ? QDir::homePath() + "/.ssh/config" : config->text());
+        if (!selected.isEmpty()) config->setText(selected);
+    });
+    auto configHint = new QLabel(tr("Leave blank to use your normal SSH settings. Enter a Host alias from the config file above."), &dialog);
+    configHint->setWordWrap(true);
     auto note = new QLabel(tr("Uses OpenSSH and your configured keys or SSH agent. First connect with ssh in a terminal to verify the host key. The remote computer needs Python 3 and a TeX installation. Passwords and private keys are not stored here."), &dialog);
     note->setWordWrap(true); note->setMinimumWidth(430);
     layout->addRow(tr("Saved connection"), existing); layout->addRow(tr("SSH host"), host);
     layout->addRow(tr("Project folder"), root); layout->addRow(tr("Remote Python 3 command"), python);
-    layout->addRow(tr("SSH config file"), config); layout->addRow(note);
+    layout->addRow(tr("SSH config file"), configRow); layout->addRow(configHint); layout->addRow(note);
     auto buttons = new QDialogButtonBox(QDialogButtonBox::Open | QDialogButtonBox::Cancel, &dialog);
     layout->addRow(buttons);
     connect(existing, qOverload<int>(&QComboBox::currentIndexChanged), &dialog, [=](int) {
@@ -75,8 +86,13 @@ void Controller::showConnectionDialog()
     connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
     connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
     if (dialog.exec() != QDialog::Accepted) return;
+    QString selectedConfig = QDir::fromNativeSeparators(config->text().trimmed());
+    if (selectedConfig == "~") selectedConfig = QDir::homePath();
+    else if (selectedConfig.startsWith("~/")) selectedConfig = QDir::homePath() + selectedConfig.mid(1);
+    if (!selectedConfig.isEmpty()) selectedConfig = QFileInfo(selectedConfig).absoluteFilePath();
     Profile profile = Profile::load(existing->currentData().toString());
-    if (!profile.isValid() || profile.host != host->text().trimmed() || profile.root != root->text().trimmed()) {
+    if (!profile.isValid() || profile.host != host->text().trimmed() || profile.root != root->text().trimmed()
+            || profile.sshConfig != selectedConfig) {
         profile = Profile();
         const QString folder = cacheBase() + "/" + QUuid::createUuid().toString(QUuid::WithoutBraces);
         if (!QDir().mkpath(folder)) { QMessageBox::warning(m_window, tr("SSH workspace"), tr("Cannot create a private cache folder.")); return; }
@@ -84,7 +100,7 @@ void Controller::showConnectionDialog()
         profile.manifest = folder + "/profile.json";
     }
     profile.host = host->text().trimmed(); profile.root = root->text().trimmed();
-    profile.python = python->currentText(); profile.sshConfig = config->text().trimmed();
+    profile.python = python->currentText(); profile.sshConfig = selectedConfig;
     QString error;
     if (!profile.save(&error)) { QMessageBox::warning(m_window, tr("SSH workspace"), error); return; }
     m_current = profile; enqueue(profile, "connect");
@@ -159,7 +175,7 @@ void Controller::next(const QString &manifest)
         queue->error = process->errorString(); queue->jobs.clear();
         m_status->setText(queue->error); emit status(queue->error); process->deleteLater();
     });
-    process->start(QCoreApplication::applicationFilePath(), workerArguments(queue->profile, operation, request));
+    process->start(workerProgram(), workerArguments(queue->profile, operation, request));
 }
 void Controller::saved(const QString &filename)
 {

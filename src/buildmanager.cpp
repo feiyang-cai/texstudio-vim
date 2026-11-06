@@ -2734,7 +2734,7 @@ void ProcessX::startCommand()
         stdoutCodec = QTextCodec::codecForName("UTF-8");
         setProperty("remoteWorkspaceApplyFailed", false);
         setProperty("remoteWorkspaceCommand", true);
-        QProcess::start(QCoreApplication::applicationFilePath(), remoteArguments);
+        QProcess::start(RemoteWorkspace::workerProgram(), remoteArguments);
     } else {
         ExecProgram execProgram(cmd, BuildManager::resolvePaths(BuildManager::additionalSearchPaths));
         execProgram.execAndNoWait(*this);

@@ -23,6 +23,17 @@ class RemoteTests : public QObject {
             QJsonObject{{"path", name}, {"stage", token}, {"expected", QString::fromLatin1(expected)}, {"local", hash}, {"remote", hash}}}}}));
     }
 private slots:
+    void workerLauncher() {
+#ifdef Q_OS_LINUX
+        const QString bundle = qEnvironmentVariable("APPDIR");
+        if (!bundle.isEmpty()) {
+            QCOMPARE(workerProgram(), bundle + "/AppRun");
+            QVERIFY(QCoreApplication::applicationFilePath().contains("ld-linux"));
+            return;
+        }
+#endif
+        QCOMPARE(workerProgram(), QCoreApplication::applicationFilePath());
+    }
     void pathMappings() {
         QTemporaryDir temp; auto profile = makeProfile(temp.path());
         profile.root = "C:/Users/Office/Paper"; profile.platform = "win32";
@@ -81,7 +92,7 @@ private slots:
         QVERIFY(profile.save());
         auto worker=[&](const QString &operation,const QJsonObject &data=QJsonObject()) {
             QProcess process;process.setProcessChannelMode(QProcess::MergedChannels);
-            process.start(QCoreApplication::applicationFilePath(),workerArguments(profile,operation,data));
+            process.start(workerProgram(),workerArguments(profile,operation,data));
             if(!process.waitForFinished(120000)) { process.kill();process.waitForFinished(); return QByteArray("timeout"); }
             const auto output=process.readAll();
             return process.exitStatus()==QProcess::NormalExit&&process.exitCode()==0?QByteArray():output;

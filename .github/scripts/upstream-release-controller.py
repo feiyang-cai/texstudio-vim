@@ -51,6 +51,7 @@ CD_JOBS = {
     'AppImage desktop (debian-12)',
     'AppImage desktop (debian-13)',
     'AppImage desktop (fedora-43)',
+    'AppImage SSH save and remote build',
 }
 VIM_JOBS = {
     'Vim desktop (windows-latest)',

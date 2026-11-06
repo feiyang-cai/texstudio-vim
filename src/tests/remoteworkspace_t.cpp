@@ -39,7 +39,7 @@ void RemoteWorkspaceGuiTest::sshEditCompilePreviewAndSyncTeX()
     m_profile.sshConfig = qEnvironmentVariable("TXS_TEST_SSH_CONFIG");
     QString error; QVERIFY2(m_profile.save(&error), qPrintable(error));
     QProcess connect;
-    connect.start(QCoreApplication::applicationFilePath(), workerArguments(m_profile, "connect"));
+    connect.start(workerProgram(), workerArguments(m_profile, "connect"));
     QVERIFY(connect.waitForFinished(60000));
     QCOMPARE(connect.exitCode(), 0);
     m_profile = Profile::load(m_profile.manifest);

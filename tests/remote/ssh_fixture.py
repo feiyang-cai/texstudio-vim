@@ -57,6 +57,7 @@ def ssh_fixture():
             config = ['Host office-test', '  HostName 127.0.0.1', f'  Port {port}', '  User '+getpass.getuser(),
                       '  IdentityFile '+quoted(folder/'client_key'), '  UserKnownHostsFile '+quoted(folder/'known_hosts'),
                       '  HostKeyAlias office-fixture', '  IdentitiesOnly yes', '  BatchMode yes', '  StrictHostKeyChecking yes']
+            config += ['  RemoteCommand exit 99']  # Workspace transport must override interactive login commands.
             (folder/'config').write_text('\n'.join(config)+'\n')
             paper = folder/'office paper'; paper.mkdir()
             (paper/'main.tex').write_text('\\documentclass{article}\n\\begin{document}Office revision.\\end{document}\n')

@@ -391,10 +391,14 @@ jobs:
         run: git fetch --tags --force
 
       - name: Updates
-        run: sudo apt-get update
+        run: |
+          if [ -f /etc/apt/apt-mirrors.txt ]; then
+            sudo sed -i 's/azure.archive.ubuntu.com/archive.ubuntu.com/g' /etc/apt/apt-mirrors.txt
+          fi
+          sudo apt-get -o Acquire::http::Timeout=30 -o Acquire::Retries=2 update
 
       - name: Dependencies
-        run: sudo apt-get install qt6-base-dev qt6-base-dev-tools qt6-svg-dev qt6-declarative-dev qt6-tools-dev qt6-tools-dev-tools libpoppler-qt6-dev libpoppler-cpp-dev pkg-config zlib1g-dev libquazip1-qt6-dev libhunspell-dev
+        run: sudo DEBIAN_FRONTEND=noninteractive apt-get -o Acquire::http::Timeout=30 -o Acquire::Retries=2 install -y qt6-base-dev qt6-base-dev-tools qt6-svg-dev qt6-declarative-dev qt6-tools-dev qt6-tools-dev-tools libpoppler-qt6-dev libpoppler-cpp-dev pkg-config zlib1g-dev libquazip1-qt6-dev libhunspell-dev
 
       - name: Configure
         run: |
@@ -523,6 +527,33 @@ jobs:
         with:
           name: appimage-smoke-${{ matrix.name }}
           path: smoke-results/
+          if-no-files-found: warn
+
+  appimage-ssh:
+    name: AppImage SSH save and remote build
+    needs: build-linux-release
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: texstudio-linux
+          path: appimage
+      - name: SSH and desktop test dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y openssh-server texlive-latex-base xvfb xauth xdotool scrot openbox
+          sudo mkdir -p /run/sshd
+      - name: Packaged remote workspace test
+        run: xvfb-run -a bash -c 'openbox > /tmp/remote-appimage-openbox.log 2>&1 & python3 tests/remote/run_packaged_gui_tests.py appimage/*.AppImage'
+      - name: Save SSH desktop diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: appimage-ssh-tests
+          path: packaged-remote-results/
           if-no-files-found: warn
 
   ############################
@@ -736,7 +767,7 @@ jobs:
       actions: write # for GeekyEggo/delete-artifact to delete artifacts
       contents: write # for softprops/action-gh-release to create GitHub release
     name: Release
-    needs: [verify, build-win10, build-win10-arm, build-linux-release, macosx, macosxM1, native-package-smoke, appimage-smoke]
+    needs: [verify, build-win10, build-win10-arm, build-linux-release, macosx, macosxM1, native-package-smoke, appimage-smoke, appimage-ssh]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/texstudio-vim-') && vars.UPSTREAM_RELEASE_PUBLICATION_ENABLED == 'true'
     steps:

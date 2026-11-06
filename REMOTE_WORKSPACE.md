@@ -48,7 +48,12 @@ stored in workspace profiles.
 2. Enter the SSH alias and the remote project's absolute folder, for example
    `/home/me/papers/article`, `/Users/me/papers/article` or
    `C:/Users/me/papers/article`. Select `python3`, `python`, or `py -3` to match
-   the remote installation. You can specify a separate OpenSSH config file.
+   the remote installation. **Browse…** selects a separate OpenSSH config file;
+   enter its `Host` alias in the SSH host field. Leaving the config field blank
+   uses OpenSSH's normal configuration, including `~/.ssh/config`. Custom config
+   paths beginning with `~/` are expanded to your home directory.
+   The workspace overrides interactive `RemoteCommand` settings for its helper;
+   your regular terminal SSH connections keep their usual behavior.
 3. Open a `.tex` file by double-clicking it in the remote project panel. Use the
    normal editor and Vim commands. Saving queues an upload in the background.
 4. Compile normally. External build commands for this workspace run remotely;

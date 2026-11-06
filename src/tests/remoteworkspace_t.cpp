@@ -116,7 +116,8 @@ void RemoteWorkspaceGuiTest::sshEditCompilePreviewAndSyncTeX()
     QVERIFY(txsInstance->grab().save(diagnostics + "/remote-editor.png"));
     QVERIFY(viewer.grab().save(diagnostics + "/remote-pdf-viewer.png"));
     QVERIFY(rendered.save(diagnostics + "/remote-rendered-page.png"));
-    viewer.close();
+    // This stack-owned test viewer stays alive until all asynchronous preview
+    // work finishes; closing a WA_DeleteOnClose window would delete it early.
     const QString preview = previewDirectory(source) + "/preview.tex";
     QFile snippet(m_profile.cache() + "/snippet.tex");
     QVERIFY(snippet.open(QIODevice::WriteOnly)); snippet.write("Remote snippet preview."); snippet.close();

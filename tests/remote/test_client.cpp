@@ -96,6 +96,15 @@ private slots:
         const QJsonArray argv{"python", "-c", "from pathlib import Path;Path('output.bin').write_bytes(b'\\0artifact\\xff')"};
         QCOMPARE(worker("command",{{"argv",argv},{"cwd",profile.cache()}}),QByteArray());
         QString error;QVERIFY2(applyPull(profile,&error),qPrintable(error));QVERIFY(QFileInfo::exists(profile.cache()+"/output.bin"));
+        const QString preview = ".texstudio-remote-preview/generated.tex";
+        write(profile.cache()+"/"+preview, ("\\input{"+profile.cache()+"/main.tex}").toUtf8());
+        QCOMPARE(worker("sync"),QByteArray());
+        auto previewData = connection.request("read", {{"path",preview}});
+        QCOMPARE(QByteArray::fromBase64(previewData.value("data").toString().toLatin1()), ("\\input{"+profile.root+"/main.tex}").toUtf8());
+        QVERIFY(QFile::remove(profile.cache()+"/"+preview));
+        QCOMPARE(worker("sync"),QByteArray());
+        const auto remainingFiles = connection.request("list").value("files").toArray();
+        for (const auto &entry : remainingFiles) QVERIFY(entry.toObject().value("path").toString()!=preview);
         const auto old=received.value("hash");
         auto changed=connection.request("put",{{"path","main.tex"},{"data",QString::fromLatin1(QByteArray("office revision").toBase64())},{"expected",old}});
         QVERIFY2(connection.error().isEmpty(),qPrintable(connection.error()));

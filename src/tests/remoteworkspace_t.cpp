@@ -77,6 +77,8 @@ void RemoteWorkspaceGuiTest::sshEditCompilePreviewAndSyncTeX()
     QVERIFY(configuration);
     PDFDocument viewer(configuration->pdfDocumentConfig);
     viewer.loadFile(pdf, QFileInfo(source)); viewer.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&viewer));
+    viewer.fillRenderCache();
     QTRY_VERIFY_WITH_TIMEOUT(viewer.popplerDoc(), 15000);
     QCOMPARE(viewer.popplerDoc()->numPages(), 1);
     const auto page = viewer.popplerDoc()->page(0);
@@ -84,6 +86,22 @@ void RemoteWorkspaceGuiTest::sshEditCompilePreviewAndSyncTeX()
     const QImage rendered = page->renderToImage(96, 96);
     QVERIFY(!rendered.isNull());
     QVERIFY(page->text(QRectF()).contains("Office revision"));
+    // The viewer renders asynchronously. Wait for ink inside the actual paper
+    // area, so a blank placeholder cannot count as a working GUI preview.
+    const auto previewHasText = [&] {
+        auto widget = viewer.widget();
+        const QRect area = widget->pageRect(0).adjusted(4, 4, -4, -4).intersected(widget->rect());
+        if (area.isEmpty()) return false;
+        const auto image = widget->grab(area).toImage().convertToFormat(QImage::Format_RGB32);
+        int ink = 0;
+        for (int y = 0; y < image.height(); ++y) {
+            const auto row = reinterpret_cast<const QRgb *>(image.constScanLine(y));
+            for (int x = 0; x < image.width(); ++x)
+                if (qRed(row[x]) < 150 && qGreen(row[x]) < 150 && qBlue(row[x]) < 150 && ++ink >= 20) return true;
+        }
+        return false;
+    };
+    QTRY_VERIFY_WITH_TIMEOUT(previewHasText(), 5000);
     QSynctex::Scanner scanner(pdf);
     QVERIFY(scanner.isValid());
     const auto target = scanner.syncFromTeX(QSynctex::TeXSyncPoint(source, 3, 1), pdf);
@@ -99,6 +117,21 @@ void RemoteWorkspaceGuiTest::sshEditCompilePreviewAndSyncTeX()
     QVERIFY(viewer.grab().save(diagnostics + "/remote-pdf-viewer.png"));
     QVERIFY(rendered.save(diagnostics + "/remote-rendered-page.png"));
     viewer.close();
+    const QString preview = previewDirectory(source) + "/preview.tex";
+    QFile snippet(m_profile.cache() + "/snippet.tex");
+    QVERIFY(snippet.open(QIODevice::WriteOnly)); snippet.write("Remote snippet preview."); snippet.close();
+    QFile previewSource(preview); QVERIFY(previewSource.open(QIODevice::WriteOnly));
+    previewSource.write(("\\documentclass{article}\n\\begin{document}\n\\input{" + m_profile.cache()
+            + "/snippet.tex}\n\\end{document}\n").toUtf8()); previewSource.close();
+    ProcessX previewCompiler(m_manager, "pdflatex -interaction=nonstopmode -halt-on-error -synctex=1 \"" + preview + "\"", preview);
+    QString previewOutput; previewCompiler.setStdoutBuffer(&previewOutput); previewCompiler.setStderrBuffer(&previewOutput);
+    QSignalSpy previewFinished(&previewCompiler, &ProcessX::processFinished);
+    previewCompiler.startCommand();
+    QTRY_COMPARE_WITH_TIMEOUT(previewFinished.count(), 1, 120000);
+    QVERIFY2(previewCompiler.exitCode() == 0, qPrintable(previewOutput));
+    const auto previewPdf = Poppler::Document::load(QFileInfo(preview).absolutePath() + "/preview.pdf");
+    QVERIFY(previewPdf); const auto previewPage = previewPdf->page(0); QVERIFY(previewPage);
+    QVERIFY(previewPage->text(QRectF()).contains("Remote snippet preview"));
 #else
     QFAIL("The remote desktop test requires the internal PDF viewer.");
 #endif

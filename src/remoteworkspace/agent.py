@@ -1,7 +1,8 @@
 """Transient SSH workspace helper. Python 3 stdlib only; no listening socket.
 
-The client sends framed JSON over SSH stdin/stdout. All filesystem operations
-are confined to the explicitly selected project. No credentials are accepted.
+The client sends framed JSON over SSH stdin/stdout. File transfers are confined
+to the selected project. Build commands retain the SSH user's normal permissions.
+No credentials are accepted.
 """
 import atexit
 import base64
@@ -245,6 +246,7 @@ class Workspace:
         extras = ['/Library/TeX/texbin'] if sys.platform == 'darwin' else []
         import glob
         for tinytex in (Path.home()/'.TinyTeX', Path.home()/'Library'/'TinyTeX',
+                        Path.home()/'AppData'/'Roaming'/'TinyTeX',
                         Path(environment.get('APPDATA', str(Path.home())))/'TinyTeX'):
             extras.extend(sorted(glob.glob(str(tinytex/'bin'/'*'))))
         if os.name == 'nt':

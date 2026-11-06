@@ -71,6 +71,16 @@ public:
             files.insert(name, QJsonObject{{"remote", QString::fromLatin1(sentHash)}, {"local", QString::fromLatin1(localHash)}});
             save();
         }
+        // TeXstudio removes its generated preview files when a preview expires.
+        // Synchronize that cleanup only in our reserved transient directory;
+        // ordinary project deletions always retain their recovery copies.
+        for (const auto &name : files.keys()) {
+            if (!name.startsWith(".texstudio-remote-preview/") || QFileInfo::exists(cachePath(profile, name))) continue;
+            const auto previous = files.value(name).toObject();
+            if (!previous.value("remote").isString()) continue;
+            call(connection, "delete", {{"path", name}, {"expected", previous.value("remote")}});
+            files.remove(name); save();
+        }
     }
     void pull() {
         const auto listing = call(connection, "list").value("files");

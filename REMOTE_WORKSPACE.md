@@ -61,6 +61,8 @@ save is retained even if SSH fails. Compilation uploads saved project files
 first; normal TeXstudio rules still control whether unsaved buffers are saved
 before a build. Commands are executed with arguments, without inserting file
 names into a remote shell command.
+The selected folder limits synchronization; build commands run with your SSH
+account's normal permissions.
 
 Use **Refresh remote project** after changes made on the remote computer. There
 is no continuous remote filesystem watcher. **Synchronize saved changes** retries
@@ -73,6 +75,8 @@ pipelines and interactive terminal programs may need project-specific changes.
 TeX search paths under the project are translated for the remote OS. External
 PDF viewers remain local. TeX Live, MiKTeX, MacTeX and common TinyTeX locations
 are detected; other installations should be on the SSH session's PATH.
+The `.texstudio-remote-preview` directory is reserved for generated previews.
+Its tracked files are removed remotely when TeXstudio cleans their local copies.
 
 ## Conflicts and recovery
 

@@ -32,6 +32,9 @@ private slots:
         QCOMPARE(toRemote(profile, temp.path()+"/project-other/paper.tex"), temp.path()+"/project-other/paper.tex");
         QCOMPARE(mapCommandArgument(profile, "-output-directory="+profile.cache()+"/output"), "-output-directory="+profile.root+"/output");
         QCOMPARE(mapCommandArgument(profile, profile.cache()+"-other/output"), profile.cache()+"-other/output");
+        QString nativeCache = profile.cache(); nativeCache.replace('/', '\\');
+        profile.root = "/office/paper"; profile.platform = "linux";
+        QCOMPARE(mapCommandArgument(profile, nativeCache+"\\chapter\\main.tex"), profile.root+"/chapter/main.tex");
     }
     void rejectsNonportableOrEscapingNames() {
         for (const QString &name : {"../x", "/tmp/x", "C:/x", "a/../../x", "a\\..\\x", ".", "aux.tex", "a.", "a/b ", "a?b"}) QVERIFY(!validRelativePath(name));

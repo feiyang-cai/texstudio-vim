@@ -4,6 +4,9 @@ Vim editing revisions are recorded in [VIM_CHANGELOG.md](VIM_CHANGELOG.md).
 
 ## Unreleased
 
+- Move Apple Silicon CI and package GUI checks to macOS 15 after GitHub retired
+  its macOS 14 runners on November 2, 2026.
+
 - Optional SSH remote workspaces for Windows, macOS and Linux: cached project
   editing, background saves, remote TeX compilation, local PDF preview and SyncTeX.
 - Revision-checked saves, separately staged downloads and explicit conflict

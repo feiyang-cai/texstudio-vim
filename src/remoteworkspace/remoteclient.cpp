@@ -39,7 +39,7 @@ bool applyPull(const Profile &profile, QString *error, const std::function<bool(
     if (!QFileInfo::exists(manifest)) return true;
     QLockFile lock(profile.directory() + "/sync.lock");
     auto fail = [&](const QString &reason) { if (error) *error = reason; return false; };
-    if (!lock.tryLock(0)) return fail("Another workspace transfer is running; downloaded files are preserved.");
+    if (!lock.tryLock(100)) return fail("Another workspace transfer is running; downloaded files are preserved.");
     QFile file(manifest), state(profile.directory() + "/state.json");
     if (!file.open(QIODevice::ReadOnly) || file.size() > 64 * 1024 * 1024) return fail("Cannot read downloaded project changes.");
     const auto doc = QJsonDocument::fromJson(file.readAll());
@@ -193,12 +193,19 @@ QString mapCommandArgument(const Profile &profile, const QString &argument)
         while (matches.hasNext()) {
             const auto match = matches.next(); positions.prepend({match.capturedStart(), match.capturedLength()});
         }
-        for (const auto &position : positions) mapped.replace(position.first, position.second, profile.root);
+        for (const auto &position : positions) {
+            const int start = position.first + position.second;
+            int end = start;
+            while (end < mapped.size() && !QString("\"'{}").contains(mapped.at(end))) ++end;
+            QString suffix = mapped.mid(start, end - start);
+            suffix.replace('\\', '/');
+            mapped.replace(start, end - start, suffix);
+            mapped.replace(position.first, position.second, profile.root);
+        }
     };
     replaceRoot(profile.cache());
-#ifdef Q_OS_WIN
-    replaceRoot(QDir::toNativeSeparators(profile.cache()));
-#endif
+    QString windowsCache = profile.cache(); windowsCache.replace('/', '\\');
+    replaceRoot(windowsCache);
     return mapped;
 }
 QStringList workerArguments(const Profile &profile, const QString &operation, const QJsonObject &data)

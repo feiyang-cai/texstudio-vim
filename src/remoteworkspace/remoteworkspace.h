@@ -14,7 +14,7 @@ public:
     static void saved(const QString &filename);
     static void opened(const QString &filename);
     static bool confirmClose();
-    static void commandFinished(const QString &file);
+    static bool commandFinished(const QString &file);
     ~Controller() override;
     static bool prepareCommand(const QString &file, const QString &command, const QStringList &environment,
                                QStringList *arguments);

@@ -1847,6 +1847,8 @@ void BuildManager::runNextCommandInternalAsync()
  */
 void BuildManager::runNextCommandInternalAsyncFinished(int exitCode, QProcess::ExitStatus exitStatus)
 {
+    if (sender() && sender()->property("remoteWorkspaceApplyFailed").toBool()) exitCode = 1;
+
     processWaitedFor = nullptr;
     if(exitCode!=0 || exitStatus != QProcess::NormalExit){
         emit processNotification(tr("Error: Command failed with error code %1").arg(exitCode));
@@ -2730,6 +2732,7 @@ void ProcessX::startCommand()
     if (!(subCommandFlags & (RCF_SINGLE_INSTANCE | RCF_DETACH))
             && RemoteWorkspace::Controller::prepareCommand(file, cmd, overrideEnvironment(), &remoteArguments)) {
         stdoutCodec = QTextCodec::codecForName("UTF-8");
+        setProperty("remoteWorkspaceApplyFailed", false);
         setProperty("remoteWorkspaceCommand", true);
         QProcess::start(QCoreApplication::applicationFilePath(), remoteArguments);
     } else {
@@ -2828,7 +2831,7 @@ int ProcessX::exitStatus() const
 
 int ProcessX::exitCode() const
 {
-	return QProcess::exitCode();
+    return property("remoteWorkspaceApplyFailed").toBool() ? 1 : QProcess::exitCode();
 }
 
 QString ProcessX::readAllStandardOutputStr()
@@ -2881,7 +2884,10 @@ void ProcessX::onFinished(int error)
 {
     if (property("remoteWorkspaceCommand").toBool()) {
         setProperty("remoteWorkspaceCommand", false);
-        RemoteWorkspace::Controller::commandFinished(file);
+        if (!RemoteWorkspace::Controller::commandFinished(file)) {
+            setProperty("remoteWorkspaceApplyFailed", true);
+            error = 1;
+        }
     }
 	if (cmd.contains("AcroRd32.exe") && error == 1) error = 0; // fix for Adobe Reader: It returns 1 on success
 	if (error) {

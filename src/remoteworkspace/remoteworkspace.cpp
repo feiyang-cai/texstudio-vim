@@ -236,19 +236,21 @@ void Controller::deleteFile()
         enqueue(m_current, "delete", {{"path", name}});
 }
 
-void Controller::commandFinished(const QString &file)
+bool Controller::commandFinished(const QString &file)
 {
-    if (!s_instance) return;
+    if (!s_instance) return true;
     const auto profile = forFile(file);
-    if (!profile.isValid()) return;
+    if (!profile.isValid()) return true;
     auto queue = s_instance->m_queues.value(profile.manifest, nullptr);
     QString error;
-    if (!s_instance->apply(profile, &error)) {
+    const bool applied = s_instance->apply(profile, &error);
+    if (!applied) {
         if (queue) { queue->error = error; queue->pending.insert("conflict"); }
         s_instance->m_status->setText(error); emit s_instance->status(error);
     }
     if (queue) queue->commands = qMax(0, queue->commands - 1);
     if (queue) s_instance->next(profile.manifest);
+    return applied;
 }
 bool Controller::apply(const Profile &profile, QString *error)
 {

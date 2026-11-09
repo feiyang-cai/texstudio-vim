@@ -6480,7 +6480,8 @@ bool Texstudio::runCommand(const QString &commandline, QString *buffer, QTextCod
 		return false;
 	}
     // disable buttons
-    if(commandline==BuildManager::CMD_COMPILE || commandline== BuildManager::CMD_QUICK){
+    const QStringList lstOfCompileCommands={BuildManager::CMD_COMPILE,BuildManager::CMD_QUICK,BuildManager::CMD_LATEX,BuildManager::CMD_PDFLATEX,BuildManager::CMD_XELATEX,BuildManager::CMD_LUALATEX,BuildManager::CMD_LATEXMK};
+    if(lstOfCompileCommands.contains(commandline)){
         setBuildButtonsDisabled(true);
     }
 
@@ -6530,6 +6531,7 @@ bool Texstudio::runCommandAsync(const QString &commandline, const char * returnC
     if(!proc) return false;
     setStatusMessageProcess(tr("  Running this command: ") + proc->getCommandLine());
     connect(proc, SIGNAL(finished(int,QProcess::ExitStatus)), obj, returnCMD);
+    connect(proc, SIGNAL(finished(int,QProcess::ExitStatus)), proc, SLOT(deleteLater()));
     QString *buffer=new QString();
     proc->setStdoutBuffer(buffer);
     proc->startCommand();

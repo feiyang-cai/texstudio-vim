@@ -679,6 +679,92 @@ void LatexEditorViewTest::vimVisualIndentation()
     QCOMPARE(view.editor->inputModeLabel(), QString("NORMAL"));
 }
 
+void LatexEditorViewTest::vimUnindent_data()
+{
+    QTest::addColumn<QString>("initial");
+    QTest::addColumn<QString>("keys");
+    QTest::addColumn<QString>("expected");
+    const QString spaces(QDocument::tabStop(), QLatin1Char(' '));
+    QTest::newRow("single-following-unindented") << QString("\tabc\ntail") << QString("<<") << QString("abc\ntail");
+    QTest::newRow("single-following-blank") << QString("\tabc\n\ntail") << QString("<<") << QString("abc\n\ntail");
+    QTest::newRow("single-following-short-indent") << spaces + "abc\n tail" << QString("<<") << QString("abc\n tail");
+    QTest::newRow("short-selected-indent") << QString("  abc\n\tdef\ntail") << QString("2<<") << QString("abc\ndef\ntail");
+    QTest::newRow("single-eof") << QString("\tabc") << QString("<<") << QString("abc");
+    QTest::newRow("count-mixed-indent") << spaces + "abc\n\tdef\ntail" << QString("2<<") << QString("abc\ndef\ntail");
+    QTest::newRow("count-eof-mixed-indent") << spaces + "abc\n\tdef" << QString("2<<") << QString("abc\ndef");
+    QTest::newRow("operator-count") << spaces + "abc\n\tdef\ntail" << QString("<2<") << QString("abc\ndef\ntail");
+    QTest::newRow("motion-range") << spaces + "abc\n\tdef\ntail" << QString("<j") << QString("abc\ndef\ntail");
+    QTest::newRow("visual-line-mixed-indent") << spaces + "abc\n\tdef\ntail" << QString("Vj<") << QString("abc\ndef\ntail");
+    QTest::newRow("visual-character-mixed-indent") << spaces + "abc\n\tdef\ntail" << QString("vj$<") << QString("abc\ndef\ntail");
+    QTest::newRow("visual-backward-mixed-indent") << spaces + "abc\n\tdef\ntail" << QString("jVk<") << QString("abc\ndef\ntail");
+    QTest::newRow("blank-first-line") << QString("\n\tabc\ntail") << QString("2<<") << QString("\nabc\ntail");
+    QTest::newRow("unindented-first-line") << QString("abc\n\tdef\ntail") << QString("2<<") << QString("abc\ndef\ntail");
+}
+
+void LatexEditorViewTest::vimUnindent()
+{
+    if (skipVimUiTestInQuickRuns()) return;
+    QFETCH(QString, initial);
+    QFETCH(QString, keys);
+    QFETCH(QString, expected);
+    LatexEditorViewConfig config = *edView->getConfig();
+    config.editingMode = LatexEditorViewConfig::VimEditing;
+    config.replaceIndentTabs = false;
+    LatexDocument document;
+    LatexEditorView view(nullptr, &config, &document);
+    view.editor->setText(initial, false);
+    view.editor->setCursorPosition(0, 0, false);
+    QTest::keyClicks(view.editor, keys);
+    QCOMPARE(document.textLines().join("\n"), expected);
+    QCOMPARE(view.editor->inputModeLabel(), QString("NORMAL"));
+    QVERIFY(!view.editor->cursor().hasSelection());
+    QCOMPARE(view.editor->cursor().lineNumber(), 0);
+    QCOMPARE(view.editor->cursor().columnNumber(), 0);
+    QTest::keyClicks(view.editor, "u");
+    QCOMPARE(document.textLines().join("\n"), initial);
+    QTest::keyClick(view.editor, Qt::Key_R, Qt::ControlModifier);
+    QCOMPARE(document.textLines().join("\n"), expected);
+}
+
+void LatexEditorViewTest::vimUnindentNoOp()
+{
+    if (skipVimUiTestInQuickRuns()) return;
+    for (const QString &initial : {QString(), QString("abc\ntail"), QString("\nabc")}) {
+        LatexEditorViewConfig config = *edView->getConfig();
+        config.editingMode = LatexEditorViewConfig::VimEditing;
+        LatexDocument document;
+        LatexEditorView view(nullptr, &config, &document);
+        view.editor->setText("x" + initial, false);
+        view.editor->setCursorPosition(0, 0, false);
+        QTest::keyClicks(view.editor, "x");
+        QCOMPARE(document.textLines().join("\n"), initial);
+        document.setClean();
+        QTest::keyClicks(view.editor, "2<<");
+        QCOMPARE(document.textLines().join("\n"), initial);
+        QVERIFY(document.isClean());
+        QTest::keyClicks(view.editor, "u");
+        QCOMPARE(document.textLines().join("\n"), "x" + initial);
+    }
+}
+
+void LatexEditorViewTest::vimUnindentPreservesStandardEditing()
+{
+    if (skipVimUiTestInQuickRuns()) return;
+    LatexEditorViewConfig config = *edView->getConfig();
+    config.editingMode = LatexEditorViewConfig::StandardEditing;
+    LatexDocument document;
+    LatexEditorView view(nullptr, &config, &document);
+    const QString spaces(QDocument::tabStop(), QLatin1Char(' '));
+    const QString initial = spaces + "abc\n def";
+    view.editor->setText(initial, false);
+    view.editor->setCursor(QDocumentCursor(&document, 0, 0, 1, 4));
+    view.editor->unindentSelection();
+    // Upstream caps every selected line at the active line's one-space indent.
+    QCOMPARE(document.textLines().join("\n"), spaces.mid(1) + "abc\ndef");
+    view.editor->undo();
+    QCOMPARE(document.textLines().join("\n"), initial);
+}
+
 void LatexEditorViewTest::vimCursorStyles()
 {
     if (skipVimUiTestInQuickRuns())

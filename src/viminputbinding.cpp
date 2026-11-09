@@ -1887,8 +1887,25 @@ private:
         editor->setCursor(cursor);
         if (indent)
             editor->indentSelection();
-        else
-            editor->unindentSelection();
+        else {
+            // Vim shifts each selected line independently. Upstream's selection
+            // unindent aligns lines using the active cursor's indentation, which
+            // may be on the following, unselected line for a linewise range.
+            bool macroStarted = false;
+            for (int line = qMin(startLine, endLine); line <= lastLine; ++line) {
+                const QDocumentLine documentLine = editor->document()->line(line);
+                if (!documentLine.length() || documentLine.firstChar() == 0)
+                    continue;
+                if (!macroStarted) {
+                    editor->document()->beginMacro();
+                    macroStarted = true;
+                }
+                editor->setCursor(QDocumentCursor(editor->document(), line, 0), false);
+                editor->unindentSelection();
+            }
+            if (macroStarted)
+                editor->document()->endMacro();
+        }
         QDocumentCursor newCursor(editor->document(), qMin(startLine, endLine), 0);
         editor->setCursor(newCursor);
         normalizeNormalCursor(editor);

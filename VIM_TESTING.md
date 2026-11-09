@@ -30,6 +30,7 @@ coverage of every combination. No release is authorized by these tests.
 | Visual boundaries and cancellation | `vimMouseDragCancellation`, `vimCtrlClickFromVisual`, `vimVisualBoundaries`, `vimFoldedMouseSelection` | Empty drag ranges, Ctrl-click cleanup, Unicode-safe exits, blank-line mode switches and exact folded-text payloads |
 | Vertical motions after mouse input | `vimMouseSelectionResetsMotionColumn` | A new mouse selection resets the remembered keyboard column before `j`/`k` |
 | Modified mouse actions and context menus | `vimModifiedMouseCleanup` | Ctrl-drag/right-click cleanup, native menu dismissal, selection available while the menu is open, and subsequent single-character edits |
+| Vim unindent and upstream selection behavior | `vimUnindent`, `vimUnindentNoOp`, `vimUnindentPreservesStandardEditing` | Single/count/motion and forward/backward Visual ranges, mixed indentation, blank lines, EOF, one-step undo/redo, no-op clean/undo state, and unchanged standard selection unindent |
 | Visual indentation | `vimVisualIndentation` | Blank lines, forward/backward newline boundaries, and indentation through the end of the document |
 | Insert-mode completion | Focused `LatexCompleterTest` cases | Editor/completion integration |
 

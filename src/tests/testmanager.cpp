@@ -24,6 +24,7 @@
 #include "tablemanipulation_t.h"
 #include "syntaxcheck_t.h"
 #include "updatechecker_t.h"
+#include "appimageupdate_t.h"
 #include "utilsui_t.h"
 #include "utilsversion_t.h"
 #include "help_t.h"
@@ -88,7 +89,8 @@ QString TestManager::execute(TestLevel level, LatexEditorView* edView, QCodeEdit
         // Isolate Vim UI checks from suites that alter shared editor state.
         tests << new LatexEditorViewTest(edView)
               << new LatexCompleterTest(edView)
-              << new VersionTest(true);
+              << new VersionTest(true)
+              << new AppImageUpdateTest();
     } else {
         tests = QList<QObject*>()
             << new SmallUsefulFunctionsTest()
@@ -113,6 +115,7 @@ QString TestManager::execute(TestLevel level, LatexEditorView* edView, QCodeEdit
             << new StructureViewTest(edView,edView->document,level==TL_ALL)
             << new TableManipulationTest(editor)
             << new SyntaxCheckTest(edView)
+            << new AppImageUpdateTest()
             << new UpdateCheckerTest(level==TL_ALL)
             << new UtilsUITest(level==TL_ALL)
             << new VersionTest(level==TL_ALL)

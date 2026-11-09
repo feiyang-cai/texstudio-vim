@@ -106,6 +106,7 @@ set(HEADER_FILES ${HEADER_FILES}
     ${CMAKE_CURRENT_SOURCE_DIR}/universalinputdialog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/unixutils.h
     ${CMAKE_CURRENT_SOURCE_DIR}/updatechecker.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/appimageupdate.h
     ${CMAKE_CURRENT_SOURCE_DIR}/usermacro.h
     ${CMAKE_CURRENT_SOURCE_DIR}/usermenudialog.h
     ${CMAKE_CURRENT_SOURCE_DIR}/userquickdialog.h
@@ -216,6 +217,7 @@ set(SOURCE_FILES ${SOURCE_FILES}
     ${CMAKE_CURRENT_SOURCE_DIR}/universalinputdialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/unixutils.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/updatechecker.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/appimageupdate.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/usermacro.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/usermenudialog.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/userquickdialog.cpp

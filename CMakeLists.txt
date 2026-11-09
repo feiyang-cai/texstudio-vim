@@ -306,6 +306,7 @@ if(${TEXSTUDIO_ENABLE_TESTS})
 		src/tests/testutil.h
                 src/tests/texstudio_t.h
 		src/tests/updatechecker_t.h
+                src/tests/appimageupdate_t.h
 		src/tests/usermacro_t.h
 		src/tests/utilsui_t.h
 		src/tests/utilsversion_t.h

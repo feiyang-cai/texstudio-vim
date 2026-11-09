@@ -551,6 +551,8 @@ void Texstudio::startupCompleted()
 		buildManager.checkLatexConfiguration(noWarnAgain);
 		configManager.checkLatexConfiguration = !noWarnAgain;
 	}
+    connect(UpdateChecker::instance(), &UpdateChecker::updateStatus, this,
+            [this](const QString &message) { statusBar()->showMessage(message, 15000); });
 	UpdateChecker::instance()->autoCheck();
 	// package reading (at least with Miktex) apparently slows down the startup
 	// the first rendering of lines in QDocumentPrivate::draw() gets very slow

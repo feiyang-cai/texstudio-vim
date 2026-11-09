@@ -2,53 +2,41 @@
 #define Header_UpdateChecker
 
 #include "mostQtHeaders.h"
-#include <QNetworkAccessManager>
-#include <QNetworkReply>
 #include "utilsVersion.h"
+#include <QJsonObject>
+#include <QNetworkAccessManager>
 #include <QLocale>
 
+class AppImageUpdate;
 class UpdateChecker : public QObject
 {
-	Q_OBJECT
-
+    Q_OBJECT
 public:
-	~UpdateChecker();
-
-	static UpdateChecker *instance();
-
-	static QString lastCheckAsString();
+    ~UpdateChecker();
+    static UpdateChecker *instance();
+    static QString lastCheckAsString();
     static QList<Version> releaseVersions(const QByteArray &data);
-	QString latestVersion() { return latestStableVersion.versionNumber; }  // returns the version number retrieved in last check(), empty if no check has been performed so far
-	void autoCheck();
-	void check(bool m_silent = true, int currentComboBoxUpdateLevel = -1);
-
+    static QJsonObject newestRelease(const QByteArray &data, int level, const Version &current);
+    static bool automaticUpdatesAvailable();
+    QString automaticUpdateStatus() const;
+    QString latestVersion() { return latestStableVersion.versionNumber; }
+    void autoCheck();
+    void check(bool silent = true, int level = -1);
 signals:
-	void dataParsed(QString versionNumber);
-	void checkCompleted();
-
-public slots:
-
-private slots:
-    void onRequestError(QNetworkReply::NetworkError code);
-	void onRequestCompleted();
-
+    void dataParsed(QString versionNumber);
+    void checkCompleted();
+    void updateStatus(const QString &message);
 private:
-	UpdateChecker();
-	UpdateChecker(const UpdateChecker &);
-	UpdateChecker &operator=(const UpdateChecker &);
-
-	static UpdateChecker *m_Instance;
-
-	QNetworkAccessManager *networkManager;
-	bool silent; // do not show error or up-to-date messages
-
-	Version latestStableVersion;
-	Version latestReleaseCandidateVersion;
-	Version latestDevVersion;
-
-	void parseData(const QByteArray &data);
-	void checkForNewVersion();
-	void notify(QString message);
+    UpdateChecker();
+    Q_DISABLE_COPY(UpdateChecker)
+    static UpdateChecker *m_Instance;
+    QNetworkAccessManager *networkManager = nullptr;
+    AppImageUpdate *m_appImageUpdate;
+    int m_requests = 0;
+    QString m_status;
+    Version latestStableVersion;
+    void parseData(const QByteArray &data);
+    void checkForNewVersion(const QByteArray &data, bool silent, int level);
+    void notify(const QString &message);
 };
-
-#endif // UPDATECHECKER_H
+#endif

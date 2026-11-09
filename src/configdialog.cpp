@@ -446,6 +446,10 @@ ConfigDialog::ConfigDialog(QWidget *parent): QDialog(parent,Qt::Dialog|Qt::Windo
 	connect(ui.pushButtonUpdateCheckNow, SIGNAL(clicked()), this, SLOT(updateCheckNow()));
 	connect(UpdateChecker::instance(), SIGNAL(checkCompleted()), this, SLOT(refreshLastUpdateTime()));
 	refreshLastUpdateTime();
+    ui.checkBoxAutoInstallAppImage->setEnabled(UpdateChecker::automaticUpdatesAvailable());
+    ui.labelAutomaticUpdateStatus->setText(UpdateChecker::instance()->automaticUpdateStatus());
+    connect(UpdateChecker::instance(), &UpdateChecker::updateStatus,
+            ui.labelAutomaticUpdateStatus, &QLabel::setText);
 
 	//pageEditor
 	populateComboBoxFont(false);

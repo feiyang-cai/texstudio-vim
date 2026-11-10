@@ -21,14 +21,43 @@ on:
         description: Existing CD run ID (empty selects latest compatible packages)
         type: string
         required: false
+      inspect_wsl_registry_only:
+        description: 'READ-ONLY Windows ARM registry inspection; skips package tests and is NOT release validation'
+        type: boolean
+        default: false
+        required: false
 permissions:
   contents: read
   actions: read
 concurrency:
-  group: packaged-gui-${{ github.ref }}-${{ github.workflow }}
+  group: packaged-gui-${{ github.ref }}-${{ github.workflow }}${{ github.event_name == 'workflow_dispatch' && inputs.inspect_wsl_registry_only && '-registry-inspection' || '' }}
   cancel-in-progress: true
 jobs:
+  inspect-wsl-registry:
+    name: Read-only Windows ARM registry inspection (NOT release validation)
+    if: github.event_name == 'workflow_dispatch' && inputs.inspect_wsl_registry_only
+    runs-on: windows-11-arm
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      # Use the runner's preinstalled Python. No installation/fallback is allowed
+      # in this read-only diagnostic route.
+      - name: Inspect exact WSL registry targets without changes
+        env:
+          TEXSTUDIO_WSL_REGISTRY_INSPECTION: '1'
+        run: python .github/scripts/inspect_windows_wsl_registry.py --output windows-registry-inspection/registry-report.json
+      - name: Save read-only inspection (NOT release validation)
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: read-only-windows-arm-registry-inspection
+          path: windows-registry-inspection/
+          if-no-files-found: warn
+
   select:
+    if: github.event_name != 'workflow_dispatch' || !inputs.inspect_wsl_registry_only
     runs-on: ubuntu-24.04
     outputs:
       run_id: ${{ steps.build.outputs.run_id }}

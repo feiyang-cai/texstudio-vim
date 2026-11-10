@@ -21,6 +21,16 @@ on:
         description: Existing CD run ID (empty selects latest compatible packages)
         type: string
         required: false
+      temporary_wsl_ifeo:
+        description: 'APPROVAL REQUIRED: temporarily redirect ALL WSL launches on the disposable ARM runner only'
+        type: boolean
+        default: false
+        required: false
+      wsl_ifeo_approved_head:
+        description: 'Exact approved workflow commit SHA; required with temporary_wsl_ifeo (attempt 1 only)'
+        type: string
+        default: ''
+        required: false
       inspect_wsl_registry_only:
         description: 'READ-ONLY Windows ARM registry inspection; skips package tests and is NOT release validation'
         type: boolean
@@ -30,7 +40,7 @@ permissions:
   contents: read
   actions: read
 concurrency:
-  group: packaged-gui-${{ github.ref }}-${{ github.workflow }}${{ github.event_name == 'workflow_dispatch' && inputs.inspect_wsl_registry_only && '-registry-inspection' || '' }}
+  group: packaged-gui-${{ github.ref }}-${{ github.workflow }}${{ github.event_name == 'workflow_dispatch' && inputs.inspect_wsl_registry_only && '-registry-inspection' || '' }}${{ github.event_name == 'workflow_dispatch' && inputs.temporary_wsl_ifeo && format('-temporary-wsl-{0}', github.run_id) || '' }}
   cancel-in-progress: true
 jobs:
   inspect-wsl-registry:
@@ -88,8 +98,18 @@ jobs:
             artifact: texstudio-osx
           - runner: macos-15
             artifact: texstudio-vim-osx-m1
+    env:
+      TEXSTUDIO_TEMPORARY_WSL_IFEO: ${{ github.event_name == 'workflow_dispatch' && inputs.temporary_wsl_ifeo && matrix.runner == 'windows-11-arm' && '1' || '0' }}
+      TEXSTUDIO_IFEO_APPROVED_HEAD: ${{ inputs.wsl_ifeo_approved_head }}
+      TEXSTUDIO_BUILD_RUN_ID: ${{ needs.select.outputs.run_id }}
+      BUILD_SHA: ${{ needs.select.outputs.sha }}
     steps:
       - uses: actions/checkout@v7
+      # The native inspector confirmed preinstalled 64-bit Python. Setup is early
+      # to prevent new prompts; it cannot undo an already-running obstruction.
+      - name: Apply explicitly approved temporary WSL redirect
+        if: env.TEXSTUDIO_TEMPORARY_WSL_IFEO == '1'
+        run: python .github/scripts/windows_wsl_ifeo.py setup
       - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
@@ -110,6 +130,9 @@ jobs:
           TEXSTUDIO_HOSTED_WSL_GUARD: ${{ matrix.runner == 'windows-11-arm' && '1' || '0' }}
           BUILD_SHA: ${{ needs.select.outputs.sha }}
         run: python .github/scripts/smoke-native-package.py
+      - name: Remove exact temporary WSL redirect
+        if: always() && env.TEXSTUDIO_TEMPORARY_WSL_IFEO == '1'
+        run: python .github/scripts/windows_wsl_ifeo.py cleanup
       - name: Save GUI diagnostics
         if: always()
         uses: actions/upload-artifact@v7

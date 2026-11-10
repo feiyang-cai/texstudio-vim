@@ -27,8 +27,9 @@ are diagnostic only because names cannot establish an authorized target.
 Ancestry PID/path/session/creation metadata is diagnostic only. It is **not** a
 verified provisioner allowlist; ancestor command lines are never logged.
 
-There are no new registry, UAC, IFEO, task-scheduler, executable replacement,
-installation, or security-setting changes. The existing
+The process guard itself makes no registry, UAC, IFEO, task-scheduler,
+executable replacement, installation, or security-setting changes. The separate
+manual IFEO option below requires explicit security-setting approval. The existing
 `prepare-windows-gui.ps1` is unchanged and still has its prior first-login OOBE
 registry/process preparation. This patch must not be described as removing all
 existing desktop setup changes.
@@ -75,3 +76,56 @@ use `packaged-gui.yml` with `build_run_id=42832542074`; it must preserve immutab
 source `066c2c8c09e9995129efdc903d3480a8e9c72255`. Do not move the alpha tag or
 publish a release until all required checks pass. This local patch alone is not
 release approval or proof of readiness.
+
+## Optional one-run IFEO workaround (approval required)
+
+This option is **off by default** and is not enabled in ordinary push, PR, CD,
+or reusable runs. Before dispatch, obtain action-time approval for the exact
+workflow commit and the following operation. Select `temporary_wsl_ifeo=true`,
+set `wsl_ifeo_approved_head` to that exact commit, and use original build run
+`42832542074`. Only attempt 1 is permitted; rerunning a job is not covered.
+The journal binds the repository, workflow head, run ID, attempt and original
+build identity. The manual switch is an execution gate, not proof of consent;
+the operator must obtain approval before selecting it. Its distinct concurrency
+group prevents an ordinary branch run from canceling this temporary operation.
+
+On that disposable GitHub-hosted Windows ARM runner only, before package setup:
+
+1. Require the native IFEO parent to resolve to the inspected canonical key and
+   require the entire `wsl.exe` subkey to be absent, even if an existing key has
+   no Debugger. A native registry transaction creates only that direct subkey
+   and its REG_SZ `Debugger`, pointing to the quoted, existing built-in native
+   `System32\systray.exe`. No second logical or literal WOW key is written.
+2. This temporarily redirects **all WSL launches**, including legitimate WSL
+   use and runner provisioning, not just the updater. It prevents new launches
+   only. An already-open prompt or any foreground interference still fails the
+   strict GUI checks. No Terminal window is closed or its focus loss hidden.
+3. An `always()` cleanup step uses a fresh native registry transaction. It
+   checks the exact Debugger bytes, key value/subkey shape, canonical identity,
+   class size, security-descriptor size and last-write timestamp against the
+   committed setup snapshot. Every observed drift or transaction error fails;
+   there is no overwrite, retry or nontransactional fallback. It removes only
+   that Debugger value and deliberately **leaves an empty key shell**. It never
+   deletes the key or changes ACLs, other settings, or other executable entries.
+
+This is an **exact observed-state contract, not proof of ownership history**.
+An identical external rewrite between transactions cannot reliably be
+identified; timestamps are not unique revision tokens. The bounded operation
+assumes an isolated disposable runner and does not claim to detect every
+historical write. Transactions protect the individual compare/change operation.
+No marker registry value, ACL change, or broader ownership mechanism is added.
+
+If setup commits but the process/journal update is interrupted, cleanup refuses
+to infer ownership from a matching value. Failed or uncertain cleanup fails the
+job and may leave the redirect until that disposable VM is retired. `always()`
+cannot guarantee execution after machine loss, forced cancellation or job timeout.
+Never reuse that runner or claim successful restoration in those cases.
+
+The read-only native inspection on run `42852256989` found all four target keys
+absent and all four logical/literal parent handles aliased to the same canonical
+IFEO parent. It verified native systray availability, **not** transaction support
+or mitigation effectiveness. Local tests use fake APIs. The first explicitly
+approved native run must validate the actual transaction setup/cleanup and all
+nine original-package GUI jobs; unsupported APIs or conflicts fail closed. The
+existing foreground probes, final fences, editor assertions and release gates
+remain unchanged. An opt-in or mocked pass is never release approval.

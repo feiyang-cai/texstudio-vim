@@ -6547,6 +6547,7 @@ bool Texstudio::runCommandAsync(const QString &commandline, const char * returnC
     if(!proc) return false;
     setStatusMessageProcess(tr("  Running this command: ") + proc->getCommandLine());
     connect(proc, SIGNAL(finished(int,QProcess::ExitStatus)), obj, returnCMD);
+    connect(proc, SIGNAL(finished(int,QProcess::ExitStatus)), proc, SLOT(deleteLater()));
     QString *buffer=new QString();
     proc->setStdoutBuffer(buffer);
     proc->startCommand();

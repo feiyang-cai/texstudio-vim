@@ -157,9 +157,9 @@ void Controller::next(const QString &manifest)
         // A save that arrived while a sync was running queued a second sync.
         if (!queue->jobs.contains(key)) queue->pending.remove(key);
         queue->profile = Profile::load(manifest);
+        QFile conflicts(queue->profile.directory() + "/conflicts.json");
+        if (conflicts.open(QIODevice::ReadOnly) && QJsonDocument::fromJson(conflicts.readAll()).object().value("files").toArray().isEmpty()) queue->pending.remove("conflict");
         if (operation == "resolve") {
-            QFile conflicts(queue->profile.directory() + "/conflicts.json");
-            if (conflicts.open(QIODevice::ReadOnly) && QJsonDocument::fromJson(conflicts.readAll()).object().value("files").toArray().isEmpty()) queue->pending.remove("conflict");
             if (!queue->jobs.contains("sync")) queue->jobs << "sync";
             queue->pending.insert("sync");
         }
@@ -297,6 +297,11 @@ void Controller::openConflict()
             tr("Local edits were preserved. Open a downloaded remote version to compare:"), names, 0, false, &ok);
     if (!ok) return;
     const auto entry = entries.at(names.indexOf(selected)).toObject();
+    if (entry.value("deleted").toBool()) {
+        QMessageBox::information(m_window, tr("Remote file deleted"),
+                tr("This file was deleted remotely. Its local cached copy is preserved. Use Upload a merged local version to explicitly recreate it, provided it is still absent remotely."));
+        return;
+    }
     const QString source = entry.value("remote_copy").toString();
     if (!validRelativePath(selected) || !source.startsWith(m_current.directory() + "/pulls/")) return;
     const QString destination = QFileInfo(source).absolutePath() + "/compare/" + selected;
@@ -325,10 +330,12 @@ void Controller::resolveConflict()
             emit openFile(local); return;
         }
     }
-    if (QMessageBox::question(m_window, tr("Upload merged local version"),
-            tr("Upload your saved local version of %1 to %2, replacing the remote revision you compared? A newer remote change will block the upload.").arg(selected, m_current.host),
-            QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes) return;
     const auto entry = entries.at(names.indexOf(selected)).toObject();
+    const QString confirmation = entry.value("deleted").toBool()
+            ? tr("%1 was deleted remotely. Recreate it on %2 using your saved local copy? A different remote version will block the upload.").arg(selected, m_current.host)
+            : tr("Upload your saved local version of %1 to %2, replacing the remote revision you compared? A newer remote change will block the upload.").arg(selected, m_current.host);
+    if (QMessageBox::question(m_window, tr("Upload merged local version"), confirmation,
+            QMessageBox::Yes | QMessageBox::No, QMessageBox::No) != QMessageBox::Yes) return;
     enqueue(m_current, "resolve", {{"path", selected}, {"expected", entry.value("remote_hash")}});
 }
 Controller::~Controller()

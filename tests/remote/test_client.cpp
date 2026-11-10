@@ -51,6 +51,51 @@ private slots:
         for (const QString &name : {"../x", "/tmp/x", "C:/x", "a/../../x", "a\\..\\x", ".", "aux.tex", "a.", "a/b ", "a?b"}) QVERIFY(!validRelativePath(name));
         QVERIFY(validRelativePath("chapter 'quoted'; $name/中文.tex"));
     }
+    void validatesPortablePathTrees() {
+        QString error;
+        QVERIFY(validateProjectPaths({"A/", "A/one.tex", "A/two.tex", "A/one.tex"}, &error));
+        QVERIFY(validateProjectPaths({"retained/old.tex", "new/current.tex"}, &error));
+        QVERIFY(!validateProjectPaths({"A/one.tex", "a/two.tex"}, &error));
+        QVERIFY(error.contains("collide"));
+        QVERIFY(!validateProjectPaths({"A", "a/two.tex"}, &error));
+        QVERIFY(!validateProjectPaths({"A", "A/two.tex"}, &error));
+        QVERIFY(!validateProjectPaths({"A/two.tex", "A"}, &error));
+        // The first entries model retained cache files/directories, and the
+        // final entry a noncolliding remote listing after a case-only rename.
+        QVERIFY(!validateProjectPaths({"A/", "A/one.tex", "a/two.tex"}, &error));
+        QVERIFY(!validateProjectPaths({"A/", "a/two.tex"}, &error));
+        // macOS can collapse canonically equivalent Unicode spellings too.
+        const QString composed = QString::fromUtf8("caf\xc3\xa9");
+        const QString decomposed = QString::fromUtf8("cafe\xcc\x81");
+        QVERIFY(!validateProjectPaths({composed + "/one.tex", decomposed + "/two.tex"}, &error));
+        QVERIFY(!validateProjectPaths({composed + ".tex", decomposed + ".tex"}, &error));
+        QVERIFY(!validateProjectPaths({"../escape"}, &error));
+    }
+    void refreshRejectsCollisionsWithRetainedCache() {
+        const QString config = qEnvironmentVariable("TXS_TEST_SSH_CONFIG");
+        if (config.isEmpty()) QSKIP("Requires the disposable SSH fixture.");
+        QTemporaryDir temp;
+        const QString root = qEnvironmentVariable("TXS_TEST_REMOTE_ROOT") + "/retained-case-collision";
+        write(root + "/A/one.tex", "retained bytes");
+        auto profile = makeProfile(temp.path()); profile.ready = false;
+        profile.root = root; profile.sshConfig = config;
+        profile.python = qEnvironmentVariable("TXS_TEST_REMOTE_PYTHON", "python3");
+        QVERIFY(profile.save());
+        auto worker = [&](const QString &operation) {
+            QProcess process;
+            process.start(workerProgram(), workerArguments(profile, operation));
+            if (!process.waitForFinished(120000)) { process.kill(); process.waitForFinished(); return false; }
+            return process.exitStatus() == QProcess::NormalExit && process.exitCode() == 0;
+        };
+        QVERIFY(worker("connect")); profile = Profile::load(profile.manifest);
+        QVERIFY(QFile::remove(root + "/A/one.tex"));
+        QVERIFY(QDir(root).rmdir("A"));
+        write(root + "/a/two.tex", "new remote bytes");
+        QVERIFY(!worker("refresh"));
+        QCOMPARE(fileHash(profile.cache() + "/A/one.tex"), QCryptographicHash::hash("retained bytes", QCryptographicHash::Sha256).toHex());
+        QVERIFY(!QFileInfo::exists(profile.cache() + "/a/two.tex"));
+        QVERIFY(!QFileInfo::exists(profile.directory() + "/pull.json"));
+    }
     void appliesVerifiedDownload() {
         QTemporaryDir temp; auto profile = makeProfile(temp.path());
         write(profile.cache()+"/paper.tex", "old"); const auto old = fileHash(profile.cache()+"/paper.tex");
@@ -132,6 +177,79 @@ private slots:
         QCOMPARE(worker("resolve",{{"path","main.tex"},{"expected",latest}}),QByteArray());
         preserved=connection.request("read",{{"path","main.tex"}});
         QCOMPARE(QByteArray::fromBase64(preserved.value("data").toString().toLatin1()),QByteArray("manually merged revision"));
+    }
+    void directoryCaseCollisionsAreRejectedBeforeDownload() {
+        const QString config = qEnvironmentVariable("TXS_TEST_SSH_CONFIG");
+        if (config.isEmpty()) QSKIP("Requires the disposable SSH fixture.");
+        QTemporaryDir temp;
+        const QString root = qEnvironmentVariable("TXS_TEST_REMOTE_ROOT") + "/case-collision";
+        write(root + "/A/one.tex", "one");
+        write(root + "/a/two.tex", "two");
+        if (QFileInfo::exists(root + "/A/two.tex"))
+            QSKIP("Remote fixture filesystem is case-insensitive.");
+        auto profile = makeProfile(temp.path()); profile.ready = false;
+        profile.root = root; profile.sshConfig = config;
+        profile.python = qEnvironmentVariable("TXS_TEST_REMOTE_PYTHON", "python3");
+        QVERIFY(profile.save());
+        QProcess process;
+        process.start(workerProgram(), workerArguments(profile, "connect"));
+        QVERIFY(process.waitForFinished(120000));
+        QVERIFY(process.exitCode() != 0);
+        QVERIFY(process.readAllStandardError().contains("collide"));
+        QVERIFY(QDir(profile.cache()).entryList(QDir::AllEntries | QDir::NoDotAndDotDot).isEmpty());
+        QVERIFY(!Profile::load(profile.manifest).ready);
+    }
+    void externallyDeletedFilesRequireExplicitRecreation() {
+        const QString config = qEnvironmentVariable("TXS_TEST_SSH_CONFIG");
+        if (config.isEmpty()) QSKIP("Requires the disposable SSH fixture.");
+        QTemporaryDir temp;
+        const QString root = qEnvironmentVariable("TXS_TEST_REMOTE_ROOT") + "/deletion-recovery";
+        write(root + "/paper.tex", "original");
+        auto profile = makeProfile(temp.path()); profile.ready = false;
+        profile.root = root; profile.sshConfig = config;
+        profile.python = qEnvironmentVariable("TXS_TEST_REMOTE_PYTHON", "python3");
+        QVERIFY(profile.save());
+        auto worker = [&](const QString &operation, const QJsonObject &data = QJsonObject()) {
+            QProcess process;
+            process.start(workerProgram(), workerArguments(profile, operation, data));
+            if (!process.waitForFinished(120000)) { process.kill(); process.waitForFinished(); return false; }
+            return process.exitStatus() == QProcess::NormalExit && process.exitCode() == 0;
+        };
+        QVERIFY(worker("connect")); profile = Profile::load(profile.manifest);
+        const QString local = profile.cache() + "/paper.tex";
+        QVERIFY(QFile::remove(root + "/paper.tex"));
+        QVERIFY(worker("refresh"));
+        QString error;
+        QVERIFY(!applyPull(profile, &error));
+        QCOMPARE(fileHash(local), QCryptographicHash::hash("original", QCryptographicHash::Sha256).toHex());
+        QFile conflicts(profile.directory() + "/conflicts.json");
+        QVERIFY(conflicts.open(QIODevice::ReadOnly));
+        auto entries = QJsonDocument::fromJson(conflicts.readAll()).object().value("files").toArray(); conflicts.close();
+        QCOMPARE(entries.size(), 1);
+        QVERIFY(entries.first().toObject().value("deleted").toBool());
+        QVERIFY(entries.first().toObject().value("remote_hash").isNull());
+        write(local, "recovered");
+        QVERIFY(!worker("sync"));
+        QVERIFY(!QFileInfo::exists(root + "/paper.tex"));
+        QVERIFY(!applyPull(profile, &error));
+        const QJsonObject recreate{{"path", "paper.tex"}, {"expected", QJsonValue(QJsonValue::Null)}};
+        // A newly created remote revision must not be overwritten by confirmation
+        // of the earlier absence.
+        write(root + "/paper.tex", "someone else recreated it");
+        QVERIFY(!worker("resolve", recreate));
+        QCOMPARE(fileHash(root + "/paper.tex"), QCryptographicHash::hash("someone else recreated it", QCryptographicHash::Sha256).toHex());
+        QVERIFY(QFile::remove(root + "/paper.tex"));
+        QVERIFY(worker("refresh")); QVERIFY(!applyPull(profile, &error));
+        QVERIFY(worker("resolve", recreate));
+        QCOMPARE(fileHash(root + "/paper.tex"), fileHash(local));
+        QVERIFY(worker("sync"));
+        // The same old bytes reappearing remotely clear a stale deletion conflict.
+        QVERIFY(QFile::remove(root + "/paper.tex"));
+        QVERIFY(worker("refresh")); QVERIFY(!applyPull(profile, &error));
+        write(root + "/paper.tex", "recovered");
+        QVERIFY(worker("refresh")); QVERIFY2(applyPull(profile, &error), qPrintable(error));
+        QVERIFY(conflicts.open(QIODevice::ReadOnly));
+        QVERIFY(QJsonDocument::fromJson(conflicts.readAll()).object().value("files").toArray().isEmpty());
     }
     void unknownHostKeyIsRejected() {
         const QString config = qEnvironmentVariable("TXS_TEST_SSH_CONFIG");

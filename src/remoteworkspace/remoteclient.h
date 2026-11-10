@@ -15,6 +15,8 @@ struct Profile {
 };
 QString cacheBase();
 bool validRelativePath(const QString &name);
+// Directory entries end in a slash; files do not. Exact repeats are allowed.
+bool validateProjectPaths(const QStringList &paths, QString *error = nullptr);
 bool applyPull(const Profile &profile, QString *error = nullptr,
                const std::function<bool(const QString &)> &canOverwrite = {});
 Profile forFile(const QString &filename);

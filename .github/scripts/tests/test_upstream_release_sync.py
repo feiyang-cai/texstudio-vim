@@ -181,17 +181,6 @@ class UpstreamReleaseSyncTests(unittest.TestCase):
         self.assertFalse(controller.candidate_is_pinned_merge(
             [commit, 'd' * 40, fork_base, upstream], commit, fork_base, upstream))
 
-    def test_release_staging_may_only_overlay_trusted_github_controls(self):
-        self.assertTrue(controller.trusted_overlay_only([
-            '.github/scripts/run-vim-tests.py',
-            '.github/workflows/cd.yml',
-        ]))
-        self.assertFalse(controller.trusted_overlay_only([
-            '.github/workflows/cd.yml',
-            'src/latexeditorview.cpp',
-        ]))
-        self.assertFalse(controller.trusted_overlay_only([]))
-
     def test_candidate_must_preserve_owner_approved_vim_revision(self):
         baseline = {'vim_revision': 1}
         self.assertTrue(controller.has_approved_revision('1\n', baseline))

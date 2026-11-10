@@ -1,8 +1,33 @@
 # Vim changelog
 
-Each Vim revision records user-visible changes here. Upstream-only syncs keep the
-Vim revision unchanged. Release names combine the two versions:
+Each fork revision records user-visible changes here, including Vim editing and
+other features shipped with this Vim-enabled fork. Upstream-only syncs keep the
+revision unchanged. Release names combine the two versions:
 `texstudio-vim-<upstream-version>-r<vim-version>`.
+
+## r1.2 with TeXstudio 4.9.10alpha1 (unreleased)
+
+This development preview combines the upstream alpha base with SSH remote
+workspaces. The revision identifies a new fork feature; it does not add Vim
+commands or change the existing Vim engine.
+
+- Edit cached remote projects with the normal editor and Vim bindings on
+  Windows, macOS and Linux. Saved files synchronize over OpenSSH in the background.
+- Compile with the remote computer's TeX installation and view downloaded PDF
+  and SyncTeX outputs locally, including generated previews.
+- Check file revisions before uploads, protect dirty buffers during downloads,
+  and offer explicit conflict comparison and merged upload.
+- Reject colliding project paths before downloading, including retained cache
+  directories. Preserve externally deleted files locally and require explicit
+  confirmation before recreating them remotely.
+- Use existing SSH host aliases, agents and verified host keys, with an optional
+  custom SSH config file. Linux AppImage workers use the bundle launcher.
+- Retain the alpha sync's Vim compatibility fix and the optional AppImage updater.
+  Packages and About/version output identify this preview as r1.2.
+
+Setup and limits are in [REMOTE_WORKSPACE.md](REMOTE_WORKSPACE.md). This is an
+unreleased preview on an upstream alpha, not a stable release. No release tag,
+published baseline or automatic-publication policy is changed by this revision.
 
 ## TeXstudio 4.9.9 with r1.1 — 2026-10-28
 

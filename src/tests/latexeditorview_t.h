@@ -34,6 +34,10 @@ class LatexEditorViewTest: public QObject{
         void vimModifiedMouseCleanup();
         void vimVisualIndentation_data();
         void vimVisualIndentation();
+        void vimUnindent_data();
+        void vimUnindent();
+        void vimUnindentNoOp();
+        void vimUnindentPreservesStandardEditing();
         void vimInsertEscape();
         void vimVisualLineStaysOnCurrentLine();
         void vimVisualBlockCtrlV();

@@ -1,4 +1,4 @@
-# SSH remote workspaces (unreleased)
+# SSH remote workspaces (r1.2 preview, unreleased)
 
 Edit a paper locally while its project and TeX installation live on another
 computer. The module uses system OpenSSH and a private project cache. It does
@@ -106,7 +106,15 @@ copies, so offline edits remain recoverable. Conflict copies are retained outsid
 that project folder. Closing with unconfirmed uploads asks whether to keep those
 cached changes. Keep the cache until you have verified your remote files.
 
-Remote deletions do not silently delete cached files. **Delete remote file…**
+Remote deletions do not silently delete cached files. After another tool deletes
+a tracked remote file, refresh records a deletion conflict and keeps the cached
+copy. **Open a downloaded conflict copy…** explains that the remote file is
+absent; **Upload a merged local version…** asks explicitly whether to recreate it
+from the saved local copy. Recreation checks that the remote path is still
+absent; an already-identical remote copy is safely acknowledged without rewriting
+it. A different remote version blocks recreation. Ordinary saves never
+automatically recreate externally deleted files.
+**Delete remote file…**
 checks the remote revision and retains the cache as a recovery copy; editing and
 saving it again can recreate the remote file. Renaming files and directories is
 not yet a dedicated operation. A project is limited to 1 GiB, 100,000 files and
@@ -121,7 +129,8 @@ The transport, transient Python helper and project controller are isolated in
 `src/remoteworkspace/`. The editor and Vim engine operate on ordinary cached files.
 Integration points are the File menu, file-open/save notifications, external
 build dispatch, preview temp directory and SyncTeX source-path resolution.
-No Vim bindings or revision numbers change for this feature.
+Vim bindings remain unchanged. The fork revision is r1.2 to identify the added
+remote-workspace feature; see [VIM_CHANGELOG.md](VIM_CHANGELOG.md).
 
 Run helper and standalone Qt tests:
 

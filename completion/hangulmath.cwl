@@ -1,26 +1,20 @@
 # hangulmath package
-# Matthew Bertucci 2026/10/13 for v0.5
+# Matthew Bertucci 2026/11/01 for v0.9
 
 #include:iftex
 #include:fontspec
 #include:amstext
-#include:graphicx
 
 #keyvals:\usepackage/hangulmath#c
 font=%<font%>
-opfont=%<font%>
 metrics=%<file%>
 scale=%<factor%>
 sidebearing=%<em%>
 #endkeyvals
 
 \hangulmathfont{font}
-\hangulmathopfont{font}
-\hangulopscale{display}{text%plain}
 
-\hangulsum{symbol}#m
-\hangulint{symbol}#m
-\hangullim{symbol}#m
+\hangulsym{name}#m
 
 \aeh#m
 \ah#m

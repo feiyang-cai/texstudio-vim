@@ -166,8 +166,11 @@ def ai_review_passes(pr, base_sha=None):
     if unresolved_ai_threads(pr['number']):
         print(f'PR #{pr["number"]} still has unresolved Copilot review findings')
         return False
-    if upstream_changes_need_human(pr) and not human_validation_passes(pr, snapshot):
-        print(f'PR #{pr["number"]} needs human validation of its proposed upstream changes')
+    integration_needs_human = integration_changes_need_human(
+        pr, base_sha or pr['base']['sha'])
+    if ((upstream_changes_need_human(pr) or integration_needs_human)
+            and not human_validation_passes(pr, snapshot)):
+        print(f'PR #{pr["number"]} needs human validation of its proposed upstream or integration changes')
         return False
     return True
 
@@ -227,10 +230,6 @@ def candidate_uses_published_base(first_parent, published_base):
 
 def candidate_is_pinned_merge(parents, commit, fork_base, upstream_base):
     return parents == [commit, fork_base, upstream_base]
-
-
-def trusted_overlay_only(paths):
-    return bool(paths) and all(path.startswith('.github/') for path in paths)
 
 
 def has_approved_revision(revision, baseline):
@@ -393,9 +392,7 @@ def fetch_candidate(pr):
             raise RuntimeError('Sync candidate contains unresolved conflict markers')
         if conflict.returncode != 1:
             raise RuntimeError('Could not inspect sync candidate for conflict markers')
-    if subprocess.run(['git', 'diff', '--check', f'{fork_base}..{sha}'],
-                      check=False, capture_output=True).returncode:
-        raise RuntimeError('Sync candidate has whitespace errors')
+    verify_candidate_whitespace(fork_base, sha)
 
 
 def sync_pr_for_commit(sha):
@@ -421,16 +418,116 @@ def dispatch(workflow, ref, inputs=None):
     api('POST', f'/repos/{repository}/actions/workflows/{workflow}/dispatches', payload)
 
 
-def create_release_candidate(pr, baseline):
-    candidate_sha = pr['head']['sha']
+def verify_candidate_whitespace(fork_base, sha):
+    # Upstream completion files use CRLF. Recognize the CR as part of the line
+    # ending, but keep all default Git whitespace checks (including spaces or
+    # tabs before CRLF). Never ignore all whitespace or suppress diagnostics.
+    result = subprocess.run([
+        'git', '-c', 'core.whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol',
+        'diff', '--check', f'{fork_base}..{sha}',
+    ], check=False, capture_output=True)
+    if result.returncode:
+        raise RuntimeError('Sync candidate has whitespace errors')
+
+
+def reviewed_merge_tree(base, head):
+    if not all(re.fullmatch(r'[0-9a-f]{40}', sha) for sha in (base, head)):
+        raise RuntimeError('Invalid reviewed commit SHA')
+    result = subprocess.run(['git', 'merge-tree', '--write-tree', base, head],
+                            capture_output=True, text=True, check=False)
+    tree = result.stdout.strip()
+    if result.returncode or not re.fullmatch(r'[0-9a-f]{40}', tree):
+        raise RuntimeError('Could not construct a conflict-free reviewed merge tree')
+    return tree
+
+
+def verify_source_revision(sha, baseline):
+    revision = subprocess.check_output(
+        ['git', 'show', f'{sha}:VIM_REVISION'], text=True).strip()
+    if not has_approved_revision(revision, baseline):
+        raise RuntimeError('Integrated or staged release source changed the approved VIM_REVISION')
+
+
+def integration_changes_need_human(pr, base):
+    """Master-only source is not approved merely because the merge is clean."""
+    head = pr['head']['sha']
+    if not all(re.fullmatch(r'[0-9a-f]{40}', sha or '') for sha in (base, head)):
+        raise RuntimeError('Invalid reviewed commit SHA')
+    subprocess.run(['git', 'fetch', 'origin', base, head], check=True, capture_output=True)
+    tree = reviewed_merge_tree(base, head)
+    baseline = json.loads(Path('.github/approved-vim-baseline.json').read_text())
+    verify_source_revision(tree, baseline)
+    changed = subprocess.run([
+        'git', 'diff', '--quiet', '--no-ext-diff', '--ignore-submodules=none',
+        head, tree, '--', '.', ':(exclude).github',
+    ], check=False, capture_output=True)
+    if changed.returncode not in (0, 1):
+        raise RuntimeError('Could not inspect reviewed integration changes')
+    return changed.returncode == 1
+
+
+def verify_reviewed_merge(pr, merge_sha, baseline, expected_base=None):
+    """Bind integration to both ordered inputs, their exact tree and master."""
+    head = pr['head']['sha']
+    if (pr['base']['ref'] != baseline['branch']
+            or not all(re.fullmatch(r'[0-9a-f]{40}', sha or '')
+                       for sha in (merge_sha, head))):
+        raise RuntimeError('Invalid reviewed integration source')
+    subprocess.run(['git', 'fetch', 'origin', merge_sha,
+                    f'+refs/heads/{baseline["branch"]}:refs/remotes/verified-default'],
+                   check=True, capture_output=True)
+    parents = subprocess.check_output(
+        ['git', 'rev-list', '--parents', '-n', '1', merge_sha], text=True).split()
+    if (len(parents) != 3 or parents[0] != merge_sha or parents[2] != head
+            or (expected_base is not None and parents[1] != expected_base)):
+        raise RuntimeError('Integration merge does not match the reviewed base and source candidate')
+    base = parents[1]
+    if subprocess.run(['git', 'merge-base', '--is-ancestor', merge_sha,
+                       'refs/remotes/verified-default'], check=False).returncode:
+        raise RuntimeError('Merged sync PR is no longer on the default branch')
+    actual_tree = subprocess.check_output(
+        ['git', 'rev-parse', f'{merge_sha}^{{tree}}'], text=True).strip()
+    if actual_tree != reviewed_merge_tree(base, head):
+        raise RuntimeError('Integration merge tree differs from the exact reviewed inputs')
+    verify_source_revision(merge_sha, baseline)
+    return base
+
+
+def expected_release_tree(merge_sha):
+    """Preserve every integration entry except the trusted .github subtree."""
+    trusted_github_tree = subprocess.check_output(
+        ['git', 'rev-parse', 'HEAD:.github'], text=True).strip()
+    entries = subprocess.check_output(['git', 'ls-tree', '-z', merge_sha]).split(b'\0')
+    entries = [entry for entry in entries
+               if entry and entry.split(b'\t', 1)[1] != b'.github']
+    entries.append(f'040000 tree {trusted_github_tree}\t.github'.encode())
+    return subprocess.run(['git', 'mktree', '-z'], input=b'\0'.join(entries) + b'\0',
+                          check=True, capture_output=True).stdout.decode().strip()
+
+
+def verify_release_tree(merge_sha, release_sha, baseline):
+    parents = subprocess.check_output(
+        ['git', 'rev-list', '--parents', '-n', '1', release_sha], text=True).split()
+    if parents != [release_sha, merge_sha]:
+        raise RuntimeError('Release candidate must be a single child of its reviewed integration merge')
+    verify_source_revision(release_sha, baseline)
+    tree = subprocess.check_output(
+        ['git', 'rev-parse', f'{release_sha}^{{tree}}'], text=True).strip()
+    if tree != expected_release_tree(merge_sha):
+        raise RuntimeError('Release tree differs from the reviewed integration and trusted .github overlay')
+
+
+def create_release_candidate(pr, merge_sha, baseline):
+    verify_reviewed_merge(pr, merge_sha, baseline, expected_base=pr['base']['sha'])
     _, upstream_tag, _, _ = marker_from(pr.get('body'))
     tag = f'texstudio-vim-{upstream_tag}-r{baseline["vim_revision"]}'
     branch = f'release-sync/{tag}'
+    expected_tree = expected_release_tree(merge_sha)
     trusted_github_tree = subprocess.check_output(
         ['git', 'rev-parse', 'HEAD:.github'], text=True).strip()
-    candidate = api('GET', f'/repos/{repository}/git/commits/{candidate_sha}')
+    integration = api('GET', f'/repos/{repository}/git/commits/{merge_sha}')
     tree = api('POST', f'/repos/{repository}/git/trees', {
-        'base_tree': candidate['tree']['sha'],
+        'base_tree': integration['tree']['sha'],
         'tree': [{
             'path': '.github',
             'mode': '040000',
@@ -438,6 +535,8 @@ def create_release_candidate(pr, baseline):
             'sha': trusted_github_tree,
         }],
     })
+    if tree['sha'] != expected_tree:
+        raise RuntimeError('Staged release tree does not match the reviewed integration')
     ref_path = f'/repos/{repository}/git/ref/heads/{quote(branch, safe="/")}'
     try:
         ref = api('GET', ref_path)
@@ -448,14 +547,14 @@ def create_release_candidate(pr, baseline):
     if ref:
         release_sha = ref['object']['sha']
         release_commit = api('GET', f'/repos/{repository}/git/commits/{release_sha}')
-        if (release_commit['tree']['sha'] != tree['sha']
-                or [parent['sha'] for parent in release_commit['parents']] != [candidate_sha]):
+        if (release_commit['tree']['sha'] != expected_tree
+                or [parent['sha'] for parent in release_commit['parents']] != [merge_sha]):
             raise RuntimeError(f'Refusing to reuse unexpected release candidate branch {branch}')
     else:
         release_commit = api('POST', f'/repos/{repository}/git/commits', {
             'message': f'Prepare verified release build {tag}',
-            'tree': tree['sha'],
-            'parents': [candidate_sha],
+            'tree': expected_tree,
+            'parents': [merge_sha],
         })
         release_sha = release_commit['sha']
         api('POST', f'/repos/{repository}/git/refs', {
@@ -472,10 +571,7 @@ def merge_reviewed_commits(pr):
     if not all(re.fullmatch(r'[0-9a-f]{40}', sha) for sha in (base, head)):
         raise RuntimeError('Invalid reviewed commit SHA')
     subprocess.run(['git', 'fetch', 'origin', base, head], check=True, capture_output=True)
-    tree = subprocess.check_output(
-        ['git', 'merge-tree', '--write-tree', base, head], text=True).strip()
-    if not re.fullmatch(r'[0-9a-f]{40}', tree):
-        raise RuntimeError('Could not construct a conflict-free reviewed merge tree')
+    tree = reviewed_merge_tree(base, head)
     merge_sha = subprocess.check_output([
         'git', '-c', 'user.name=github-actions[bot]',
         '-c', 'user.email=41898282+github-actions[bot]@users.noreply.github.com',
@@ -522,7 +618,7 @@ def promote_candidate(run, dry_run=False, allow_publication=False):
     merge_sha = merge_reviewed_commits(fresh)
     if branch_sha(baseline['branch']) != merge_sha:
         raise RuntimeError('Default branch advanced unexpectedly during the merge')
-    create_release_candidate(fresh, baseline)
+    create_release_candidate(fresh, merge_sha, baseline)
     print(f'Merged tested PR #{fresh["number"]} at {merge_sha}; dispatched release candidate checks')
 
 
@@ -603,13 +699,14 @@ def promote_release_candidate(run, baseline, dry_run=False):
     commit = api('GET', f'/repos/{repository}/git/commits/{sha}')
     if len(commit['parents']) != 1:
         raise RuntimeError('Release candidate must have exactly one parent')
-    candidate_sha = commit['parents'][0]['sha']
-    pr = sync_pr_for_commit(candidate_sha)
+    merge_sha = commit['parents'][0]['sha']
+    pr = sync_pr_for_commit(merge_sha)
     if not pr or not pr.get('merged'):
         return
-    if (pr['head']['sha'] != candidate_sha
+    if (pr.get('merge_commit_sha') != merge_sha
             or pr['head']['repo']['full_name'].lower() != repository.lower()):
-        raise RuntimeError('Merged sync PR is no longer from this repository')
+        raise RuntimeError('Merged sync PR does not match this release integration source')
+    candidate_sha = pr['head']['sha']
     marker = marker_from(pr.get('body'))
     if not marker or resolve_upstream_tag(marker[1]) != marker[2]:
         raise RuntimeError('Merged PR release marker is missing or no longer matches upstream')
@@ -619,30 +716,11 @@ def promote_release_candidate(run, baseline, dry_run=False):
     if not candidate_checks:
         raise RuntimeError('Exact source candidate checks are missing or failed')
     validate_sync_metadata(pr, baseline)
-    merge_commit = api('GET', f'/repos/{repository}/git/commits/{pr["merge_commit_sha"]}')
-    if len(merge_commit['parents']) != 2 or merge_commit['parents'][1]['sha'] != candidate_sha:
-        raise RuntimeError('Merged sync PR does not match the reviewed source candidate')
-    if not ai_review_passes(pr, merge_commit['parents'][0]['sha']):
+    reviewed_base = verify_reviewed_merge(pr, merge_sha, baseline)
+    if not ai_review_passes(pr, reviewed_base):
         return
-    changed = subprocess.check_output(
-        ['git', 'diff', '--name-only', f'{candidate_sha}..{sha}'], text=True).splitlines()
-    if not trusted_overlay_only(changed):
-        raise RuntimeError('Release candidate may only overlay trusted controller and test files')
-    trusted_github_tree = subprocess.check_output(
-        ['git', 'rev-parse', 'HEAD:.github'], text=True).strip()
-    candidate_github_tree = subprocess.check_output(
-        ['git', 'rev-parse', f'{sha}:.github'], text=True).strip()
-    if candidate_github_tree != trusted_github_tree:
-        raise RuntimeError('Release candidate does not use the trusted base-branch controller and tests')
-    if not pr.get('merge_commit_sha'):
-        raise RuntimeError('Merged sync PR has no merge commit')
-    subprocess.run(['git', 'fetch', 'origin',
-                    f'+refs/heads/{baseline["branch"]}:refs/remotes/verified-default'],
-                   check=True, capture_output=True)
-    if subprocess.run(['git', 'merge-base', '--is-ancestor', pr['merge_commit_sha'],
-                       'refs/remotes/verified-default'], check=False).returncode:
-        raise RuntimeError('Merged sync PR is no longer on the default branch')
-    create_release_tag(pr, pr['merge_commit_sha'], sha, baseline, dry_run)
+    verify_release_tree(merge_sha, sha, baseline)
+    create_release_tag(pr, merge_sha, sha, baseline, dry_run)
 
 
 def publish_progress(run, baseline):
@@ -665,22 +743,13 @@ def publish_progress(run, baseline):
         tag_object = api('GET', f'/repos/{repository}/git/tags/{tag_object["sha"]}')['object']
     if run['head_sha'] != tag_object['sha']:
         raise RuntimeError('Published release workflow did not use the immutable tag commit')
-    release_commit = api('GET', f'/repos/{repository}/git/commits/{run["head_sha"]}')
-    if len(release_commit['parents']) != 1 or release_commit['parents'][0]['sha'] != pr['head']['sha']:
-        raise RuntimeError('Published release does not use its verified source candidate')
     subprocess.run(['git', 'fetch', 'origin', run['head_sha']],
                    check=True, capture_output=True)
-    changed = subprocess.check_output(
-        ['git', 'diff', '--name-only', f'{pr["head"]["sha"]}..{run["head_sha"]}'],
-        text=True).splitlines()
-    if not trusted_overlay_only(changed):
-        raise RuntimeError('Published release contains changes beyond the trusted controller and test overlay')
-    trusted_github_tree = subprocess.check_output(
-        ['git', 'rev-parse', 'HEAD:.github'], text=True).strip()
-    release_github_tree = subprocess.check_output(
-        ['git', 'rev-parse', f'{run["head_sha"]}:.github'], text=True).strip()
-    if release_github_tree != trusted_github_tree:
-        raise RuntimeError('Published release does not use the trusted base-branch controller and tests')
+    merge_sha = pr.get('merge_commit_sha')
+    reviewed_base = verify_reviewed_merge(pr, merge_sha, baseline)
+    if not ai_review_passes(pr, reviewed_base):
+        raise RuntimeError('Published release no longer has approval of its reviewed integration inputs')
+    verify_release_tree(merge_sha, run['head_sha'], baseline)
     release = api('GET', f'/repos/{repository}/releases/tags/{quote(tag, safe="")}')
     if release['draft'] or release['prerelease'] != (kind == 'prerelease'):
         raise RuntimeError('Release is not published with the expected stable/prerelease status')

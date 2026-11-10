@@ -85,20 +85,47 @@ public:
     void pull() {
         const auto listing = call(connection, "list").value("files");
         require(listing.isArray(), "Invalid remote project listing.");
+        // Validate the complete remote tree against retained cache paths before
+        // writing downloads. A remotely deleted directory can still exist in
+        // the recovery cache and collide with a new case-only spelling.
         QSet<QString> seen;
+        QStringList paths;
+        for (const auto &value : listing.toArray()) {
+            const QString name = relativeName(value.toObject().value("path").toString());
+            require(!seen.contains(name), "Duplicate remote project filename.");
+            seen.insert(name); paths.append(name);
+        }
+        QDirIterator cached(profile.cache(), QDir::Files | QDir::Dirs | QDir::Hidden | QDir::System | QDir::NoDotAndDotDot,
+                            QDirIterator::Subdirectories);
+        while (cached.hasNext()) {
+            const QString path = cached.next();
+            require(!cached.fileInfo().isSymLink(), "A local symbolic link cannot be synchronized: " + path);
+            require(cached.fileInfo().isDir() || cached.fileInfo().isFile(), "Unsupported local project file: " + path);
+            paths.append(QDir(profile.cache()).relativeFilePath(path) + (cached.fileInfo().isDir() ? "/" : ""));
+        }
+        QString pathError;
+        const bool validPaths = validateProjectPaths(paths, &pathError);
+        require(validPaths, pathError);
+        QSet<QString> deletedConflicts;
+        QFile conflicts(profile.directory() + "/conflicts.json");
+        if (conflicts.open(QIODevice::ReadOnly)) {
+            for (const auto &value : QJsonDocument::fromJson(conflicts.readAll()).object().value("files").toArray()) {
+                const auto entry = value.toObject();
+                if (entry.value("deleted").toBool()) deletedConflicts.insert(entry.value("path").toString());
+            }
+        }
         QJsonArray updates;
         const QString folder = QUuid::createUuid().toString(QUuid::WithoutBraces);
         const QString staging = profile.directory() + "/pulls/" + folder;
         if (profile.ready) require(QDir().mkpath(staging), "Cannot create a download staging folder.");
         for (const auto &value : listing.toArray()) {
             const auto item = value.toObject(); const QString name = relativeName(item.value("path").toString());
-            require(!seen.contains(name.toCaseFolded()), "Project filenames collide on a case-insensitive client filesystem."); seen.insert(name.toCaseFolded());
             const QString path = cachePath(profile, name);
             const auto previous = files.value(name).toObject();
             const auto oldLocal = previous.value("local").toString().toLatin1();
             const auto local = QFileInfo(path).isFile() ? fileHash(path) : QByteArray();
             const auto remote = item.value("hash").toString();
-            if (previous.value("remote").toString() == remote && !local.isEmpty()) continue;
+            if (previous.value("remote").toString() == remote && !local.isEmpty() && !deletedConflicts.contains(name)) continue;
             // Existing projects are applied by the GUI thread, never by this
             // network worker, so a concurrent editor save cannot be overwritten.
             if (!profile.ready) require(!QFileInfo(path).isSymLink(), "Unsafe initial cache path.");
@@ -124,7 +151,14 @@ public:
                     {"expected", QString::fromLatin1(oldLocal)}, {"remote", QString::fromLatin1(receivedHash)}, {"local", localHash}});
             else files.insert(name, QJsonObject{{"remote", QString::fromLatin1(receivedHash)}, {"local", localHash}});
         }
-        // Never silently delete a cached source if another editor removed it remotely.
+        // Preserve the old revision and cached bytes until the user explicitly
+        // confirms recreation. An ordinary save must never recreate a deletion.
+        if (profile.ready) {
+            for (auto it = files.begin(); it != files.end(); ++it) {
+                if (!seen.contains(it.key()) && it.value().toObject().value("remote").isString())
+                    updates.append(QJsonObject{{"path", it.key()}, {"deleted", true}, {"remote", QJsonValue(QJsonValue::Null)}});
+            }
+        }
         save();
         if (profile.ready) {
             QString error;
@@ -177,13 +211,14 @@ int workerMain(int argc, char **argv)
             QFile conflicts(profile.directory() + "/conflicts.json");
             require(conflicts.open(QIODevice::ReadOnly), "No downloaded conflict revision is available. Refresh the remote project first.");
             const auto entries = QJsonDocument::fromJson(conflicts.readAll()).object().value("files").toArray(); conflicts.close();
-            const QString expected = request.value("expected").toString();
+            const QJsonValue expected = request.value("expected");
             bool found = false;
             for (const auto &value : entries) {
                 const auto entry = value.toObject();
-                found |= entry.value("path").toString() == name && entry.value("remote_hash").toString() == expected;
+                found |= entry.value("path").toString() == name && entry.value("remote_hash") == expected
+                        && (expected.isString() || (expected.isNull() && entry.value("deleted").toBool()));
             }
-            require(found && expected.size() == 64, "The compared remote revision is no longer available. Refresh and compare again.");
+            require(found && (expected.isNull() || (expected.isString() && expected.toString().size() == 64)), "The compared remote revision is no longer available. Refresh and compare again.");
             const auto data = bytesAt(cachePath(profile, name));
             const auto hash = QCryptographicHash::hash(data, QCryptographicHash::Sha256).toHex();
             const auto result = call(connection, "put", {{"path", name}, {"data", QString::fromLatin1(data.toBase64())}, {"expected", expected}});

@@ -22,6 +22,33 @@ bool validRelativePath(const QString &name)
     }
     return true;
 }
+bool validateProjectPaths(const QStringList &paths, QString *error)
+{
+    QMap<QString, QString> spellings;
+    QMap<QString, bool> directories;
+    for (QString name : paths) {
+        const bool isDirectory = name.endsWith('/');
+        if (isDirectory) name.chop(1);
+        if (!validRelativePath(name)) {
+            if (error) *error = "Unsafe project path.";
+            return false;
+        }
+        const auto parts = name.split('/');
+        QString prefix;
+        for (int i = 0; i < parts.size(); ++i) {
+            prefix += (i ? "/" : "") + parts.at(i);
+            const QString folded = prefix.normalized(QString::NormalizationForm_C).toCaseFolded();
+            const bool directory = isDirectory || i + 1 < parts.size();
+            if (spellings.contains(folded) && (spellings.value(folded) != prefix
+                    || directories.value(folded) != directory)) {
+                if (error) *error = "Project paths collide on a case-insensitive client filesystem.";
+                return false;
+            }
+            spellings.insert(folded, prefix); directories.insert(folded, directory);
+        }
+    }
+    return true;
+}
 QString cacheBase() { return QStandardPaths::writableLocation(QStandardPaths::AppDataLocation) + "/remote-workspaces"; }
 
 bool writeJson(const QString &path, const QJsonObject &object, QString *error)
@@ -66,7 +93,14 @@ bool applyPull(const Profile &profile, QString *error, const std::function<bool(
     for (const auto &value : pull.value("files").toArray()) {
         const auto change = value.toObject(); const QString name = change.value("path").toString();
         const QString token = change.value("stage").toString();
-        if (!validRelativePath(name) || !uuid.match(token).hasMatch()) return fail("Unsafe downloaded filename.");
+        if (!validRelativePath(name)) return fail("Unsafe downloaded filename.");
+        if (change.value("deleted").toBool()) {
+            if (!change.value("remote").isNull()) return fail("Invalid remote deletion revision.");
+            conflictCopies.insert(name, QJsonObject{{"path", name}, {"deleted", true},
+                    {"remote_hash", QJsonValue(QJsonValue::Null)}});
+            continue;
+        }
+        if (!uuid.match(token).hasMatch()) return fail("Unsafe downloaded filename.");
         QString target = profile.cache();
         for (const auto &part : name.split('/')) {
             target += "/" + part;
@@ -78,7 +112,10 @@ bool applyPull(const Profile &profile, QString *error, const std::function<bool(
         const auto expected = change.value("expected").toString().toLatin1();
         const auto record = records.value(name).toObject();
         if (exists && record.value("remote") == change.value("remote")
-                && fileHash(target) == change.value("local").toString().toLatin1()) continue;
+                && fileHash(target) == change.value("local").toString().toLatin1()) {
+            conflictCopies.remove(name);
+            continue;
+        }
         if ((canOverwrite && !canOverwrite(target)) || (exists && (expected.isEmpty() || fileHash(target) != expected)) || (!exists && !expected.isEmpty())) {
             conflictCopies.insert(name, QJsonObject{{"path", name}, {"remote_copy", source}, {"remote_hash", change.value("remote")}});
             continue;

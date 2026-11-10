@@ -69,7 +69,7 @@ if verified_run_id is not None:
         raise SystemExit('GUI checker changes require rerunning all GUI environments')
     verified_jobs = get(f'/actions/runs/{verified_run_id}/jobs?per_page=100')['jobs']
     required_gui = {'gui / Packaged retest (' + runner + ')' for runner in
-                    ('windows-latest', 'windows-11-arm', 'macos-14', 'macos-15-intel')}
+                    ('windows-latest', 'windows-11-arm', 'macos-15', 'macos-15-intel')}
     required_gui |= {'gui / AppImage retest (' + distro + ')' for distro in
                      ('ubuntu-22.04', 'ubuntu-24.04', 'debian-12', 'debian-13', 'fedora-43')}
     if not required_gui <= {job['name'] for job in verified_jobs if job['conclusion'] == 'success'}:

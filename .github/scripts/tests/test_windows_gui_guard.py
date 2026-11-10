@@ -6,6 +6,7 @@ import io
 from pathlib import Path
 import sys
 import threading
+import tempfile
 import time
 from types import SimpleNamespace
 import unittest
@@ -16,7 +17,7 @@ sys.path.insert(0, str(SCRIPTS))
 from windows_gui_guard import (FocusState, GuardError, GuardedInput,
                                WindowsFocusGuard, WindowsUpdaterGuard,
                                startup_caption_focus, updater_candidate,
-                               verify_held_identity, fence_event_matches)
+                               verify_held_identity, fence_event_matches, verify_probe_window, wait_probe_ready)
 from windows_desktop_input import WindowsDesktopInput
 
 ROOT = r'C:\Windows'
@@ -213,6 +214,76 @@ class FocusTests(unittest.TestCase):
         guard.owner = lambda: 42
         with self.assertRaises(GuardError):
             guard.check()
+
+
+class ProbeHandshakeTests(unittest.TestCase):
+    def native(self, owner=123, alive=True):
+        api = Mock()
+        api.IsWindow.return_value = alive
+        api.GetWindowThreadProcessId.side_effect = lambda window, pid: setattr(pid._obj, 'value', owner) or 4
+        child = Mock(pid=123, returncode=None)
+        child.poll.return_value = None
+        return api, child
+
+    def test_ready_window_must_belong_to_exact_owned_child(self):
+        api, child = self.native()
+        self.assertEqual(verify_probe_window(api, child, {'pid': 123, 'window': 456}), 456)
+
+    def test_exited_child_is_rejected_before_any_window_action(self):
+        api, child = self.native()
+        child.poll.return_value = 1
+        with self.assertRaises(GuardError):
+            verify_probe_window(api, child, {'pid': 123, 'window': 456})
+        api.IsWindow.assert_not_called()
+
+    def test_handshake_other_pid_is_rejected(self):
+        api, child = self.native()
+        with self.assertRaises(GuardError):
+            verify_probe_window(api, child, {'pid': 999, 'window': 456})
+
+    def test_reused_hwnd_other_owner_is_rejected(self):
+        api, child = self.native(owner=999)
+        with self.assertRaises(GuardError):
+            verify_probe_window(api, child, {'pid': 123, 'window': 456})
+
+    def test_destroyed_hwnd_is_rejected(self):
+        api, child = self.native(alive=False)
+        with self.assertRaises(GuardError):
+            verify_probe_window(api, child, {'pid': 123, 'window': 456})
+
+    def test_missing_or_invalid_hwnd_is_rejected(self):
+        for window in (None, 0, -1, '456'):
+            api, child = self.native()
+            with self.subTest(window=window), self.assertRaises(GuardError):
+                verify_probe_window(api, child, {'pid': 123, 'window': window})
+
+    def test_readiness_accepts_only_published_verified_window(self):
+        api, child = self.native()
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'ready.json'
+            path.write_text('{"pid":123,"window":456}', encoding='utf-8')
+            self.assertEqual(wait_probe_ready(api, child, path), {'pid': 123, 'window': 456})
+
+    def test_child_exit_before_ready_is_fatal(self):
+        api, child = self.native()
+        child.returncode = 7
+        child.poll.return_value = 7
+        with self.assertRaisesRegex(GuardError, 'before GUI readiness: 7'):
+            wait_probe_ready(api, child, Path('missing-probe-record'))
+
+    def test_missing_readiness_times_out_without_window_actions(self):
+        api, child = self.native()
+        with self.assertRaisesRegex(GuardError, 'deadline'):
+            wait_probe_ready(api, child, Path('missing-probe-record'), timeout=0)
+        api.IsWindow.assert_not_called()
+
+    def test_self_test_does_not_depend_on_foreground_permission_handoff(self):
+        source = (SCRIPTS / 'windows_gui_guard.py').read_text()
+        self.assertNotIn('api.AllowSetForegroundWindow(', source)
+        self.assertNotIn('sys.stdin.readline()', source)
+        self.assertLess(source.index('probe = wait_probe_ready('), source.index('driver.activate(probe_window)'))
+        self.assertIn('probe_window = verify_probe_window(api, child, probe)', source)
+        self.assertIn('api.PostMessageW(probe_window, 0x0010, 0, 0)', source)
 
 
 class NativeDiagnosticsTests(unittest.TestCase):

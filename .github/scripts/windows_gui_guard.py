@@ -519,6 +519,42 @@ def _test_window(title, window_class='STATIC'):
     return api, window
 
 
+def pump_messages(api):
+    message = wintypes.MSG()
+    while api.PeekMessageW(ctypes.byref(message), None, 0, 0, 1):
+        api.TranslateMessage(ctypes.byref(message))
+        api.DispatchMessageW(ctypes.byref(message))
+
+
+def verify_probe_window(api, child, probe):
+    """The handshake must name a live window of this exact owned subprocess."""
+    window = probe.get('window')
+    if (child.poll() is not None or probe.get('pid') != child.pid or
+            not isinstance(window, int) or window <= 0):
+        raise GuardError('Focus probe exited or returned an invalid window identity')
+    api.IsWindow.argtypes = [wintypes.HWND]
+    api.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
+    owner = wintypes.DWORD()
+    thread = api.GetWindowThreadProcessId(window, ctypes.byref(owner))
+    if not thread or not api.IsWindow(window) or owner.value != child.pid:
+        raise GuardError('Focus probe HWND does not belong to the live owned subprocess')
+    return window
+
+
+def wait_probe_ready(api, child, probe_path, timeout=10):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if child.poll() is not None:
+            raise GuardError(f'Focus probe exited before GUI readiness: {child.returncode}')
+        if probe_path.exists():
+            probe = json.loads(probe_path.read_text(encoding='utf-8'))
+            verify_probe_window(api, child, probe)
+            return probe
+        pump_messages(api)
+        time.sleep(.01)
+    raise GuardError('Focus probe did not report GUI readiness before the deadline')
+
+
 def focus_self_test(output):
     """Prove native callbacks detect an away-and-back transition before testing.
 
@@ -538,40 +574,54 @@ def focus_self_test(output):
         # desktop. A self-owned hit-tested caption is the only click permitted.
         startup_caption_focus(driver, os.getpid(), (50, 50, 300, 120), guard)
         guard.arm()
+        # The child initializes a real HWND and pumps its GUI queue before the
+        # parent attempts any focus transfer. Popen alone is not GUI readiness.
+        # The foreground parent activates that verified owned HWND directly;
+        # no AllowSetForegroundWindow permission handoff is needed.
+        import uuid
+        probe_path = Path(output) / f'focus-probe-{uuid.uuid4().hex}.json'
+        with (Path(output) / 'focus-probe-errors.log').open('w', encoding='utf-8') as errors:
+            child = subprocess.Popen([sys.executable, str(Path(__file__).resolve()), '--focus-probe', str(probe_path)],
+                                     stdout=subprocess.DEVNULL, stderr=errors,
+                                     creationflags=subprocess.CREATE_NO_WINDOW)
+        probe = wait_probe_ready(api, child, probe_path)
+        guard.check()
         paused, resume = threading.Event(), threading.Event()
         guard.test_pause = (paused, resume)
         if not api.PostThreadMessageW(guard.thread_id, 0x8002, 0, 0) or not paused.wait(5):
             raise GuardError('Could not pause the native self-test event pump')
-        probe_path = Path(output) / 'focus-probe.json'
-        child = subprocess.Popen([sys.executable, str(Path(__file__).resolve()), '--focus-probe', str(probe_path)],
-                                 stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
-                                 stderr=subprocess.DEVNULL, text=True,
-                                 creationflags=subprocess.CREATE_NO_WINDOW)
-        # Give only our disposable child the right to foreground its own window.
-        # This is a transient foreground API, not an integrity/UAC/OS setting.
-        if not api.AllowSetForegroundWindow(child.pid):
-            raise GuardError('Cannot authorize the disposable focus probe')
-        child.stdin.write('show\n')
-        child.stdin.flush()
-        # The parent owns a real HWND. Keep its native queue moving while the
-        # probe activates, rather than blocking cross-thread activation in wait().
-        message = wintypes.MSG()
-        deadline = time.monotonic() + 10
+        probe_window = verify_probe_window(api, child, probe)
+        driver.activate(probe_window)
+        probe_owner = guard.owner()
+        (Path(output) / 'focus-probe-activation.json').write_text(json.dumps({
+            'expected_pid': child.pid, 'foreground_pid': probe_owner,
+            'window': probe_window, 'activation': driver.activation}), encoding='utf-8')
+        if probe_owner != child.pid:
+            raise GuardError('Foreground parent could not activate the verified probe HWND; see focus-probe-activation.json')
+        until = time.monotonic() + .3
+        while time.monotonic() < until:
+            pump_messages(api)
+            time.sleep(.01)
+        # Close only our exact verified probe, never a title-matched foreground
+        # window. Keep the observer paused until this source HWND is destroyed.
+        verify_probe_window(api, child, probe)
+        api.PostMessageW.argtypes = [wintypes.HWND, wintypes.UINT, ctypes.c_size_t, ctypes.c_ssize_t]
+        ctypes.set_last_error(0)
+        if not api.PostMessageW(probe_window, 0x0010, 0, 0):
+            raise GuardError(f'Could not close the owned focus probe: {ctypes.get_last_error()}')
+        deadline = time.monotonic() + 5
         while child.poll() is None and time.monotonic() < deadline:
-            while api.PeekMessageW(ctypes.byref(message), None, 0, 0, 1):
-                api.TranslateMessage(ctypes.byref(message))
-                api.DispatchMessageW(ctypes.byref(message))
+            pump_messages(api)
             time.sleep(.01)
         if child.poll() is None:
-            raise GuardError('Native focus probe timed out')
+            raise GuardError('Native focus probe did not exit after its verified close request')
         if child.returncode:
-            raise GuardError('Native focus probe failed')
+            raise GuardError(f'Native focus probe failed: {child.returncode}; see focus-probe-errors.log')
         driver.activate(window)
         resume.set()
         guard.fence()
         if guard.owner() != os.getpid():
             raise GuardError('Focus self-test could not restore its own window')
-        probe = json.loads(probe_path.read_text(encoding='utf-8'))
         if not any(window == probe['window'] and pid in (0, child.pid) for window, pid in guard.foreground_events):
             raise GuardError('Native foreground hook missed the known probe window')
         if not guard.state.fault or 'Desktop focus changed' not in guard.state.fault:
@@ -596,25 +646,22 @@ if __name__ == '__main__':
     import sys
     if len(sys.argv) != 3 or sys.argv[1] != '--focus-probe' or sys.platform != 'win32':
         raise SystemExit('Only the disposable Windows foreground probe is supported')
-    if sys.stdin.readline().strip() != 'show':
-        raise SystemExit('Missing probe request')
-    from windows_desktop_input import WindowsDesktopInput
     api, window = _test_window('TeXstudio CI temporary focus obstruction')
     try:
-        Path(sys.argv[2]).write_text(json.dumps({'pid': os.getpid(), 'window': window}), encoding='utf-8')
-        driver = WindowsDesktopInput()
-        driver.activate(window)
-        api.GetForegroundWindow.restype = wintypes.HWND
-        if api.GetForegroundWindow() != window:
-            raise GuardError('Probe could not acquire foreground')
-        # Pump the test window while it owns focus, then destroy it. The monitor
-        # must retain its event even after the originating HWND/process is gone.
-        message = wintypes.MSG()
-        until = time.monotonic() + .3
-        while time.monotonic() < until:
-            while api.PeekMessageW(ctypes.byref(message), None, 0, 0, 1):
-                api.TranslateMessage(ctypes.byref(message))
-                api.DispatchMessageW(ctypes.byref(message))
+        # Atomic file publication is the readiness handshake. The window starts
+        # hidden and this process continuously pumps messages; only the verified
+        # foreground parent may activate and close it.
+        probe_path = Path(sys.argv[2])
+        temporary = probe_path.with_suffix('.tmp')
+        temporary.write_text(json.dumps({'pid': os.getpid(), 'window': window}), encoding='utf-8')
+        temporary.replace(probe_path)
+        api.IsWindow.argtypes = [wintypes.HWND]
+        deadline = time.monotonic() + 30
+        while api.IsWindow(window) and time.monotonic() < deadline:
+            pump_messages(api)
             time.sleep(.01)
+        if api.IsWindow(window):
+            raise GuardError('Focus probe timed out without its verified close request')
     finally:
-        api.DestroyWindow(window)
+        if api.IsWindow(window):
+            api.DestroyWindow(window)

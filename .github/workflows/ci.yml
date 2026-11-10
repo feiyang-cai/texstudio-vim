@@ -22,7 +22,7 @@ jobs:
       run: sudo apt-get update
 
     - name: Dependencies
-      run: sudo apt-get install cmake qt6-base-dev qt6-base-dev-tools qt6-svg-dev qt6-declarative-dev qt6-tools-dev qt6-tools-dev-tools zlib1g-dev pkg-config libhunspell-dev libquazip1-qt6-dev xvfb xauth openbox
+      run: sudo apt-get install cmake qt6-base-dev qt6-base-dev-tools qt6-svg-dev qt6-declarative-dev qt6-tools-dev qt6-tools-dev-tools zlib1g-dev pkg-config libhunspell-dev libquazip1-qt6-dev libpoppler-qt6-dev libpoppler-cpp-dev xvfb xauth openbox openssh-server texlive-latex-base
 
     - name: Configure
       run: cmake -DTEXSTUDIO_ENABLE_TESTS=ON -DTEXSTUDIO_BUILD_ADWAITA=OFF -DCMAKE_BUILD_TYPE=Debug .
@@ -39,10 +39,24 @@ jobs:
     - name: X11 desktop Vim tests
       run: xvfb-run -a bash -c 'openbox > /tmp/openbox.log 2>&1 & python3 .github/scripts/run-vim-tests.py ./texstudio'
 
+    - name: Remote workspace transport and safety tests
+      run: |
+        sudo mkdir -p /run/sshd
+        python3 tests/remote/test_agent.py
+        cmake -S tests/remote -B build-remote-tests
+        cmake --build build-remote-tests --parallel 2
+        python3 tests/remote/run_ssh_tests.py build-remote-tests/remote-workspace-tests
+        python3 tests/remote/run_ssh_tests.py build-remote-tests/remote-workspace-tests --through-loader
+
+    - name: X11 remote editor, compiler, PDF and SyncTeX
+      run: xvfb-run -a bash -c 'openbox > /tmp/remote-openbox.log 2>&1 & python3 tests/remote/run_gui_tests.py ./texstudio'
+
     - name: Save desktop diagnostics
       if: always()
       uses: actions/upload-artifact@v7
       with:
         name: vim-tests-linux-${{ github.run_id }}-${{ github.job }}
-        path: vim-test-results/
+        path: |
+          vim-test-results/
+          remote-test-results/
         if-no-files-found: warn

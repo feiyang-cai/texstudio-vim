@@ -29,11 +29,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Dependencies
-        run: brew install cmake ninja qt hunspell poppler pkg-config
+        run: bash .github/scripts/install-macos-remote-test-deps.sh
+      - uses: r-lib/actions/setup-tinytex@v2
       - name: Configure
         run: >-
           cmake -S . -B build-vim -G Ninja
-          -DCMAKE_PREFIX_PATH="$(brew --prefix qt);$(brew --prefix hunspell)"
+          -DCMAKE_PREFIX_PATH="${REMOTE_TEST_QT};$(brew --prefix hunspell)"
           -DCMAKE_DISABLE_FIND_PACKAGE_QuaZip-Qt6=ON -DCMAKE_DISABLE_FIND_PACKAGE_QuaZip=ON
           -DCMAKE_BUILD_TYPE=Debug -DTEXSTUDIO_ENABLE_TESTS=ON
           -DTEXSTUDIO_BUILD_ADWAITA=OFF -DTEXSTUDIO_ENABLE_CRASH_HANDLER=OFF
@@ -41,12 +42,22 @@ jobs:
         run: cmake --build build-vim --parallel 2
       - name: Native desktop Vim tests
         run: python3 .github/scripts/run-vim-tests.py build-vim/texstudio.app/Contents/MacOS/texstudio
+      - name: Remote workspace transport and safety tests
+        run: |
+          python3 tests/remote/test_agent.py
+          cmake -S tests/remote -B build-remote-tests -DCMAKE_PREFIX_PATH="${REMOTE_TEST_QT}"
+          cmake --build build-remote-tests --parallel 2
+          python3 tests/remote/run_ssh_tests.py build-remote-tests/remote-workspace-tests
+      - name: Native remote editor, compiler, PDF and SyncTeX
+        run: python3 tests/remote/run_gui_tests.py build-vim/texstudio.app/Contents/MacOS/texstudio
       - name: Save diagnostics
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: vim-tests-${{ matrix.runner }}
-          path: vim-test-results/
+          path: |
+            vim-test-results/
+            remote-test-results/
           if-no-files-found: warn
 
   windows:
@@ -69,6 +80,11 @@ jobs:
         shell: msys2 {0}
     steps:
       - uses: actions/checkout@v7
+      - uses: r-lib/actions/setup-tinytex@v2
+      - name: OpenSSH server for disposable loopback tests
+        shell: pwsh
+        timeout-minutes: 5
+        run: .github/scripts/prepare-remote-test-sshd.ps1
       - uses: msys2/setup-msys2@v2
         with:
           msystem: ${{ matrix.msystem }}
@@ -79,6 +95,7 @@ jobs:
             ${{ matrix.package }}-qt6-declarative ${{ matrix.package }}-qt6-tools
             ${{ matrix.package }}-qt6-svg ${{ matrix.package }}-quazip-qt6
             ${{ matrix.package }}-hunspell ${{ matrix.package }}-python
+            ${{ matrix.package }}-poppler-qt6
       - name: Configure
         run: >-
           cmake -S . -B build-vim -G Ninja -DCMAKE_BUILD_TYPE=Debug
@@ -88,10 +105,23 @@ jobs:
         run: cmake --build build-vim --parallel 2
       - name: Native desktop Vim tests
         run: python .github/scripts/run-vim-tests.py build-vim/texstudio.exe
+      - name: Remote workspace transport and safety tests
+        run: |
+          export PATH="/c/Windows/System32/OpenSSH:$PATH"
+          python tests/remote/test_agent.py
+          cmake -S tests/remote -B build-remote-tests -G Ninja
+          cmake --build build-remote-tests --parallel 2
+          python tests/remote/run_ssh_tests.py build-remote-tests/remote-workspace-tests.exe
+      - name: Native remote editor, compiler, PDF and SyncTeX
+        run: |
+          export PATH="/c/Windows/System32/OpenSSH:$PATH"
+          python tests/remote/run_gui_tests.py build-vim/texstudio.exe
       - name: Save diagnostics
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: vim-tests-${{ matrix.runner }}
-          path: vim-test-results/
+          path: |
+            vim-test-results/
+            remote-test-results/
           if-no-files-found: warn

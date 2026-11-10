@@ -2,10 +2,16 @@
 
 ## Vim revision history
 
-Vim revisions are independent of the upstream version. Major revisions use `r1`,
+Fork revisions are independent of the upstream version and cover Vim editing
+and other user-visible fork features. Major revisions use `r1`,
 `r2`, etc.; compatible fixes use `r1.1`, `r1.2`, etc. Compare components numerically,
 so `r1.10` is newer than `r1.2`. Record every Vim revision in
 [VIM_CHANGELOG.md](VIM_CHANGELOG.md); upstream-only syncs keep the Vim revision.
+
+The unreleased `4.9.10alpha1-r1.2` preview adds SSH remote workspaces while
+retaining the existing Vim engine and AppImage updater. Its revision is recorded
+in `VIM_REVISION`, but it is not an approved published baseline. Update release
+state only after a separately authorized publication has succeeded.
 
 The stable `texstudio-vim-4.9.9-r1.1` release combines upstream `4.9.9` with
 the existing Vim `r1.1` implementation and the optional AppImage updater.

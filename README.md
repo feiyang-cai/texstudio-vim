@@ -3,12 +3,13 @@
 An experimental fork of [TeXstudio](https://github.com/texstudio-org/texstudio) with native Vim-style editing. Vim mode is enabled by default for fresh configurations.
 
 See [VIM_MODE.md](VIM_MODE.md) for supported commands and limitations.
+The unreleased [SSH workspace feature](REMOTE_WORKSPACE.md) supports editing and compiling projects on another Windows, macOS or Linux computer.
 
 ## Downloads
 
 Get Linux, Windows and macOS builds from [GitHub Releases](https://github.com/feiyang-cai/texstudio-vim/releases).
 
-Versions use `texstudio-vim-<upstream-version>-r<vim-version>`, such as `texstudio-vim-4.9.9rc1-r1.1`. The Vim revision is independent of upstream; see the [Vim changelog](VIM_CHANGELOG.md).
+Versions use `texstudio-vim-<upstream-version>-r<vim-version>`, such as `texstudio-vim-4.9.9rc1-r1.1`. The fork revision is independent of upstream and covers Vim editing and added fork features; see the [version changelog](VIM_CHANGELOG.md). The unreleased remote-workspace preview uses `4.9.10alpha1-r1.2`.
 
 ## Important warning
 

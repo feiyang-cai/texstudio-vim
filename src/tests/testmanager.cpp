@@ -33,6 +33,7 @@
 #include "git_t.h"
 #include "latexdocument_t.h"
 #include "texstudio_t.h"
+#include "remoteworkspace_t.h"
 #include <QtTest/QtTest>
 
 const QRegularExpression TestToken::simpleTextRegExp ("^[A-Z'a-z0-9]+.?$");
@@ -85,7 +86,9 @@ QString TestManager::execute(TestLevel level, LatexEditorView* edView, QCodeEdit
 	totalTestTime = 0;
 	QString tr;
     QList<QObject*> tests;
-    if (vimTests) {
+    if (QCoreApplication::arguments().contains("--remote-workspace-tests")) {
+        tests << new RemoteWorkspaceGuiTest(buildManager);
+    } else if (vimTests) {
         // Isolate Vim UI checks from suites that alter shared editor state.
         tests << new LatexEditorViewTest(edView)
               << new LatexCompleterTest(edView)
@@ -162,7 +165,8 @@ QString TestManager::execute(TestLevel level, LatexEditorView* edView, QCodeEdit
     // to the system debugger or fails during application shutdown.
     const QString diagnosticDir = qEnvironmentVariable("TEXSTUDIO_TEST_SCREENSHOT_DIR");
     if (!diagnosticDir.isEmpty()) {
-        QFile report(diagnosticDir + "/vim-test-report.log");
+        QFile report(diagnosticDir + (QCoreApplication::arguments().contains("--remote-workspace-tests")
+                ? "/remote-workspace-test-report.log" : "/vim-test-report.log"));
         if (report.open(QIODevice::WriteOnly | QIODevice::Truncate))
             report.write(tr.toUtf8());
     }

@@ -211,6 +211,7 @@ class UpstreamReleaseSyncTests(unittest.TestCase):
         self.assertFalse(controller.has_approved_revision('1\n', {'vim_revision': '1.1'}))
 
     def test_required_release_gates_cover_all_packages_and_gui_environments(self):
+        self.assertIn('AppImage SSH save and remote build', controller.CD_JOBS)
         self.assertTrue({
             'verify / Linux-autoTests',
             'win10 build (msys2)',
@@ -226,6 +227,7 @@ class UpstreamReleaseSyncTests(unittest.TestCase):
             'linux appimage',
             'Mac OS X',
             'Mac OS X (M1)',
+            'AppImage SSH save and remote build',
         }), 9)
         self.assertEqual(len(controller.VIM_JOBS), 4)
 

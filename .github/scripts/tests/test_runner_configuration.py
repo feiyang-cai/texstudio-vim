@@ -18,13 +18,25 @@ DESKTOP_RUNNERS = {
 LINUX_DISTROS = {'ubuntu-22.04', 'ubuntu-24.04', 'debian-12', 'debian-13', 'fedora-43'}
 
 
+def macos_runner_labels(source):
+    # A helper path such as install-macos-remote-test-deps.sh is not a runner.
+    # Keep unknown/retired standalone labels visible to the strict set check.
+    return set(re.findall(r'(?<![\w/-])macos-[\w-]+(?![\w/-])', source))
+
+
 class RunnerConfigurationTests(unittest.TestCase):
     def test_active_workflows_keep_both_mac_architectures_on_supported_runners(self):
         for filename in ('cd.yml', 'vim-platforms.yml', 'packaged-gui.yml'):
             with self.subTest(workflow=filename):
                 source = (ROOT / '.github/workflows' / filename).read_text()
-                self.assertEqual(set(re.findall(r'macos-[\w-]+', source)),
+                self.assertEqual(macos_runner_labels(source),
                                  {'macos-15', 'macos-15-intel'})
+
+    def test_runner_labels_exclude_helper_paths_without_hiding_retired_runners(self):
+        source = ('runner: [macos-15, macos-15-intel, macos-14, macos-retired]\n'
+                  'run: bash .github/scripts/install-macos-remote-test-deps.sh\n')
+        self.assertEqual(macos_runner_labels(source),
+                         {'macos-15', 'macos-15-intel', 'macos-14', 'macos-retired'})
 
     def test_controller_still_requires_all_four_native_desktops(self):
         self.assertEqual(controller.VIM_JOBS,

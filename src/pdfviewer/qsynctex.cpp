@@ -16,6 +16,7 @@
  */
 
 #include "qsynctex.h"
+#include "remoteworkspace/remoteclient.h"
 
 #include <QDir>
 
@@ -78,13 +79,13 @@ QFileInfo Scanner::getNameFileInfo(const QDir &curDir, const Node &node, const c
 	if (rawName) *rawName = synctex_name;
 	if (!synctex_name) return QFileInfo();
 
-	fileinfo = QFileInfo(curDir, QFile::decodeName(synctex_name)); //old synctex
+	fileinfo = QFileInfo(curDir, RemoteWorkspace::mapSourcePath(curDir.absolutePath(), QFile::decodeName(synctex_name))); //old synctex
 	if (fileinfo.exists()) return fileinfo;
 
-	fileinfo = QFileInfo(curDir, QString::fromUtf8(synctex_name)); //new synctex
+	fileinfo = QFileInfo(curDir, RemoteWorkspace::mapSourcePath(curDir.absolutePath(), QString::fromUtf8(synctex_name))); //new synctex
 	if (fileinfo.exists()) return fileinfo;
 
-	fileinfo = QFileInfo(curDir, QString::fromLatin1(synctex_name)); //for safety (not used afaik)
+	fileinfo = QFileInfo(curDir, RemoteWorkspace::mapSourcePath(curDir.absolutePath(), QString::fromLatin1(synctex_name))); //for safety (not used afaik)
 	if (fileinfo.exists()) return fileinfo;
 
 	return QFileInfo();

@@ -2,6 +2,8 @@ INCLUDEPATH += $$PWD
 DEPENDPATH += $$PWD
 
 HEADERS += \
+    $$PWD/remoteworkspace/remoteclient.h \
+    $$PWD/remoteworkspace/remoteworkspace.h \
     $$PWD/aboutdialog.h \
     $$PWD/aichatassistant.h \
     $$PWD/aiquerystoragemodel.h \
@@ -116,6 +118,9 @@ HEADERS += \
     $$PWD/terminal_config.h
 
 SOURCES += \
+    $$PWD/remoteworkspace/remoteclient.cpp \
+    $$PWD/remoteworkspace/remoteworker.cpp \
+    $$PWD/remoteworkspace/remoteworkspace.cpp \
     $$PWD/aboutdialog.cpp \
     $$PWD/additionaltranslations.cpp \
     $$PWD/aichatassistant.cpp \
@@ -245,3 +250,5 @@ FORMS += \
     $$PWD/usermenudialog.ui \
     $$PWD/userquickdialog.ui \
     $$PWD/webpublishdialog.ui
+
+RESOURCES += $$PWD/remoteworkspace/remote.qrc

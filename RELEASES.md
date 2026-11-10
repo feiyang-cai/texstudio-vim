@@ -103,11 +103,16 @@ both retain the approved `VIM_REVISION`. Sync PRs cannot change workflow,
 action, script, test, package
 identity, or publication controls.
 
-After merge, the trusted controller stages the tested application tree with the
-current base-branch `.github` tree, then reruns CD and Vim-platform checks on that
-exact release candidate. This ensures the tag's CD release job enforces the
-publication switch even though release source commits are based on earlier
-published tags.
+After merge, the trusted controller stages the exact integration tree formed
+from the reviewed base and sync-head commits, with the current trusted
+base-branch `.github` tree. The staged commit is a single child of that integration
+merge, not of the older sync head. This retains already-reviewed base-branch
+application changes such as the stable AppImage updater. Before staging, tagging,
+and recording publication, the controller verifies the merge's ordered parents,
+reconstructs its tree from those exact inputs, and verifies the complete staged
+tree against the integration plus trusted `.github` overlay. It then requires
+CD and Vim-platform checks on the exact release candidate. A later controller
+change invalidates the old overlay; it cannot silently change tested artifacts.
 
 Dry-run procedure: run **Actions → Upstream release sync → Run workflow** on the
 default branch. `.github/upstream-release-policy.json` defaults to
@@ -132,6 +137,12 @@ on the merge commit, creates an immutable fork tag only after those checks pass,
 and dispatches `CD` on that tag. Publication waits for all platform builds and
 all nine packaged GUI checks. Stable and prerelease progress is recorded
 separately only after the matching fork release is published.
+
+Apple Silicon build, native-test, and packaged-GUI jobs use `macos-15`;
+Intel Mac jobs use `macos-15-intel`. Required-job validation uses the same runner
+names and still requires both architectures, all four native desktop jobs, and
+all nine packaged GUI environments. Unsupported runner configuration, cancellation,
+or skipped jobs do not count as successful validation.
 
 GitHub-required approval of Copilot workflow runs is not bypassed. Syncs preserve
 the approved Vim baseline and `VIM_REVISION`; changing either requires an
@@ -186,7 +197,12 @@ also blocks unattended promotion. The `upstream-human-validation-required` label
 can additionally flag concerns found during review.
 The controller compares the candidate tree with Git's automatic merge of the
 pinned fork and upstream commits. Conflicts or additional edits require a human
-even when described as Vim compatibility fixes. Before merging or tagging, the
+even when described as Vim compatibility fixes. It also compares the reviewed
+integration tree with the sync candidate: any additional non-`.github` content
+from the base branch requires human validation, even if the pinned candidate
+was an unmodified automatic merge. Both the integrated and staged source must
+retain the approved Vim revision; a revision match alone does not approve
+base-branch implementation changes. Before merging or tagging, the
 latest review from a configured `human_validation_reviewers` account must approve
 the exact head and follow the current base snapshot. Only `feiyang-cai` is
 configured initially. New commits or base changes require fresh validation;

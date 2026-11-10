@@ -26,7 +26,8 @@ class WindowsDesktopInput:
     keys = {'esc': 0x1b, 'enter': 0x0d, 'ctrl': 0x11, 'shift': 0x10, 'alt': 0x12, 'tab': 0x09}
 
     def __init__(self):
-        self.api = ctypes.windll.user32
+        self.api = ctypes.WinDLL('user32', use_last_error=True)
+        self.input_guard = None
         self.api.SendInput.argtypes = [wintypes.UINT, ctypes.POINTER(Input), ctypes.c_int]
         self.api.SendInput.restype = wintypes.UINT
         self.api.VkKeyScanW.argtypes = [wintypes.WCHAR]
@@ -36,8 +37,12 @@ class WindowsDesktopInput:
             raise RuntimeError('Unexpected Win32 input structure layout')
 
     def send(self, item):
+        if self.input_guard:
+            self.input_guard()
         if self.api.SendInput(1, ctypes.byref(item), ctypes.sizeof(Input)) != 1:
             raise RuntimeError('Windows rejected SendInput; check the interactive desktop and integrity level')
+        if self.input_guard:
+            self.input_guard()
 
     def key(self, vk, up=False):
         self.send(Input(type=1, value=InputUnion(keyboard=KeyboardInput(vk=vk, flags=2 if up else 0))))
@@ -84,6 +89,9 @@ class WindowsDesktopInput:
 
     def activate(self, hwnd):
         api = self.api
+        api.GetForegroundWindow.restype = ctypes.c_void_p
+        api.ShowWindow.argtypes = [ctypes.c_void_p, ctypes.c_int]
+        api.SetForegroundWindow.argtypes = [ctypes.c_void_p]
         api.GetWindowThreadProcessId.argtypes = [ctypes.c_void_p, ctypes.POINTER(wintypes.DWORD)]
         api.GetWindowThreadProcessId.restype = wintypes.DWORD
         api.AttachThreadInput.argtypes = [wintypes.DWORD, wintypes.DWORD, wintypes.BOOL]
@@ -99,8 +107,9 @@ class WindowsDesktopInput:
         self.activation = {'target_thread': target, 'foreground_thread': foreground, 'current_thread': current, 'attachments': []}
         try:
             for thread in {target, foreground} - {current, 0}:
+                ctypes.set_last_error(0)
                 success = bool(api.AttachThreadInput(current, thread, True))
-                self.activation['attachments'].append({'thread': thread, 'success': success, 'error': ctypes.windll.kernel32.GetLastError()})
+                self.activation['attachments'].append({'thread': thread, 'success': success, 'error': 0 if success else ctypes.get_last_error()})
                 if success:
                     attached.append(thread)
             api.ShowWindow(hwnd, 9)

@@ -6,6 +6,7 @@ on:
       - .github/scripts/package_identity.py
       - .github/scripts/smoke-appimage.py
       - .github/scripts/windows_desktop_input.py
+      - .github/scripts/windows_gui_guard.py
       - .github/scripts/prepare-windows-gui.ps1
       - .github/scripts/select-gui-build.py
       - .github/workflows/packaged-gui.yml
@@ -77,6 +78,7 @@ jobs:
         run: python -m pip install pyautogui pillow
       - name: Packaged OS keyboard and mouse tests
         env:
+          TEXSTUDIO_HOSTED_WSL_GUARD: ${{ matrix.runner == 'windows-11-arm' && '1' || '0' }}
           BUILD_SHA: ${{ needs.select.outputs.sha }}
         run: python .github/scripts/smoke-native-package.py
       - name: Save GUI diagnostics

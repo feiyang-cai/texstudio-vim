@@ -472,6 +472,7 @@ jobs:
         run: python -m pip install pyautogui pillow
       - name: Packaged OS keyboard and mouse tests
         env:
+          TEXSTUDIO_HOSTED_WSL_GUARD: ${{ matrix.runner == 'windows-11-arm' && '1' || '0' }}
           BUILD_SHA: ${{ github.sha }}
         run: python .github/scripts/smoke-native-package.py
       - name: Save GUI diagnostics

@@ -14,6 +14,7 @@ import pyautogui as gui
 from package_identity import package_identity
 
 input_driver = gui
+focus_guard = updater_guard = None
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--packages', default='native-package')
@@ -100,59 +101,16 @@ def activate(pid):
             return result[0]
     return None
 
-def ensure_windows_input_focus(recover=True):
-    if sys.platform == 'darwin':
-        return
-    api = ctypes.windll.user32
-    api.GetForegroundWindow.restype = ctypes.c_void_p
-    foreground = api.GetForegroundWindow()
-    owner = ctypes.c_ulong()
-    api.GetWindowThreadProcessId(foreground, ctypes.byref(owner))
-    if owner.value == process.pid:
-        return
-    api.GetWindowTextLengthW.argtypes = [ctypes.c_void_p]
-    api.GetWindowTextW.argtypes = [ctypes.c_void_p, ctypes.c_wchar_p, ctypes.c_int]
-    title = ctypes.create_unicode_buffer(api.GetWindowTextLengthW(foreground) + 1)
-    api.GetWindowTextW(foreground, title, len(title))
-    gui.screenshot().save(output / 'interrupted-desktop.png')
-    details = {'expected_pid': process.pid, 'foreground_pid': owner.value,
-               'foreground_title': title.value, 'recover': recover}
-    with (output / 'focus-interruptions.jsonl').open('a', encoding='utf-8') as log:
-        log.write(json.dumps(details) + '\n')
-    if not recover:
-        # A key may have gone to the other window. Never replay an editing
-        # command or accept its result after an interruption during input.
-        raise RuntimeError(f'Desktop focus changed during input: {details!r}')
-    # Hosted runners can launch a terminal after initial desktop preparation.
-    # Bring the test app forward before input, without closing unrelated windows.
-    # Close only the positively identified WSL first-login prompt.
-    if 'wsl.exe' in title.value.lower():
-        print('Closing delayed hosted-runner WSL setup:', title.value, flush=True)
-        api.PostMessageW.argtypes = [ctypes.c_void_p, ctypes.c_uint, ctypes.c_size_t, ctypes.c_ssize_t]
-        api.PostMessageW(foreground, 0x0010, 0, 0) # WM_CLOSE
-        time.sleep(.5)
-    else:
-        print('Restoring test app focus before input:', json.dumps(details), flush=True)
-    geometry = activate(process.pid)
-    if not geometry:
-        raise RuntimeError('Application window missing while restoring desktop focus')
-    x, y, width, height = geometry
-    # Click the native caption, not the editor: editor clicks change the Vim
-    # cursor and can corrupt a pending motion or Visual selection.
-    input_driver.click(x + width // 2, y + 12)
-    time.sleep(.2)
-    api.GetWindowThreadProcessId(api.GetForegroundWindow(), ctypes.byref(owner))
-    if owner.value != process.pid:
-        raise RuntimeError('Application did not regain desktop focus')
-
 def type_keys(text):
-    if sys.platform == 'darwin':
-        input_driver.write(text, interval=.09)
-        return
-    for char in text:
-        ensure_windows_input_focus()
-        input_driver.write(char, interval=.09)
-        ensure_windows_input_focus(recover=False)
+    input_driver.write(text, interval=.09)
+
+
+class InputGuards:
+    def check(self):
+        if updater_guard:
+            updater_guard.check()
+        focus_guard.check()
+
 
 def save_and_check(label, expected):
     type_keys(':w')
@@ -168,8 +126,19 @@ def save_and_check(label, expected):
     raise RuntimeError(f'{label}: desktop input or editing failed; expected {expected!r}, got {actual!r}')
 
 with (output / 'application.log').open('w') as log:
-    process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT)
+    if sys.platform != 'darwin':
+        from windows_gui_guard import WindowsFocusGuard, WindowsUpdaterGuard, GuardedInput, focus_self_test, startup_caption_focus
+        if os.environ.get('TEXSTUDIO_HOSTED_WSL_GUARD') == '1':
+            updater_guard = WindowsUpdaterGuard(output)
+    process = None
     try:
+        if updater_guard:
+            updater_guard.quiet()
+        if sys.platform != 'darwin':
+            focus_self_test(output)
+        process = subprocess.Popen(command, stdout=log, stderr=subprocess.STDOUT)
+        if sys.platform != 'darwin':
+            focus_guard = WindowsFocusGuard(process.pid, output)
         deadline = time.monotonic() + 45
         geometry = None
         while not geometry and time.monotonic() < deadline:
@@ -182,19 +151,15 @@ with (output / 'application.log').open('w') as log:
         # The title appears before startup finishes arranging the editor/docks.
         # Re-read geometry after startup so the click uses the final editor area.
         time.sleep(3)
-        if sys.platform != 'darwin':
-            # First-login setup can leave the Start menu over the app window.
-            input_driver.press('esc')
-            time.sleep(.2)
         geometry = activate(process.pid)
         if not geometry:
             raise RuntimeError('Fixture window disappeared during startup')
         (output / 'window.json').write_text(json.dumps(geometry))
         x, y, width, height = geometry
-        input_driver.click(x + width * 2 // 3, y + height // 4)
-        time.sleep(.5)
-        gui.screenshot().save(output / 'before-input.png')
+        # Startup activation is the only recovery. Never send Escape, close a
+        # title-matched Terminal, or click until ownership has been verified.
         if sys.platform != 'darwin':
+            startup_caption_focus(input_driver, process.pid, geometry, focus_guard)
             owner = ctypes.c_ulong()
             foreground = user32.GetForegroundWindow()
             user32.GetWindowThreadProcessId(ctypes.c_void_p(foreground), ctypes.byref(owner))
@@ -218,6 +183,21 @@ with (output / 'application.log').open('w') as log:
             print('Desktop focus:', json.dumps(details))
             if owner.value != process.pid:
                 raise RuntimeError('Desktop focus did not reach the packaged application')
+            # A brief stable desktop is a readiness check, not a guarantee that
+            # the runner will never open a later window. Later theft is fatal.
+            until = time.monotonic() + 2
+            while time.monotonic() < until:
+                InputGuards().check()
+                time.sleep(.05)
+            if updater_guard:
+                updater_guard.quiet()
+                updater_guard.arm()
+            focus_guard.arm()
+            input_driver.input_guard = InputGuards().check
+            input_driver = GuardedInput(input_driver, InputGuards())
+        input_driver.click(x + width * 2 // 3, y + height // 4)
+        time.sleep(.5)
+        gui.screenshot().save(output / 'before-input.png')
         input_driver.press('esc')
         type_keys('gg0"ayyjdd"aP')
         save_and_check('default-vim-registers', ['one', 'one', 'three'])
@@ -257,11 +237,21 @@ with (output / 'application.log').open('w') as log:
         save_and_check('visual-block', ['ONE', 'E', 'Three'])
         type_keys('u')
         save_and_check('visual-block-undo', ['ZBONE', 'ONE', 'Three'])
+        if updater_guard:
+            updater_guard.finish()
+        if focus_guard:
+            focus_guard.finish()
         (output / 'result.json').write_text(json.dumps({'status':'passed', 'input':'OS keyboard and mouse', 'default':'Vim'}))
     finally:
         try:
             gui.screenshot().save(output / 'desktop.png')
         finally:
-            if process.poll() is None:
-                process.kill()
-                process.wait(timeout=15)
+            try:
+                if focus_guard:
+                    focus_guard.close()
+                if updater_guard:
+                    updater_guard.close()
+            finally:
+                if process and process.poll() is None:
+                    process.kill()
+                    process.wait(timeout=15)

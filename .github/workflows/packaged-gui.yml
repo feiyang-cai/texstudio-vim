@@ -56,7 +56,7 @@ jobs:
             artifact: texstudio-vim-win-arm-qt6-zip
           - runner: macos-15-intel
             artifact: texstudio-osx
-          - runner: macos-14
+          - runner: macos-15
             artifact: texstudio-vim-osx-m1
     steps:
       - uses: actions/checkout@v7

@@ -1,5 +1,5 @@
 # simpleicons package
-# Matthew Bertucci 2026/10/09 for v16.34.0
+# Matthew Bertucci 2026/10/30 for v16.36.0
 
 #include:iftex
 
@@ -239,6 +239,7 @@ asciidoctor
 asciinema
 asda
 aseprite
+aspire
 assemblyscript
 asterisk
 astonmartin
@@ -1290,6 +1291,7 @@ h2database
 handshake
 handshakeprotocol
 happycow
+haproxy
 harbor
 harmonyos
 hashcat
@@ -3447,6 +3449,7 @@ zendesk
 zenn
 zenodo
 zensar
+zensical
 zerodha
 zerotier
 zettlr

@@ -1462,7 +1462,7 @@ void QEditor::gotoLine()
 		// makes sense hiding this one if present...
 		m->sendPanelCommand("Search", "hide");
 		
-		m->sendPanelCommand("Goto", "show");
+		m->sendPanelCommand("Goto", "display");
 	} else {
 		QGotoLineDialog dlg(this);
 		
@@ -2620,22 +2620,31 @@ void QEditor::paste()
 		insertFromMimeData(d);
 }
 
-static bool unindent(const QDocumentCursor& cur)
+static int unindentCount(const QDocumentCursor& cur)
 {
-	QDocumentLine beg(cur.line());
-	int r = 0, n = 0, t = QDocument::tabStop();
-	QString txt = beg.text().left(beg.firstChar());
+    QDocumentLine beg(cur.line());
+    int r = 0, n = 0, t = QDocument::tabStop();
+    QString txt = beg.text().left(beg.firstChar());
 
     while ( txt.size() && (n < t) )
-	{
-		if ( txt.at(txt.length() - 1) == '\t' )
-			n += t - (n % t);
-		else
-			++n;
+    {
+        if ( txt.at(txt.length() - 1) == '\t' )
+            n += t - (n % t);
+        else
+            ++n;
 
-		++r;
-		txt.chop(1);
-	}
+        ++r;
+        txt.chop(1);
+    }
+
+    return r;
+}
+
+static bool unindent(const QDocumentCursor& cur,int maxRemove = -1)
+{
+    int r = unindentCount(cur);
+    if ( maxRemove >= 0 && r > maxRemove )
+        r = maxRemove;
 
 	if ( !r )
 		return false;
@@ -2799,11 +2808,15 @@ void QEditor::unindentSelection()
 			if ( s.end == 0 && s.startLine < s.endLine )
 				s.endLine--; //only change last line if there is selected text
 
+            // remove the same number of characters for all cursors to keep them aligned
+            int maxRemove = -1;
+            maxRemove = unindentCount(m_cursor);
+
 			m_doc->beginMacro();
 
 			for ( int i = s.startLine; i <= s.endLine; ++i )
 			{
-				unindent(QDocumentCursor(m_doc, i));
+                unindent(QDocumentCursor(m_doc, i),maxRemove);
 			}
 
 			m_doc->endMacro();

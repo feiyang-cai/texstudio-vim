@@ -23,6 +23,9 @@ class UpstreamAIReviewTests(unittest.TestCase):
         classification_patch = patch.object(controller, 'upstream_changes_need_human', return_value=False)
         classification_patch.start()
         self.addCleanup(classification_patch.stop)
+        integration_patch = patch.object(controller, 'integration_changes_need_human', return_value=False)
+        integration_patch.start()
+        self.addCleanup(integration_patch.stop)
         self.snapshot = {'description': 'b' * 40, 'created_at': '2026-10-01T00:00:00Z'}
         self.snapshot_patch = patch.object(controller, 'review_base_snapshot', return_value=self.snapshot)
         self.snapshot_patch.start()
@@ -285,9 +288,9 @@ class UpstreamAIReviewTests(unittest.TestCase):
                     patch.object(controller, 'workflows_pass', return_value=True), \
                     patch.object(controller.subprocess, 'run'), \
                     patch.object(controller.subprocess, 'check_output', return_value=run['head_sha']), \
-                    patch.object(controller, 'api', side_effect=[
-                        {'parents': [{'sha': 'a' * 40}]},
-                        {'parents': [{'sha': 'b' * 40}, {'sha': 'a' * 40}]}]), \
+                    patch.object(controller, 'api', return_value={
+                        'parents': [{'sha': 'f' * 40}]}), \
+                    patch.object(controller, 'verify_reviewed_merge', return_value='b' * 40), \
                     patch.object(controller, 'sync_pr_for_commit', return_value=pr), \
                     patch.object(controller, 'resolve_upstream_tag', return_value='c' * 40), \
                     patch.object(controller, 'validate_sync_metadata'), \

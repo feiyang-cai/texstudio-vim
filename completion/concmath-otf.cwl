@@ -1,10 +1,11 @@
 # concmath-otf package
-# Matthew Bertucci 2025/10/29 for v0.70
+# Matthew Bertucci 2026/11/02 for v0.78
 
 #include:iftex
 #include:unicode-math
 
 #keyvals:\usepackage/concmath-otf#c
+lum
 no-text
 tight
 loose
@@ -12,10 +13,12 @@ math-style=#ISO,TeX,french,upright
 bold-style=#ISO,TeX,upright
 nabla=#italic,upright,literal
 partial=#italic,upright,literal
+Numbers=
 CharacterVariant=%<number%>
 CharacterVariant={%<glyph num list%>:%<variety num%>}
 StylisticSet=#3,4,5,6
 Style=#leqslant,smaller,subsetneq,upint
+Scale=%<factor%>
 #endkeyvals
 
 # text or math mode commands
@@ -50,6 +53,7 @@ Style=#leqslant,smaller,subsetneq,upint
 \gggtr#m
 \gtreqqslantless#m
 \gtreqslantless#m
+\gtrsimslant#m
 \gvertneqq#m
 \harrowextender#*m
 \intextender#*m
@@ -58,6 +62,7 @@ Style=#leqslant,smaller,subsetneq,upint
 \leqqslant#m
 \lesseqqslantgtr#m
 \lesseqslantgtr#m
+\lesssimslant#m
 \lgblkcircle#m
 \lgblksquare#m
 \lgwhtsquare#m
@@ -86,6 +91,7 @@ Style=#leqslant,smaller,subsetneq,upint
 \mscre#*m
 \mscrg#*m
 \mscro#*m
+\mupvarzero#*m
 \ngeqq#m
 \ngeqqslant#m
 \ngeqslant#m
@@ -95,9 +101,7 @@ Style=#leqslant,smaller,subsetneq,upint
 \npreceq#m
 \nshortmid#m
 \nshortparallel#m
-\nsubseteqq#m
 \nsucceq#m
-\nsupseteqq#m
 \ntriangleleft#m
 \ntriangleright#m
 \overrightarc{arg}#m
@@ -274,4 +278,5 @@ Style=#leqslant,smaller,subsetneq,upint
 \mitsansvarpi#*m
 
 # not documented
-\CCMtoks#*
+\CCMtoks#S
+\CCMScale#S

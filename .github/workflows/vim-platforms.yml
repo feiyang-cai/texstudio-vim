@@ -23,7 +23,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [macos-15-intel, macos-14]
+        runner: [macos-15-intel, macos-15]
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     steps:
